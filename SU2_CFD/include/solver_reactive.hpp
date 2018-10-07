@@ -28,6 +28,7 @@ protected:
   const unsigned short nSpecies; /*!< \brief Total number of species. */
 
   unsigned long nMarker;         /*!< \brief Total number of markers using the grid information. */
+  std::unique_ptr<unsigned long[]> nVertex;         /*!< \brief Total number of vertices using the grid information. */
 
   su2double  Gamma,              /*!< \brief Mixture Cp/Cv. */
 	           Gamma_Minus_One;	   /*!< \brief Mixture Cp/Cv - 1. */
@@ -37,11 +38,11 @@ protected:
              Pressure_Inf,		  /*!< \brief Free stream pressure. */
 	           Temperature_Inf;   /*!< \brief Trans.-rot. free stream temperature. */
 
-  RealVec    Density,       /*!< \brief Free stream species density. */
+  SmartArr   Density,       /*!< \brief Free stream species density. */
              Velocity_Inf,  /*!< \brief Free stream flow velocity. */
              MassFrac_Inf;  /*!< \brief Free stream species mass fraction. */
 
-  RealVec    Sol_i,  /*!< \brief Auxiliary vector for storing the solution at point i. */
+  SmartArr   Sol_i,  /*!< \brief Auxiliary vector for storing the solution at point i. */
              Sol_j,      /*!< \brief Auxiliary vector for storing the solution at point j. */
              Primitive,    /*!< \brief Auxiliary nPrimVar vector. */
              Primitive_i,        /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point i. */
@@ -60,7 +61,7 @@ public:
 	 * \param[in] geometry - Geometrical definition of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
-	 CReactiveEulerSolver(std::unique_ptr<CGeometry> geometry, std::unique_ptr<CConfig> config);
+	 CReactiveEulerSolver(std::unique_ptr<CGeometry> geometry, std::unique_ptr<CConfig> config,unsigned short iMesh);
 
 	/*!
 	 * \brief Destructor of the class.

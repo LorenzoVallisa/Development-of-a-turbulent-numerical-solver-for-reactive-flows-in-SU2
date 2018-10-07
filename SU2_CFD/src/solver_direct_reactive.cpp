@@ -1,10 +1,10 @@
 #include "../include/solver_reactive.hpp"
-#include "../Common/reacting_model_library.hpp"
+#include "../../Common/include/reacting_model_library.hpp"
 #include "../../Common/include/not_implemented_exception.hpp"
 #include "../../Common/include/move_pointer.hpp"
 
 namespace {
-  using CReactiveEulerSolver::SmartArr = SmartArr;
+  using SmartArr = CReactiveEulerSolver::SmartArr;
   /*!
    * \brief Compute area for the current normal
    */
@@ -22,21 +22,127 @@ namespace {
 /*--- Class constructor ---*/
 //
 //
-CReactiveEulerSolver::CReactiveEulerSolver(std::unique_ptr<CGeometry> geometry, std::unique_ptr<CConfig> config):
-                      CSolver(),library(new Framework::ReactingModelLibrary(config->GetLibraryName())) {
+CReactiveEulerSolver::CReactiveEulerSolver(std::unique_ptr<CGeometry> geometry, std::unique_ptr<CConfig> config,unsigned short iMesh):
+                      CSolver(),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),nSpecies(library->GetNSpecies()) {
 
-  nSpecies = library->GetNSpecies();
+  unsigned long iPoint, iVertex;
+  unsigned short iVar, iDim, iMarker;
+
   nMarker  = config->GetnMarker_All();
+
+  nVar = geometry->GetnDim();
+  nPrimVar = nSpecies + nDim + 2;
+  nPrimVarGrad = nSpecies + nDim + 5;
+
+  /*--- Perform the non-dimensionalization for the flow equations using the
+   specified reference values. ---*/
+  SetNondimensionalization(geometry.get(), config.get(), iMesh);
+
+	/*--- Store the number of vertices on each marker for deallocation ---*/
+	nVertex = std::unique_ptr<unsigned long[]>(new unsigned long[nMarker]);
+	for (iMarker = 0; iMarker < nMarker; iMarker++)
+		nVertex[iMarker] = geometry->nVertex[iMarker];
+
+	/*--- Allocate a CVariable array for each node of the mesh ---*/
+	node = new CVariable*[nPoint];
+
+	/*--- Define some auxiliary vectors related to the residual ---*/
+	Residual = new su2double[nVar];
+  for (iVar = 0; iVar < nVar; ++iVar)
+    Residual[iVar] = 0.0;
+
+  Residual_RMS = new su2double[nVar];
+  for (iVar = 0; iVar < nVar; ++iVar)
+    Residual_RMS[iVar] = 0.0;
+
+  Residual_Max = new su2double[nVar];
+  for (iVar = 0; iVar < nVar; ++iVar)
+    Residual_Max[iVar] = 0.0;
+
+  Residual_i = new su2double[nVar];
+  for (iVar = 0; iVar < nVar; ++iVar)
+    Residual_i[iVar] = 0.0;
+
+  Residual_j = new su2double[nVar];
+  for (iVar = 0; iVar < nVar; ++iVar)
+    Residual_j[iVar]   = 0.0;
+
+  Res_Conv = new su2double[nVar];
+  for (iVar = 0; iVar < nVar; ++iVar)
+    Res_Conv[iVar] = 0.0;
+
+  Res_Visc = new su2double[nVar];
+  for (iVar = 0; iVar < nVar; ++iVar)
+    Res_Visc[iVar] = 0.0;
+
+  Res_Sour = new su2double[nVar];
+  for (iVar = 0; iVar < nVar; ++iVar)
+    Res_Sour[iVar] = 0.0;
+
+	/*--- Define some structure for locating max residuals ---*/
+	Point_Max = new unsigned long[nVar];
+  for (iVar = 0; iVar < nVar; ++iVar)
+    Point_Max[iVar] = 0;
+
+  Point_Max_Coord = new su2double*[nVar];
+	for (iVar = 0; iVar < nVar; ++iVar){
+		Point_Max_Coord[iVar] = new su2double[nDim];
+		for (iDim = 0; iDim < nDim; ++iDim)
+      Point_Max_Coord[iVar][iDim] = 0.0;
+	}
+
+  /*--- Allocate vectors related to the solution ---*/
+  Sol_i = SmartArr(new su2double[nVar]);
+  Sol_j = SmartArr(new su2double[nVar]);
+  Primitive = SmartArr(new su2double[nPrimVar]);
+  Primitive_i = SmartArr(new su2double[nPrimVar]);
+  Primitive_j = SmartArr(new su2double[nPrimVar]);
+
+  /*--- Allocate arrays for conserved variable limits ---*/
+  /*lowerlimit = new su2double[nVar];
+  upperlimit = new su2double[nVar];
+  using RHO_INDEX_SOL = CReactiveEulerVariable::RHO_INDEX_SOL
+  using VX_INDEX_SOL = CReactiveEulerVariable::VX_INDEX_SOL;
+  using RHOE_INDEX_SOL = CReactiveEulerVariable::RHOE_INDEX_SOL;
+  lowerlimit[RHO_INDEX_SOL] = 0.0;
+  upperlimit[RHO_INDEX_SOL] = 1E16;
+  for (iVar = VX_INDEX_SOL; iSpecies < VX_INDEX_SOL + nDim; ++iSpecies) {
+    lowerlimit[iSpecies] = -1E16;
+    upperlimit[iSpecies] = 1E16;
+  }
+  for (iVar = RHOE_INDEX_SOL; iVar < nVar; ++iVar) {
+    lowerlimit[iVar] = 0;
+    upperlimit[iVar] = 1E16;
+  }*/
+
+
+  /*--- Initialize the solution & residual CVectors ---*/
+ 	LinSysSol.Initialize(nPoint, nPointDomain, nVar, 0.0);
+  LinSysRes.Initialize(nPoint, nPointDomain, nVar, 0.0);
+
+  /*--- Create the structure for storing extra information ---*/
+ 	if (config->GetExtraOutput()) {
+    nOutputVariables = nVar;
+    OutputVariables.Initialize(nPoint, nPointDomain, nOutputVariables, 0.0);
+  }
+
+	/*--- Allocate Jacobians for implicit time-stepping ---*/
+	if (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT) {
+    implicit = true;
+		Jacobian_i = new su2double* [nVar];
+		Jacobian_j = new su2double* [nVar];
+		for (iVar = 0; iVar < nVar; iVar++) {
+			Jacobian_i[iVar] = new su2double [nVar];
+			Jacobian_j[iVar] = new su2double [nVar];
+		}
+  }
+  else
+    implicit = false;
 
   if (config->GetKind_ConvNumScheme_Flow() == SPACE_CENTERED )
     space_centered = true;
   else
     space_centered = false;
-
-  if (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT)
-    implicit = true;
-  else
-    implicit = false;
 
   if (config->GetKind_Gradient_Method() == WEIGHTED_LEAST_SQUARES)
     least_squares = true;
@@ -46,19 +152,26 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::unique_ptr<CGeometry> geometry, 
   Gamma = library->Gamma();
   Gamma_Minus_One = Gamma - 1.0;
 
-  Density_Inf        = config->GetDensity_FreeStream();
-  Pressure_Inf       = config->GetPressure_FreeStream();
-	Temperature_Inf    = config->GetTemperature_FreeStream();
+  Density_Inf        = config->GetDensity_FreeStreamND();
+  Pressure_Inf       = config->GetPressure_FreeStreamND();
+	Temperature_Inf    = config->GetTemperature_FreeStreamND();
   Mach_Inf           = config->GetMach();
 
-  Velocity_Inf       = library->GetVelocity_FreeStream();
-  MassFrac_Inf       = library->GetMassFrac_FreeStream();
+  Velocity_Inf       = Common::wrap_in_unique(config->GetVelocity_FreeStreamND());
+  //MassFrac_Inf       = library->GetMassFrac_FreeStream();
 
-  Sol_i.resize(nVar);
-  Sol_j.resize(nVar);
-  Primitive.resize(nPrimVar);
-  Primitive_i.resize(nPrimVar);
-  Primitive_j.resize(nPrimVar);
+  //node_infty = new CReactiveEulerVariable(Pressure_Inf, MassFrac_Inf,Velocity_Inf, Temperature_Inf,
+  //                                       nDim, nVar,nPrimVar, nPrimVarGrad, config);
+
+  /*--- Initialize the solution to the far-field state everywhere. ---*/
+  //for (iPoint = 0; iPoint < nPoint; iPoint++)
+    //node[iPoint] = new CReactiveEulerVariable(Pressure_Inf, MassFrac_Inf, Velocity_Inf, Temperature_Inf,
+    //                                          nDim, nVar, nPrimVar, nPrimVarGrad,config);
+
+  /*--- USE ANOTHER FUNCTION TO CHECK THAT THE INITIAL SOLUTION IS PHYSICAL ---*/
+
+  /*--- MPI solution ---*/
+	Set_MPI_Solution(geometry.get(), config.get());
 
 }
 
@@ -68,7 +181,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::unique_ptr<CGeometry> geometry, 
  * \brief Set the fluid solver nondimensionalization.
  */
  void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig* config, unsigned short iMesh) {
-   
+
  }
 //
 //
@@ -505,8 +618,8 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
 
     bool implicit     = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
     //bool low_fidelity = (config->GetLowFidelitySim() && (iMesh == MESH_1));
-    bool second_order = ((config->GetSpatialOrder_Flow() == SECOND_ORDER or config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER))
-                        and iMesh == MESH_0 );
+    bool second_order = ((config->GetSpatialOrder_Flow() == SECOND_ORDER or config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER)
+                        and iMesh == MESH_0);
     bool limiter      = config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER;
 
     /*--- Loop over all the edges ---*/
