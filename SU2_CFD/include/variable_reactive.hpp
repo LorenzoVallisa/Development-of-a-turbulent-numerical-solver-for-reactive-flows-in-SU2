@@ -46,7 +46,7 @@ public:
    * and its position in the physical data
    */
   enum {RHO_INDEX_SOL=0, RHOVX_INDEX_SOL=1, RHOVY_INDEX_SOL=2,RHOVZ_INDEX_SOL=3,
-        RHOE_INDEX_SOL=RHOVX_INDEX_SOL+1, RHOS_INDEX_SOL=RHOE_INDEX_SOL+1};
+        RHOE_INDEX_SOL=RHOVZ_INDEX_SOL+1, RHOS_INDEX_SOL=RHOE_INDEX_SOL+1};
 
 
   /*!
@@ -60,7 +60,7 @@ public:
    * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, std::unique_ptr<CConfig> config);
+  CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, std::unique_ptr<CConfig>& config);
 
   /*!
 	 * \brief Destructor of the class.
@@ -213,12 +213,12 @@ public:
   /*!
    * \brief Set all the primitive variables for compressible flows.
    */
-  //bool SetPrimVar_Compressible(CConfig *config) ovveride;
+  bool SetPrimVar(CConfig* config) override;
 
   /*!
    * \brief Set gradient primitive variables for compressible flows.
    */
-  //void SetPrimVar_Gradient(CConfig *config);
+  //void SetPrimVar_Gradient(CConfig* config);
 
   /*!
    * \brief Set all the primitive variables form conserved variables.
@@ -254,7 +254,7 @@ public:
   }
 
   /*!
-   * \brief Get the enthalpy of the flow.
+   * \brief Get the total enthalpy of the flow.
    * \return Value of the enthalpy of the flow.
    */
   inline su2double GetEnthalpy(void) override {
@@ -370,7 +370,7 @@ public:
    * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, std::unique_ptr<CConfig> config);
+  CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, std::unique_ptr<CConfig>& config);
 
   /*!
 	 * \brief Destructor of the class.

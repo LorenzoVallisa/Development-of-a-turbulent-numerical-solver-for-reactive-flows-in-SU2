@@ -275,47 +275,11 @@ namespace Framework  {
                                 RealVec& rhoUdiff) = 0;
 
       /*!
-       * \brief Returns the reference temperature
-       */
-      virtual su2double GetTemperature_Ref(void) = 0;
-
-      /*!
-       * \brief Returns the reference viscosity
-       */
-      virtual su2double GetViscosity_Ref(void) = 0;
-
-      /*!
-       * \brief Returns the free stream viscosity
-       */
-      virtual su2double GetViscosity_FreeStream(void) = 0;
-
-      /*!
        * \brief Returns the laminar Prandtl number
        */
       virtual su2double GetPrandtl_Lam(void) = 0;
 
-      /*!
-       * \brief Returns the free stream density
-       */
-      virtual su2double GetDensity_FreeStream(void) = 0;
-
-      /*!
-       * \brief Returns the free stream pressure
-       */
-      virtual su2double GetPressure_FreeStream(void) = 0;
-
-      /*!
-       * \brief Returns the free stream temperature
-       */
-      virtual su2double GetTemperature_FreeStream(void) = 0;
-
-      /*!
-       * \brief Returns the free stream temperature
-       */
-      virtual su2double GetMach(void) = 0;
-
-
-     protected:
+    protected:
 
        bool Lib_Setup; /*!\brief Path to some input library data */
 

@@ -3,7 +3,9 @@
 
 //
 //
-/*--- Class default constructor ---*/
+/*!
+ *\brief Class default constructor
+ */
 //
 //
 
@@ -16,11 +18,13 @@ CReactiveEulerVariable::CReactiveEulerVariable():CVariable(),nSpecies() {
 
 //
 //
-/*--- Class constructor ---*/
+/*!
+ *\brief Class constructor
+ */
 //
 //
 
-CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned short val_nvar, std::uniuqe_ptr<CConfig> config):
+CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned short val_nvar, std::unique_ptr<CConfig>& config):
                         CVariable(val_nDim,val_nvar,config.get()),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),
                         nSpecies(library->GetNSpecies()) {
 
@@ -33,11 +37,16 @@ CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned 
   Gradient_Primitive.resize(nPrimVarGrad,RealVec(nDim));
   Limiter_Primitive.resize(nPrimVarGrad);
 
+  Solution_Min = new su2double[nPrimVarGrad];
+  Solution_Max = new su2double[nPrimVarGrad];
+
 }
 
 //
 //
-/*--- Get gradient primitive variables ---*/
+/*!
+ *\brief Get Gradient Primitive Variable
+ */
 //
 //
 
@@ -50,7 +59,9 @@ su2double** CReactiveEulerVariable::GetGradient_Primitive(void) {
 
 //
 //
-/*--- Set density ---*/
+/*!
+ *\brief Set density
+ */
 //
 //
 
@@ -63,15 +74,16 @@ bool CReactiveEulerVariable::SetDensity(void) {
     Primitive.at(RHOS_INDEX_PRIM+iSpecies) = Solution[RHOS_INDEX_SOL+iSpecies];
     Density += Solution[RHOS_INDEX_SOL+iSpecies];
   }
-  Primitive.at(RHO_INDEX) = Density;
+  Primitive.at(RHO_INDEX_PRIM) = Density;
 
   return false;
 }
 
 //
 //
-/*--- Set Pressure ---*/
-//
+/*!
+ *\brief Set pressure
+ *///
 //
 
 void CReactiveEulerVariable::SetPressure(void) {
@@ -91,14 +103,15 @@ void CReactiveEulerVariable::SetPressure(void) {
 
   /*--- Store computed values and check for a physical solution ---*/
   Primitive.at(P_INDEX_PRIM) = Pressure;
-  if (Primitive[P] < 0.0)
+  if (Pressure < 0.0)
     throw std::runtime_error("Non Physical solution");
 }
 
 //
 //
-/*--- Set sound speed ---*/
-//
+/*!
+ *\brief Set sound speed
+ *///
 //
 
 bool CReactiveEulerVariable::SetSoundSpeed(void) {
@@ -139,8 +152,9 @@ bool CReactiveEulerVariable::SetSoundSpeed(void) {
 
 //
 //
-/*--- Compute norm projected velocity ---*/
-//
+/*!
+ *\brief Compute norm projected velocity
+ *///
 //
 
 su2double CReactiveEulerVariable::GetProjVel(su2double* val_vector) {
@@ -152,19 +166,20 @@ su2double CReactiveEulerVariable::GetProjVel(su2double* val_vector) {
   //for (iSpecies = 0; iSpecies < nSpecies; iSpecies++)
   //  density += Solution[RHOS_INDEX_SOL+iSpecies];
 	for (iDim = 0; iDim < nDim; iDim++)
-		ProjVel += Solution[RHOVX_INDEX_SOL+iDim]*val_vector[iDim]/Solution[RHO_INDEX];
+		ProjVel += Solution[RHOVX_INDEX_SOL+iDim]*val_vector[iDim]/Solution[RHO_INDEX_SOL];
 
 	return ProjVel;
 }
 
 //
 //
-/*--- Class constructor ---*/
-//
+/*!
+ *\brief Class constructor
+ *///
 //
 
-CReactiveNSVariable::CReactiveNSVariable(unsigned short val_nDim,unsigned short val_nvar, std::unique_ptr<CConfig> config):
-                     CReactiveEulerVariable(val_nDim,val_nvar,config.get()) {
+CReactiveNSVariable::CReactiveNSVariable(unsigned short val_nDim,unsigned short val_nvar, std::unique_ptr<CConfig>& config):
+                     CReactiveEulerVariable(val_nDim,val_nvar,config) {
 
   Temperature_Ref = config->GetTemperature_Ref();
   Viscosity_Ref   = config->GetViscosity_Ref();

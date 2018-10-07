@@ -28,7 +28,6 @@ protected:
 
   const unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
 
-  RealVec   Velocity_i,Velocity_j; /*!< \brief Velocity at node i and at node j. */
   RealVec   ProjFlux_i,ProjFlux_j; /*!< \brief Projected velocities. */
 
 public:
@@ -44,7 +43,7 @@ public:
 	 * \param[in] val_nVar - Number of variables of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
-  CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, std::unique_ptr<CConfig> config);
+  CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, std::unique_ptr<CConfig>& config);
 
   /*!
 	 * \brief Destructor of the class.
@@ -73,14 +72,15 @@ public:
 class CAvgGradReactive_Flow : public CNumerics {
 public:
 
-  typedef std::vector<su2double> RealVec;
-  typedef std::vector<RealVec>  RealMatrix;
-  typedef std::unique_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
+  using  RealVec = CReactiveEulerVariable::RealVec;
+  using  RealMatrix = CReactiveEulerVariable::RealMatrix;
+  using  LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
 
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
+  unsigned short nPrimVarGrad; /*!< \brief Numbers of primitive variables to compute gradient. */
   bool implicit; /*!< \brief Flag for implicit computations. */
   bool limiter; /*!< \brief Flag for limiter computations. */
 
@@ -104,12 +104,50 @@ public:
    * \param[in] val_nVar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, std::unique_ptr<CConfig> config);
+  CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, std::unique_ptr<CConfig>& config);
 
   /*!
    * \brief Destructor of the class.
    */
   virtual ~CAvgGradReactive_Flow() {};
+
+  /*!
+   * \brief Compute projection of the viscous fluxes into a direction
+   * \param[in] val_primvar - Primitive variables.
+   * \param[in] val_gradprimvar - Gradient of the primitive variables.
+   * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
+   * \param[in] val_diffusioncoeff - Diffusion coefficients for each species in the mixture.
+   * \param[in] val_viscosity - Laminar viscosity.
+   * \param[in] val_thermal_conductivity - Thermal Conductivity.
+   * \param[in] config - Configuration file
+   */
+  virtual void GetViscousProjFlux(RealVec& val_primvar, RealMatrix& val_gradprimvar,
+                                  su2double* val_normal, RealVec& val_diffusioncoeff,
+                                  su2double val_viscosity,su2double val_therm_conductivity,
+                                  CConfig* config);
+
+
+  /*!
+   * \brief Approximation of Viscous NS Jacobians in Thermochemical Non Equilibrium.
+   * \param[in] val_Mean_PrimVar - Mean value of the primitive variables.
+   * \param[in] val_gradprimvar - Mean value of the gradient of the primitive variables.
+   * \param[in] val_laminar_viscosity - Value of the laminar viscosity.
+   * \param[in] val_thermal_conductivity - Value of the thermal conductivity.
+   * \param[in] val_dist_ij - Distance between the points.
+   * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
+   * \param[in] val_dS - Area of the face between two nodes.
+   * \param[in] val_Proj_Visc_Flux - Pointer to the projected viscous flux.
+   * \param[out] val_Proj_Jac_Tensor_i - Pointer to the projected viscous Jacobian at point i.
+   * \param[out] val_Proj_Jac_Tensor_j - Pointer to the projected viscous Jacobian at point j.
+   * \param[in] config - Configuration file
+  */
+  virtual void GetViscousProjJacs(RealVec& val_Mean_PrimVar, RealMatrix& val_Mean_GradPrimVar,
+                                  RealVec& val_diffusion_coeff, su2double val_laminar_viscosity,su2double val_thermal_conductivity,
+                                  su2double val_dist_ij, su2double* val_normal, su2double val_dS,
+                                  su2double* val_Proj_Visc_Flux,su2double**& val_Proj_Jac_Tensor_i,su2double**& val_Proj_Jac_Tensor_j,
+                                  CConfig* config);
+
+
 
  /*!
    * \brief Compute the viscous flow residual using an average of gradients.
@@ -124,10 +162,19 @@ public:
 
 
 class CSourceReactive: public CNumerics {
+public:
+
+  using  RealVec = CReactiveEulerVariable::RealVec;
+  using  RealMatrix = CReactiveEulerVariable::RealMatrix;
+  using  LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
 
-  bool implicit; /*!< \brief Flag for implicit computations. */
+  LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
+
+  bool implicit; /*!< \brief Flag for implicit scheme. */
+
+  const unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
 
 public:
 
@@ -137,7 +184,7 @@ public:
    * \param[in] val_nVar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, std::unique_ptr<CConfig> config);
+  CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, std::unique_ptr<CConfig>& config);
 
   /*!
    * \brief Destructor of the class.

@@ -14,9 +14,9 @@ class CReactiveEulerSolver:public CSolver {
 public:
   typedef std::unique_ptr<su2double[]> SmartArr;
 
-  using   RealVec = CReactiveEulerVariable::RealVec;
-  using   RealMatrix = CReactiveEulerVariable::RealMatrix;
-  using   LibraryPtr = CReactiveEulerVariable::LibraryPtr;
+  using RealVec = CReactiveEulerVariable::RealVec;
+  using RealMatrix = CReactiveEulerVariable::RealMatrix;
+  using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
@@ -30,6 +30,12 @@ protected:
   unsigned long nMarker;         /*!< \brief Total number of markers using the grid information. */
   std::unique_ptr<unsigned long[]> nVertex;         /*!< \brief Total number of vertices using the grid information. */
 
+  su2double  Alpha, /*!< \brief Angle of attack. */
+             Beta;  /*!< \brief Angle of s. */
+
+  RealVec    Lower_Limit,   /*!< \brief Lower limit conserved variables. */
+             Upper_Limit;   /*!< \brief Upper limit conserved variables. */
+
   su2double  Gamma,              /*!< \brief Mixture Cp/Cv. */
 	           Gamma_Minus_One;	   /*!< \brief Mixture Cp/Cv - 1. */
 
@@ -38,13 +44,11 @@ protected:
              Pressure_Inf,		  /*!< \brief Free stream pressure. */
 	           Temperature_Inf;   /*!< \brief Trans.-rot. free stream temperature. */
 
-  SmartArr   Density,       /*!< \brief Free stream species density. */
-             Velocity_Inf,  /*!< \brief Free stream flow velocity. */
+  SmartArr   Velocity_Inf,  /*!< \brief Free stream flow velocity. */
              MassFrac_Inf;  /*!< \brief Free stream species mass fraction. */
 
   SmartArr   Sol_i,  /*!< \brief Auxiliary vector for storing the solution at point i. */
              Sol_j,      /*!< \brief Auxiliary vector for storing the solution at point j. */
-             Primitive,    /*!< \brief Auxiliary nPrimVar vector. */
              Primitive_i,        /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point i. */
              Primitive_j;        /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point j. */
 
@@ -53,20 +57,25 @@ public:
   /*!
 	 * \brief Default constructor of the class.
 	 */
-   CReactiveEulerSolver():CSolver(),nSpecies(),nMarker(),space_centered(),implicit(),least_squares(),Gamma(),Gamma_Minus_One(),
-                          Mach_Inf(),Density_Inf(),Pressure_Inf(),Temperature_Inf() {}
+   CReactiveEulerSolver();
 
 	/*!
 	 * \overloaded constructor of the class
 	 * \param[in] geometry - Geometrical definition of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
-	 CReactiveEulerSolver(std::unique_ptr<CGeometry> geometry, std::unique_ptr<CConfig> config,unsigned short iMesh);
+	 CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, std::shared_ptr<CConfig> config,unsigned short iMesh);
 
 	/*!
 	 * \brief Destructor of the class.
 	 */
 	 virtual ~CReactiveEulerSolver() {}
+
+   /*!
+ 	 * Looking for non physical points in the initial solution
+ 	 * \param[in] config - Definition of the particular problem.
+ 	 */
+ 	 virtual void Check_Initial_Solution(std::shared_ptr<CConfig> config);
 
   /*!
    * \brief Set gradient primitive variables using Green Gauss.
@@ -87,35 +96,35 @@ public:
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   void Set_MPI_Solution(CGeometry* geometry, CConfig* config) override;
+   //void Set_MPI_Solution(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Impose the send-receive boundary condition.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   void Set_MPI_Solution_Old(CGeometry* geometry, CConfig* config) override;
+   //void Set_MPI_Solution_Old(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Impose the send-receive boundary condition.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   void Set_MPI_Primitive(CGeometry* geometry, CConfig* config) override;
+   //void Set_MPI_Primitive(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Impose the send-receive boundary condition.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   void Set_MPI_Solution_Gradient(CGeometry* geometry, CConfig* config) override;
+   //void Set_MPI_Solution_Gradient(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief A virtual member.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   virtual void SetPrimitive_Gradient(std::unique_ptr<CConfig> config);
+   virtual void SetPrimitive_Gradient(std::shared_ptr<CConfig> config);
 
 
   /*!
@@ -123,7 +132,7 @@ public:
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   void Set_MPI_Primitive_Gradient(CGeometry* geometry, CConfig* config) override;
+   //void Set_MPI_Primitive_Gradient(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Compute the limiter of the primitive variables.
@@ -137,14 +146,14 @@ public:
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   void Set_MPI_Primitive_Limiter(CGeometry* geometry, CConfig* config) override;
+   //void Set_MPI_Primitive_Limiter(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Impose the send-receive boundary condition.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   void Set_MPI_Solution_Limiter(CGeometry* geometry, CConfig* config) override;
+   //void Set_MPI_Solution_Limiter(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Set the maximum value of the eigenvalue.
@@ -158,14 +167,14 @@ public:
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   void Set_MPI_MaxEigenvalue(CGeometry* geometry, CConfig* config) override;
+   //void Set_MPI_MaxEigenvalue(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Impose the send-receive boundary condition.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-   void Set_MPI_Undivided_Laplacian(CGeometry* geometry, CConfig* config) override;
+   //void Set_MPI_Undivided_Laplacian(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Set the fluid solver nondimensionalization.
@@ -184,8 +193,8 @@ public:
    * \param[in] Output - boolean to determine whether to print output.
    */
    void Preprocessing(CGeometry* geometry, CSolver** solver_container, CConfig* config,
-                     unsigned short iMesh, unsigned short iRKStep,
-                     unsigned short RunTime_EqSystem, bool Output) override;
+                      unsigned short iMesh, unsigned short iRKStep,
+                      unsigned short RunTime_EqSystem, bool Output) override;
 
   /*!
    * \brief Compute the time step for solving the Euler equations.
@@ -196,7 +205,7 @@ public:
    * \param[in] Iteration - Index of the current iteration.
    */
    void SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config,
-                    unsigned short iMesh, unsigned long Iteration) override;
+                     unsigned short iMesh, unsigned long Iteration) override;
 
   /*!
    * \brief Compute the spatial integration using a centered scheme.
@@ -208,7 +217,7 @@ public:
    * \param[in] iRKStep - Current step of the Runge-Kutta iteration.
    */
    void Centered_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
-                         CConfig* config, unsigned short iMesh, unsigned short iRKStep) override;
+                          CConfig* config, unsigned short iMesh, unsigned short iRKStep) override;
 
   /*!
    * \brief Compute the spatial integration using a upwind scheme.
@@ -219,7 +228,7 @@ public:
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    */
    void Upwind_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
-                       CConfig* config, unsigned short iMesh) override;
+                        CConfig* config, unsigned short iMesh) override;
 
    /*!
     * \brief Source term integration.
@@ -231,7 +240,7 @@ public:
     * \param[in] iMesh - Index of the mesh in multigrid computations.
     */
     void Source_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics, CNumerics* second_numerics,
-                       CConfig* config, unsigned short iMesh) override;
+                         CConfig* config, unsigned short iMesh) override;
 
    /*!
     * \brief Impose via the residual the Euler wall boundary condition.
@@ -254,7 +263,7 @@ public:
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
     void BC_Far_Field(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
-                    CConfig* config, unsigned short val_marker) override;
+                      CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose the inlet boundary condition.
@@ -290,7 +299,17 @@ public:
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
     void BC_Sym_Plane(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
-                    CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) override;
+                      CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) override;
+
+    /*!
+     * \brief Set the initial conditions.
+     * \param[in] geometry - Geometrical definition of the problem.
+     * \param[in] solver_container - Container with all the solutions.
+     * \param[in] config - Definition of the particular problem.
+     * \param[in] ExtIter - External iteration.
+    */
+    void SetInitialCondition(CGeometry** geometry, CSolver*** solver_container, CConfig *config, unsigned long ExtIter) override;
+
 
    /*!
     * \brief Update the solution using a Runge-Kutta scheme.
@@ -300,7 +319,7 @@ public:
     * \param[in] iRKStep - Current step of the Runge-Kutta iteration.
     */
     void ExplicitRK_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config,
-                            unsigned short iRKStep) override;
+                              unsigned short iRKStep) override;
 
    /*!
     * \brief Update the solution using the explicit Euler scheme.
@@ -338,7 +357,7 @@ public:
 	 * \param[in] geometry - Geometrical definition of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveNSSolver(CGeometry* geometry, CConfig* config);
+	CReactiveNSSolver(std::unique_ptr<CGeometry>& geometry, std::unique_ptr<CConfig>& config);
 
 	/*!
 	 * \brief Destructor of the class.
