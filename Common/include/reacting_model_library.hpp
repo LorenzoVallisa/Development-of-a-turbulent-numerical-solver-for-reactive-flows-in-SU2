@@ -116,7 +116,7 @@ namespace Framework {
       * \return gamma - specific heat ratio (output)
       * \return sound_speed - speed of sound (output)
     */
-    void Gamma_SoundSpeed(su2double& temp,su2double& pressure,su2double& rho,su2double&gamam,su2double& sound_speed) override;
+    void Gamma_SoundSpeed(su2double& temp,su2double& pressure,su2double& rho,su2double&gamma,su2double& sound_speed) override;
 
     /*!
       * \brief Calculates the density, the enthalpy and the internal energy
@@ -249,60 +249,11 @@ namespace Framework {
     void GetRhoUdiff(su2double& temp,su2double& pressure, RealVec& normConcGradients,
                      RealVec& rhoUdiff) override;
 
-   /*!
-    * \brief Returns the reference temperature
-    */
-    inline su2double GetTemperature_Ref(void) override {
-      return T_ref;
-    }
-
-    /*!
-     * \brief Returns the reference viscosity
-     */
-    inline su2double GetViscosity_Ref(void) override {
-      return Mu_ref;
-    }
-
-    /*!
-     * \brief Returns the free stream viscosity
-     */
-    inline su2double GetViscosity_FreeStream(void) override {
-      return Viscosity_Mixture;
-    }
-
     /*!
      * \brief Returns the laminar Prandtl number
      */
     inline su2double GetPrandtl_Lam(void) override {
       return Lam_Pr;
-    }
-
-    /*!
-     * \brief Returns the free stream density
-     */
-    inline su2double GetDensity_FreeStream(void) override {
-      return Rho_inf;
-    }
-
-    /*!
-     * \brief Returns the free stream pressure
-     */
-    inline su2double GetPressure_FreeStream(void) override {
-      return P_inf;
-    }
-
-    /*!
-     * \brief Returns the free stream temperature
-     */
-    inline su2double GetTemperature_FreeStream(void) override {
-      return T_inf;
-    }
-
-    /*!
-     * \brief Returns the free stream temperature
-     */
-    inline su2double GetMach(void) override {
-      return Mach;
     }
 
   private:
@@ -387,19 +338,7 @@ namespace Framework {
 
     su2double Le; /*!< \brief Lewis number. */
 
-    su2double T_ref; /*!< \brief Reference tempeature. */
-
-    su2double Mu_ref; /*!< \brief Reference viscosity. */
-
     su2double Lam_Pr; /*!< \brief Laminar Prandtl number. */
-
-    su2double Mach; /*!< \brief Mach number. */
-
-    su2double T_inf;  /*!< \brief Free stream tempeature. */
-
-    su2double P_inf;  /*!< \brief Free stream pressure. */
-
-    su2double Rho_inf;  /*!< \brief Free stream density. */
 
     su2double Viscosity_Mixture;  /*!< \brief Viscosity of the mixture. */
 
