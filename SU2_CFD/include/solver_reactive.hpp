@@ -868,6 +868,63 @@ public:
 };
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*! \class CReactiveNSSolver
  *  \brief Main class for defining a solver for chemically reacting viscous flows.
  *  \author G. Orlando.
