@@ -116,7 +116,7 @@ namespace Framework {
       * \return gamma - specific heat ratio (output)
       * \return sound_speed - speed of sound (output)
     */
-    void Gamma_SoundSpeed(su2double& temp,su2double& pressure,su2double& rho,su2double&gamma,su2double& sound_speed) override;
+    void Gamma_FrozenSoundSpeed(su2double& temp,su2double& pressure,su2double& rho,su2double&gamma,su2double& sound_speed) override;
 
     /*!
       * \brief Calculates the density, the enthalpy and the internal energy

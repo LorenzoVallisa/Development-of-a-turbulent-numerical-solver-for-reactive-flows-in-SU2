@@ -2,6 +2,7 @@
 #include "../../Common/include/reacting_model_library.hpp"
 #include "../../Common/include/not_implemented_exception.hpp"
 #include "../../Common/include/move_pointer.hpp"
+#include "../../Common/include/default_initialization.hpp"
 
 namespace {
   using SmartArr = CReactiveEulerSolver::SmartArr;
@@ -9,11 +10,11 @@ namespace {
    * \brief Compute area for the current normal
    */
   su2double ComputeArea(const SmartArr& Normal,const unsigned short nDim) {
-    su2double Area = 0.0;
-    for (unsigned short iDim = 0; iDim < nDim; iDim++)
-      Area += Normal[iDim]*Normal[iDim];
+
+    Area = std::inner_product(Normal.get(),Normal.get() + nDim, Nomral.get(), 0.0);
     Area = std::sqrt(Area);
     return Area;
+
   }
 } /*-- End of unnamed namespace ---*/
 
@@ -69,7 +70,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, 
   nDim = geometry->GetnDim();
 
   nVar = nSpecies + nDim + 2; /*--- Conserved variables (rho,rho*vx,rho*vy,rho*vz,rho*E,rho1,...rhoNs)^T ---*/
-  nPrimVar = nSpecies + nDim + 5; /*--- Primitive variables (T,vx,vy,vz,P,rho,h,a,rho1,...rhoNs)^T ---*/
+  nPrimVar = nSpecies + nDim + 5; /*--- Primitive variables (T,vx,vy,vz,P,rho,h,a,rhoCv,rho1,...rhoNs)^T ---*/
   nPrimVarGrad = nDim + 2; /*--- Gradient Primitive variables (T,vx,vy,vz,P,rho)^T ---*/
 
   /*--- Perform the non-dimensionalization for the flow equations using the
@@ -116,8 +117,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, 
   Point_Max_Coord = new su2double*[nVar];
 	for (iVar = 0; iVar < nVar; ++iVar){
 		Point_Max_Coord[iVar] = new su2double[nDim];
-		for (iDim = 0; iDim < nDim; ++iDim)
-      Point_Max_Coord[iVar][iDim] = 0.0;
+		std::fill(Point_Max_Coord[iVar],Point_Max_Coord[iVar] + nDim,0.0);
 	}
 
   /*--- Allocate vectors related to the solution ---*/
@@ -194,7 +194,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, 
 
   /*--- Use a function to check that the initial solution is physical ---*/
 
-  Check_Initial_Solution(config);
+  Check_FreeStream_Solution(config);
 
 }
 //
@@ -207,7 +207,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, 
  */
 //
 //
-void CReactiveEulerSolver::Check_Initial_Solution(std::shared_ptr<CConfig> config) {
+void CReactiveEulerSolver::Check_FreeStream_Solution(std::shared_ptr<CConfig> config) {
 
   int rank = MASTER_NODE;
   #ifdef HAVE_MPI
@@ -303,7 +303,7 @@ void CReactiveEulerSolver::Check_Initial_Solution(std::shared_ptr<CConfig> confi
   #else
     counter_global = counter_local;
   #endif
-    if (rank == MASTER_NODE and counter_global != 0)
+    if (rank == MASTER_NODE && counter_global != 0)
       std::cout << "Warning. The original solution contains "<< counter_global << " points that are not physical." << std::endl;
   }
 
@@ -352,9 +352,10 @@ void CReactiveEulerSolver::Check_Initial_Solution(std::shared_ptr<CConfig> confi
    Pressure_FreeStream     = config->GetPressure_FreeStream();
    Temperature_FreeStream  = config->GetTemperature_FreeStream();
    Gas_Constant  				  = library->GetRgas();
-   Gamma = library->Gamma();
+   Density_FreeStream = Pressure_FreeStream/(Gas_Constant*Temperature_FreeStream);
+   config->SetDensity_FreeStream(Density_FreeStream);
+   library->Gamma_FrozenSoundSpeed(Temperature_FreeStream,Pressure_FreeStream,Density_FreeStream,Gamma,Mach2Vel_FreeStream);
    Gamma_Minus_One = Gamma - 1.0;
- 	 Mach2Vel_FreeStream = std::sqrt(Gamma*Gas_Constant*Temperature_FreeStream);
 
    /*--- Compute the Free Stream velocity, using the Mach number ---*/
 
@@ -376,12 +377,6 @@ void CReactiveEulerSolver::Check_Initial_Solution(std::shared_ptr<CConfig> confi
      ModVel_FreeStream += config->GetVelocity_FreeStream()[iDim]*config->GetVelocity_FreeStream()[iDim];
    ModVel_FreeStream = std::sqrt(ModVel_FreeStream);
    config->SetModVel_FreeStream(ModVel_FreeStream);
-
-
- 	/*--- Compute the density ---*/
-
-  Density_FreeStream = Pressure_FreeStream/(Gas_Constant*Temperature_FreeStream);
-  config->SetDensity_FreeStream(Density_FreeStream);
 
 
    /*--- Viscous initialization ---*/
@@ -516,7 +511,7 @@ void CReactiveEulerSolver::Check_Initial_Solution(std::shared_ptr<CConfig> confi
 
    /*--- Write output to the console if this is the master node and first domain ---*/
 
-   if (config->GetConsole_Output_Verb() == VERB_HIGH and rank == MASTER_NODE and iMesh == MESH_0) {
+   if (config->GetConsole_Output_Verb() == VERB_HIGH && rank == MASTER_NODE && iMesh == MESH_0) {
 
      std::cout.precision(6);
 
@@ -640,8 +635,8 @@ void CReactiveEulerSolver::Preprocessing(CGeometry* geometry, CSolver** solver_c
   unsigned long ExtIter = config->GetExtIter();
   bool implicit         = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
   //bool low_fidelity     = (config->GetLowFidelitySim() && (iMesh == MESH_1));
-  bool second_order     = (config->GetSpatialOrder_Flow() == SECOND_ORDER or config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER);
-  bool limiter          = (config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER and ExtIter <= config->GetLimiterIter());
+  bool second_order     = (config->GetSpatialOrder_Flow() == SECOND_ORDER || config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER);
+  bool limiter          = (config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER && ExtIter <= config->GetLimiterIter());
                           //and !low_fidelity;
   bool center           = config->GetKind_ConvNumScheme_Flow() == SPACE_CENTERED;
 
@@ -650,7 +645,7 @@ void CReactiveEulerSolver::Preprocessing(CGeometry* geometry, CSolver** solver_c
 
   /*--- Upwind second order reconstruction ---*/
 
-  if ((second_order and !center) and iMesh == MESH_0 and !Output) {
+  if ((second_order && !center) && iMesh == MESH_0 && !Output) {
 
     /*--- Gradient computation ---*/
 
@@ -663,13 +658,13 @@ void CReactiveEulerSolver::Preprocessing(CGeometry* geometry, CSolver** solver_c
 
     /*--- Limiter computation ---*/
 
-    if (limiter and iMesh == MESH_0 and !Output)
+    if (limiter && iMesh == MESH_0 && !Output)
       SetPrimitive_Limiter(geometry, config);
   }
 
   /*--- Artificial dissipation ---*/
 
-  if (center and !Output)
+  if (center && !Output)
       throw Common::NotImplemented("Centered convective scheme not implemented\n");
 
   /*--- Initialize the Jacobian matrices ---*/
@@ -680,9 +675,7 @@ void CReactiveEulerSolver::Preprocessing(CGeometry* geometry, CSolver** solver_c
   /*--- Error message ---*/
   if (config->GetConsole_Output_Verb() == VERB_HIGH) {
     #ifdef HAVE_MPI
-      unsigned long MyErrorCounter = ErrorCounter;
-      ErrorCounter = 0;
-      SU2_MPI::Allreduce(&MyErrorCounter, &ErrorCounter, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+      SU2_MPI::Allreduce(MPI_IN_PLACE, &ErrorCounter, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
     #endif
     if (iMesh == MESH_0)
       config->SetNonphysical_Points(ErrorCounter);
@@ -873,7 +866,7 @@ void CReactiveEulerSolver::SetPrimitive_Gradient_LS(CGeometry* geometry, CConfig
       else
         r13 = 0.0;
 
-      if (r22 != 0.0 and r11*r22 != 0.0)
+      if (r22 != 0.0 && r11*r22 != 0.0)
         r23 = r23_a/r22 - r23_b*r12/(r11*r22);
       else
         r23 = 0.0;
@@ -1281,9 +1274,9 @@ void CReactiveEulerSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_co
 
   /*--- Loop boundary edges ---*/
 
-  for (iMarker = 0; iMarker < geometry->GetnMarker(); iMarker++) {
+  for (iMarker = 0; iMarker < geometry->GetnMarker(); ++iMarker) {
     if (config->GetMarker_All_KindBC(iMarker) != INTERNAL_BOUNDARY) {
-      for (iVertex = 0; iVertex < geometry->GetnVertex(iMarker); iVertex++) {
+      for (iVertex = 0; iVertex < geometry->GetnVertex(iMarker); ++iVertex) {
 
         /*--- Point identification, Normal vector and area ---*/
 
@@ -1565,8 +1558,8 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
 
     bool implicit     = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
     //bool low_fidelity = (config->GetLowFidelitySim() && (iMesh == MESH_1));
-    bool second_order = ((config->GetSpatialOrder_Flow() == SECOND_ORDER or config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER)
-                        and iMesh == MESH_0);
+    bool second_order = ((config->GetSpatialOrder_Flow() == SECOND_ORDER || config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER)
+                        && iMesh == MESH_0);
     bool limiter      = config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER;
 
     /*--- Loop over all the edges ---*/
@@ -1722,10 +1715,10 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
 				UnitaryNormal[iDim] = -Normal[iDim]/Area;
 
 				//Pressure = library->node[iPoint]->GetPressure(iSpecies);
-
+        std::fill(Residual,Residual + nVar,0.0);
 				//Residual[0] = 0.0;
 				for (iDim = 0; iDim < nDim; iDim++)
-					Residual[iDim+1] =  Pressure*UnitaryNormal[iDim]*Area;
+					Residual[CReactiveEulerVariable::RHOVX_INDEX_SOL + iDim] =  Pressure*UnitaryNormal[iDim]*Area;
 
         //Residual[nDim+1] = 0.0;
 				//Residual[nDim+2] = 0.0;
@@ -2212,9 +2205,9 @@ unsigned long ErrorCounter = 0;
 
 unsigned long ExtIter = config->GetExtIter();
 bool implicit         = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
-bool second_order     = ((config->GetSpatialOrder_Flow() == SECOND_ORDER or config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER)
-                         and iMesh == MESH_0);
-bool limiter          = (config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER and ExtIter <= config->GetLimiterIter());
+bool second_order     = ((config->GetSpatialOrder_Flow() == SECOND_ORDER || config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER)
+                         && iMesh == MESH_0);
+bool limiter          = (config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER && ExtIter <= config->GetLimiterIter());
 bool center           = (config->GetKind_ConvNumScheme_Flow() == SPACE_CENTERED);
 bool limiter_visc     = config->GetViscous_Limiter_Flow();
 

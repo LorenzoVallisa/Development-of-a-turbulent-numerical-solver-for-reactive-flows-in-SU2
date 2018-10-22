@@ -5,6 +5,8 @@
 
 #include "variable_structure.hpp"
 #include "../../Common/include/physical_property_library.hpp"
+#include "../../Common/include/datatypes/vectorT.hpp"
+#include "../../Common/include/datatypes/matrixT.hpp"
 
 /*! \class CReactiveEulerVariable
  *  \brief Main class for defining a variable for chemically reacting inviscid flows.
@@ -16,14 +18,14 @@ public:
 
   typedef std::vector<su2double> RealVec;
   typedef std::vector<RealVec>  RealMatrix;
-  typedef std::unique_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
+  typedef std::shared_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
+  typedef std::unique_ptr<su2double[]> SmartArr;
 
 protected:
 
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
   const unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
-  //const unsigned nDim;        /*!< \brief Member redefinition for enum. */
 
   /*--- Primitive variable definition ---*/
   RealVec    Primitive; /*!< \brief Primitive variables (T,vx,vy,vz,P,rho,h,a,rho1,...rhoNs) in compressible flows. */
@@ -32,6 +34,11 @@ protected:
   RealVec    dPdU;                 /*!< \brief Partial derivative of pressure w.r.t. conserved variables. */
   RealVec    dTdU;                /*!< \brief Partial derivative of temperature w.r.t. conserved variables. */
 
+  RealVec    Ri; /*!< \brief constant gas for each species in the mixture. */
+  SmartArr   xi,  /*!< \brief Rotation modes for each species in the mixture. */
+             Ms, /*!< \brief Molar masses for each species in the mixture. */
+             hf, /*!< \brief Formation enthalpies for each species in the mixture. */
+             Tref; /*!< \brief Reference temperatures for each species in the mixture. */
 
 public:
 
@@ -155,6 +162,33 @@ public:
   }
 
   /*!
+   * \brief Set all the primitive variables for compressible flows.
+   */
+  bool SetPrimVar(CConfig* config) override;
+  //bool SetPrimVar_Compressible(CConfig *config) ovveride;
+
+  /*!
+   * \brief Set gradient primitive variables for compressible flows.
+   */
+  //void SetPrimVar_Gradient(CConfig* config);
+
+  /*!
+   * \brief Set all the primitive variables form conserved variables.
+   */
+  bool Cons2PrimVar(CConfig* config, su2double* U, su2double* V, su2double* dPdU, su2double* dTdU);
+
+  /*!
+   * \brief Set Gradient of the primitive variables from conserved variables
+   */
+  //bool GradCons2GradPrimVar(std::unique_ptr<CConfig> config, RealVec& U, RealVec& V,
+  //                          RealMatrix& GradU, RealMatrix& GradV);
+
+  /*!
+   * \brief Set all the conserved variables from primitive variables.
+   */
+  void Prim2ConsVar(CConfig* config, su2double* V, su2double* U) override;
+
+  /*!
 	 * \brief Set the value of the mixture density.
 	 */
 	bool SetDensity(void) override;
@@ -181,7 +215,7 @@ public:
    * \param[in] val_T - Temperature value
    * \param[in] val_Species - Index of desired species
    */
-  //su2double CalcHs(su2double val_T, unsigned short val_Species);
+  su2double CalcHs(su2double val_T, unsigned short iSpecies);
 
   /*!
    * \brief Calculates partial derivative of pressure w.r.t. conserved variables \f$\frac{\partial P}{\partial U}\f$
@@ -210,34 +244,6 @@ public:
   inline su2double* GetdTdU(void) override {
     return dTdU.data();
   };
-
-  /*!
-   * \brief Set all the primitive variables for compressible flows.
-   */
-  bool SetPrimVar(CConfig* config) override;
-  //bool SetPrimVar_Compressible(CConfig *config) ovveride;
-
-  /*!
-   * \brief Set gradient primitive variables for compressible flows.
-   */
-  //void SetPrimVar_Gradient(CConfig* config);
-
-  /*!
-   * \brief Set all the primitive variables form conserved variables.
-   */
-  bool Cons2PrimVar(CConfig* config, su2double* U, su2double* V, su2double* dPdU,
-                    su2double* dTdU, su2double* dTvedU) override;
-
-  /*!
-   * \brief Set Gradient of the primitive variables from conserved variables
-   */
-  bool GradCons2GradPrimVar(std::unique_ptr<CConfig> config, RealVec& U, RealVec& V,
-                            RealMatrix& GradU, RealMatrix& GradV);
-
-  /*!
-   * \brief Set all the conserved variables from primitive variables.
-   */
-  void Prim2ConsVar(CConfig* config, su2double* V, su2double* U) override;
 
   /*!
    * \brief Get the flow pressure.
@@ -277,7 +283,7 @@ public:
    * \return Value of the mass fraction of species s.
    */
   inline su2double GetMassFraction(unsigned short val_Species) override {
-    return Primitive.at(RHOS_INDEX_PRIM+val_Species)/Primitive.at(RHO_INDEX_PRIM);
+    return Primitive.at(RHOS_INDEX_PRIM + val_Species)/Primitive.at(RHO_INDEX_PRIM);
   }
 
   /*!
@@ -309,7 +315,14 @@ public:
    * \brief Get the mixture specific heat at constant volume (trans.-rot.).
    * \return \f$\rho C^{t-r}_{v} \f$
    */
-  su2double GetRhoCv_tr(void) override;
+  //inline su2double GetRhoCv_tr(void) override {
+  //  return Primitive.at(RHOCV_INDEX_PRIM);
+  //}
+
+  /*!
+   * \brief Set the squared velocity
+   */
+  //void SetVelocity2(void) override;
 
   /*!
    * \brief Get the velocity of the flow.
@@ -337,7 +350,7 @@ public:
   }
 
   /*!
-   * \brief A virtual member.
+   * \brief Set the temperature.
    * \param[in] config - Configuration parameters.
    */
   bool SetTemperature(CConfig *config) override;

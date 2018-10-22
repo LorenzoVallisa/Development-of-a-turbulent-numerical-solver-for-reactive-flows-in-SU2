@@ -2,9 +2,10 @@
 #define SU2_NUMERICS_REACTIVE
 
 #include "numerics_structure.hpp"
-#include "../../Common/include/physical_property_library.hpp"
-#include "../../Common/include/reacting_model_library.hpp"
 #include "variable_reactive.hpp"
+#include "../../Common/include/reacting_model_library.hpp"
+#include "../../Common/include/datatypes/vectorT.hpp"
+#include "../../Common/include/datatypes/matrixT.hpp"
 
 #include <memory>
 
@@ -16,9 +17,9 @@
 class CUpwReactiveAUSM: public CNumerics {
 public:
 
-  using  RealVec = CReactiveEulerVariable::RealVec;
-  using  RealMatrix = CReactiveEulerVariable::RealMatrix;
-  using  LibraryPtr = CReactiveEulerVariable::LibraryPtr;
+  using RealVec = Common::RealVec;
+  using RealMatrix = Common::RealMatrix;
+  using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
 
@@ -27,8 +28,6 @@ protected:
   bool implicit; /*!< \brief Flag for implicit scheme. */
 
   const unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
-
-  RealVec   ProjFlux_i,ProjFlux_j; /*!< \brief Projected velocities. */
 
 public:
 
@@ -43,7 +42,7 @@ public:
 	 * \param[in] val_nVar - Number of variables of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
-  CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, std::unique_ptr<CConfig>& config);
+  CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, std::shared_ptr<CConfig> config);
 
   /*!
 	 * \brief Destructor of the class.
@@ -72,24 +71,25 @@ public:
 class CAvgGradReactive_Flow : public CNumerics {
 public:
 
-  using  RealVec = CReactiveEulerVariable::RealVec;
-  using  RealMatrix = CReactiveEulerVariable::RealMatrix;
-  using  LibraryPtr = CReactiveEulerVariable::LibraryPtr;
+  using RealMatrix = Common::RealMatrix;
+  using RealVec = Common::RealVec;
+  using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
+  using SmartArr = CReactiveEulerVariable::SmartArr;
+
 
 protected:
 
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
-  unsigned short nPrimVarGrad; /*!< \brief Numbers of primitive variables to compute gradient. */
   bool implicit; /*!< \brief Flag for implicit computations. */
   bool limiter; /*!< \brief Flag for limiter computations. */
 
+  unsigned short nPrimVarGrad; /*!< \brief Numbers of primitive variables to compute gradient. */
   const unsigned short nSpecies; /*!< \brief Total number of species. */
 
   RealVec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
   RealVec PrimVar_i, PrimVar_j;   /*!< \brief Primitives variables at point i and j. */
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
-  RealVec Proj_Mean_GradPrimVar_Edge; /*!< \brief Mean gradient projection. */
 
 public:
 
@@ -104,7 +104,7 @@ public:
    * \param[in] val_nVar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, std::unique_ptr<CConfig>& config);
+  CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, std::shared_ptr<CConfig> config);
 
   /*!
    * \brief Destructor of the class.
@@ -114,17 +114,16 @@ public:
   /*!
    * \brief Compute projection of the viscous fluxes into a direction
    * \param[in] val_primvar - Primitive variables.
-   * \param[in] val_gradprimvar - Gradient of the primitive variables.
+   * \param[in] val_grad_primvar - Gradient of the primitive variables.
    * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
    * \param[in] val_diffusioncoeff - Diffusion coefficients for each species in the mixture.
    * \param[in] val_viscosity - Laminar viscosity.
    * \param[in] val_thermal_conductivity - Thermal Conductivity.
    * \param[in] config - Configuration file
    */
-  virtual void GetViscousProjFlux(RealVec& val_primvar, RealMatrix& val_gradprimvar,
-                                  su2double* val_normal, RealVec& val_diffusioncoeff,
-                                  su2double val_viscosity,su2double val_therm_conductivity,
-                                  CConfig* config);
+  virtual void GetViscousProjFlux(RealVec& val_primvar, RealMatrix& val_grad_primvar,
+                                  SmartArr val_normal, RealVec& val_diffusioncoeff,
+                                  su2double val_viscosity,su2double val_therm_conductivity);
 
 
   /*!
@@ -164,9 +163,9 @@ public:
 class CSourceReactive: public CNumerics {
 public:
 
-  using  RealVec = CReactiveEulerVariable::RealVec;
-  using  RealMatrix = CReactiveEulerVariable::RealMatrix;
-  using  LibraryPtr = CReactiveEulerVariable::LibraryPtr;
+  using RealVec = Common::RealVec;
+  using RealMatrix = Common::RealMatrix;
+  using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
 
@@ -184,7 +183,7 @@ public:
    * \param[in] val_nVar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, std::unique_ptr<CConfig>& config);
+  CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, std::shared_ptr<CConfig> config);
 
   /*!
    * \brief Destructor of the class.
@@ -205,7 +204,7 @@ public:
    * \param[out] val_residual - Pointer to the source residual containing chemistry terms.
    * \param[in] config - Definition of the particular problem.
    */
-  void ComputeResidual_Axisymmetric(su2double* val_residual, CConfig* config) override;
+  //void ComputeResidual_Axisymmetric(su2double* val_residual, CConfig* config) override;
 
 };
 

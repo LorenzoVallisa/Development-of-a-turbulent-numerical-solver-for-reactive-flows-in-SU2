@@ -12,11 +12,12 @@
  */
 class CReactiveEulerSolver:public CSolver {
 public:
-  typedef std::unique_ptr<su2double[]> SmartArr;
 
   using RealVec = CReactiveEulerVariable::RealVec;
   using RealMatrix = CReactiveEulerVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
+  using SmartArr = CReactiveEulerVariable::SmartArr;
+
 
 protected:
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
@@ -75,7 +76,7 @@ public:
  	 * Looking for non physical points in the initial solution
  	 * \param[in] config - Definition of the particular problem.
  	 */
- 	 virtual void Check_Initial_Solution(std::shared_ptr<CConfig> config);
+ 	 virtual void Check_FreeStream_Solution(std::shared_ptr<CConfig> config);
 
   /*!
    * \brief Set gradient primitive variables using Green Gauss.
@@ -598,7 +599,7 @@ public:
 	 * \param[in] geometry - Geometrical definition of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
-	 CReactiveEulerSolver(std::unique_ptr<CGeometry>& geometry, std::unique_ptr<CConfig>& config,unsigned short iMesh);
+	 CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, std::shared_ptr<CConfig> config,unsigned short iMesh);
 
 	/*!
 	 * \brief Destructor of the class.
@@ -866,6 +867,7 @@ public:
     void ImplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) override;
 
 };
+
 
 
 
