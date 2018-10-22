@@ -214,6 +214,7 @@ public:
    * \brief Set all the primitive variables for compressible flows.
    */
   bool SetPrimVar(CConfig* config) override;
+  //bool SetPrimVar_Compressible(CConfig *config) ovveride;
 
   /*!
    * \brief Set gradient primitive variables for compressible flows.
@@ -341,6 +342,91 @@ public:
   bool SetTemperature(CConfig *config) override;
 
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*! \class CReactiveEulerVariable
  *  \brief Main class for defining a variable for chemically reacting inviscid flows.

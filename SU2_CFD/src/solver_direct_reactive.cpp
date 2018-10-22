@@ -304,7 +304,7 @@ void CReactiveEulerSolver::Check_Initial_Solution(std::shared_ptr<CConfig> confi
     counter_global = counter_local;
   #endif
     if (rank == MASTER_NODE and counter_global != 0)
-      cout << "Warning. The original solution contains "<< counter_global << " points that are not physical." << endl;
+      std::cout << "Warning. The original solution contains "<< counter_global << " points that are not physical." << std::endl;
   }
 
 }
