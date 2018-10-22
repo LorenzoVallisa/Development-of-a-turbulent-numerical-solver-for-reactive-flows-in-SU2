@@ -24,7 +24,7 @@ CReactiveEulerVariable::CReactiveEulerVariable():CVariable(),nSpecies() {
 //
 //
 
-CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned short val_nvar, std::unique_ptr<CConfig>& config):
+CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned short val_nvar, std::shared_ptr<CConfig> config):
                         CVariable(val_nDim,val_nvar,config.get()),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),
                         nSpecies(library->GetNSpecies()) {
 

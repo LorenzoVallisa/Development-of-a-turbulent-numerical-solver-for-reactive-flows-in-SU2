@@ -60,7 +60,7 @@ public:
    * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, std::unique_ptr<CConfig>& config);
+  CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
 
   /*!
 	 * \brief Destructor of the class.
