@@ -23,6 +23,7 @@ protected:
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
   const unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
+  //const unsigned nDim;        /*!< \brief Member redefinition for enum. */
 
   /*--- Primitive variable definition ---*/
   RealVec    Primitive; /*!< \brief Primitive variables (T,vx,vy,vz,P,rho,h,a,rho1,...rhoNs) in compressible flows. */
@@ -60,7 +61,7 @@ public:
    * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, std::unique_ptr<CConfig>& config);
+  CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
 
   /*!
 	 * \brief Destructor of the class.
