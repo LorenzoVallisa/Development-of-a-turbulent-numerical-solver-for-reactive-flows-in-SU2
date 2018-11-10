@@ -16,8 +16,8 @@
 class CReactiveEulerVariable:public CVariable {
 public:
 
-  typedef std::vector<su2double> RealVec;
-  typedef std::vector<RealVec>  RealMatrix;
+  using RealVec = Common::RealVec;
+  using RealMatrix = Common::RealMatrix;
   typedef std::shared_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
   typedef std::unique_ptr<su2double[]> SmartArr;
 
@@ -33,12 +33,6 @@ protected:
   RealVec    Limiter_Primitive;    /*!< \brief Limiter of the primitive variables (T, vx, vy, vz, P, rho). */
   RealVec    dPdU;                 /*!< \brief Partial derivative of pressure w.r.t. conserved variables. */
   RealVec    dTdU;                /*!< \brief Partial derivative of temperature w.r.t. conserved variables. */
-
-  RealVec    Ri; /*!< \brief constant gas for each species in the mixture. */
-  SmartArr   xi,  /*!< \brief Rotation modes for each species in the mixture. */
-             Ms, /*!< \brief Molar masses for each species in the mixture. */
-             hf, /*!< \brief Formation enthalpies for each species in the mixture. */
-             Tref; /*!< \brief Reference temperatures for each species in the mixture. */
 
 public:
 
@@ -63,12 +57,34 @@ public:
   CReactiveEulerVariable();
 
   /*!
-   * \overloaded Constructor
+   * \overload
    * \param[in] val_nDim - Number of dimensions of the problem.
    * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
   CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
+
+  /*!
+	 * \overload
+	 * \param[in] val_density - Value of the flow density (initialization value).
+	 * \param[in] val_velocity - Value of the flow velocity (initialization value).
+	 * \param[in] val_temperature - Value of the flow energy (initialization value).
+	 * \param[in] val_nDim - Number of dimensions of the problem.
+	 * \param[in] val_nvar - Number of conserved variables.
+   * \param[in] config - Definition of the particular problem.
+	 */
+	CReactiveEulerVariable(su2double val_pressure,RealVec& val_massfrac,RealVec& val_velocity, su2double val_temperature,
+                         unsigned short val_nDim,unsigned short val_nvar,std::shared_ptr<CConfig> config);
+
+	/*!
+	 * \overload
+	 * \param[in] val_solution - Vector with the flow value (initialization value).
+	 * \param[in] val_nDim - Number of dimensions of the problem.
+	 * \param[in] val_nvar - Number of variables of the problem.
+	 * \param[in] config - Definition of the particular problem.
+	 */
+	CReactiveEulerVariable(RealVec& val_solution, unsigned short val_nDim,unsigned short val_nvar, std::shared_ptr<CConfig> config);
+
 
   /*!
 	 * \brief Destructor of the class.
@@ -92,6 +108,15 @@ public:
   }
 
   /*!
+   * \brief Get the primitive variables.
+   * \param[in] val_var - Index of the variable.
+   * \return Value of the primitive variable for the index <i>val_var</i>.
+   */
+  inline su2double GetPrimitive(unsigned short val_var) override {
+    return Primitive.at(val_var);
+  }
+
+  /*!
    * \brief Set the value of the primitive variables.
    * \param[in] val_var - Index of the variable.
    * \param[in] val_prim - Value of the selected primitive variable.
@@ -107,7 +132,7 @@ public:
    * \return Set the value of the primitive variable for the index <i>val_var</i>.
    */
   inline void SetPrimitive(su2double* val_prim) override {
-    std::vector<su2double> tmp(val_prim,val_prim + nPrimVar);
+    RealVec tmp(val_prim,val_prim + nPrimVar);
     Primitive = tmp;
   }
 
@@ -136,6 +161,16 @@ public:
   }
 
   /*!
+	 * \brief Set to zero the gradient of the primitive variables.
+	 */
+	inline void SetGradient_PrimitiveZero(unsigned short val_primvar) override {
+    for (unsigned short iVar = 0; iVar < val_primvar; ++iVar) {
+		  for (unsigned short iDim = 0; iDim < nDim; ++iDim)
+			   Gradient_Primitive(iVar,iDim) = 0.0;
+    }
+  }
+
+  /*!
    * \brief Get the value of the primitive variables gradient.
    * \return Value of the primitive variables gradient.
    */
@@ -148,7 +183,7 @@ public:
 	 * \param[in] val_value - Value to add to the gradient of the selected primitive variable.
 	 */
 	inline void AddGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    Gradient_Primitive.at(val_var).at(val_dim) += val_value;
+    Gradient_Primitive.at(val_var,val_dim) += val_value;
   }
 
   /*!
@@ -158,33 +193,37 @@ public:
 	 * \param[in] val_value - Value to subtract to the gradient of the selected primitive variable.
 	 */
 	inline void SubtractGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    Gradient_Primitive.at(val_var).at(val_dim) -= val_value;
+    Gradient_Primitive.at(val_var,val_dim) -= val_value;
+  }
+
+  /*!
+	 * \brief Set the gradient of the primitive variables.
+	 * \param[in] val_var - Index of the variable.
+	 * \param[in] val_dim - Index of the dimension.
+	 * \param[in] val_value - Value of the gradient.
+	 */
+	inline void SetGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
+    Gradient_Primitive.at(val_var,val_dim) = val_value;
   }
 
   /*!
    * \brief Set all the primitive variables for compressible flows.
+   * \param[in] config - Configuration of the particular problem.
    */
   bool SetPrimVar(CConfig* config) override;
-  //bool SetPrimVar_Compressible(CConfig *config) ovveride;
-
-  /*!
-   * \brief Set gradient primitive variables for compressible flows.
-   */
-  //void SetPrimVar_Gradient(CConfig* config);
 
   /*!
    * \brief Set all the primitive variables form conserved variables.
+   * \param[in] U - Storage of conservative variables.
+   * \param[in] V - Storage of primitive variables.
    */
-  bool Cons2PrimVar(CConfig* config, su2double* U, su2double* V, su2double* dPdU, su2double* dTdU);
-
-  /*!
-   * \brief Set Gradient of the primitive variables from conserved variables
-   */
-  //bool GradCons2GradPrimVar(std::unique_ptr<CConfig> config, RealVec& U, RealVec& V,
-  //                          RealMatrix& GradU, RealMatrix& GradV);
+  bool Cons2PrimVar(su2double* U, su2double* V);
 
   /*!
    * \brief Set all the conserved variables from primitive variables.
+   * \param[in] config - Configuration of the particular problem.
+   * \param[in] U - Storage of conservative variables.
+   * \param[in] V - Storage of primitive variables.
    */
   void Prim2ConsVar(CConfig* config, su2double* V, su2double* U) override;
 
@@ -195,8 +234,9 @@ public:
 
 	/*!
 	 * \brief Set the value of the pressure.  Requires T calculation.
+   * \param[in] config - Configuration of the particular problem.
 	 */
-	void SetPressure(void) override;
+	bool SetPressure(CConfig* config) override;
 
 	/*!
 	 * \brief Set the value of the speed of the sound.
@@ -312,19 +352,6 @@ public:
   }
 
   /*!
-   * \brief Get the mixture specific heat at constant volume (trans.-rot.).
-   * \return \f$\rho C^{t-r}_{v} \f$
-   */
-  //inline su2double GetRhoCv_tr(void) override {
-  //  return Primitive.at(RHOCV_INDEX_PRIM);
-  //}
-
-  /*!
-   * \brief Set the squared velocity
-   */
-  //void SetVelocity2(void) override;
-
-  /*!
    * \brief Get the velocity of the flow.
    * \param[in] val_dim - Index of the dimension.
    * \return Value of the velocity for the dimension <i>val_dim</i>.
@@ -344,101 +371,14 @@ public:
    * \brief Set the velocity vector from the old solution.
    * \param[in] val_velocity - Pointer to the velocity.
    */
-  inline void SetVelocity_Old(su2double* val_velocity) override {
-    for(unsigned short iDim=0; iDim<nDim; ++iDim)
-      Solution_Old[RHOVX_INDEX_SOL+iDim] = val_velocity[iDim]*Primitive.at(RHO_INDEX_PRIM);
-  }
-
+  inline void SetVelocity_Old(su2double* val_velocity) override;
   /*!
    * \brief Set the temperature.
    * \param[in] config - Configuration parameters.
    */
-  bool SetTemperature(CConfig *config) override;
+  bool SetTemperature(CConfig* config) override;
 
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -448,12 +388,8 @@ public:
  */
 class CReactiveNSVariable:public CReactiveEulerVariable {
 protected:
-	su2double  Temperature_Ref;   /*!< \brief Reference temperature of the fluid. */
-	su2double  Viscosity_Ref;     /*!< \brief Reference viscosity of the fluid. */
-	su2double  Viscosity_Inf;     /*!< \brief Viscosity of the fluid at the infinity. */
-  RealVec    Diffusion_Coeffs;    /*!< \brief Diffusion coefficients of the mixture. */
-  RealMatrix Dij;             /*!< \brief Binary diffusion coefficients. */
-	su2double  Laminar_Viscosity;	/*!< \brief Viscosity of the fluid. */
+	RealVec    Diffusion_Coeffs;    /*!< \brief Diffusion coefficients of the mixture. */
+  su2double  Laminar_Viscosity;	/*!< \brief Viscosity of the fluid. */
   su2double  Thermal_Conductivity;       /*!< \brief Thermal conductivity of the gas mixture. */
 
 public:
@@ -461,8 +397,7 @@ public:
   /*!
 	 * \brief Default constructor of the class.
 	 */
-  CReactiveNSVariable() : CReactiveEulerVariable(),Temperature_Ref(),Viscosity_Ref(),Viscosity_Inf(),
-                          Laminar_Viscosity(),Thermal_Conductivity() {}
+  CReactiveNSVariable(): CReactiveEulerVariable(),Laminar_Viscosity(),Thermal_Conductivity() {}
 
   /*!
    * \overloaded Constructor
@@ -470,7 +405,28 @@ public:
    * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, std::unique_ptr<CConfig>& config);
+  CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
+
+  /*!
+	 * \overload
+	 * \param[in] val_density - Value of the flow density (initialization value).
+	 * \param[in] val_velocity - Value of the flow velocity (initialization value).
+	 * \param[in] val_temperature - Value of the flow temperature (initialization value).
+	 * \param[in] val_nDim - Number of dimensions of the problem.
+	 * \param[in] val_nvar - Number of conserved variables.
+	 * \param[in] config - Definition of the particular problem.
+	 */
+	CReactiveNSVariable(su2double val_density, RealVec& val_massfrac, RealVec& val_velocity,su2double val_temperature,
+                      unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
+
+  /*!
+	 * \overload
+	 * \param[in] val_solution - Pointer to the flow value (initialization value).
+	 * \param[in] val_nDim - Number of dimensions of the problem.
+	 * \param[in] val_nvar - Number of conserved variables.
+   * \param[in] config - Definition of the particular problem.
+	 */
+	CReactiveNSVariable(RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
 
   /*!
 	 * \brief Destructor of the class.
@@ -502,21 +458,30 @@ public:
   }
 
   /*!
+   * \brief Set the laminar viscosity of the mixture.
+   * \param[in] laminarViscosity - value of laminar viscosity to set
+   * \return Laminar viscoisty of the mixture
+   */
+  inline void SetLaminarViscosity(su2double laminarViscosity) override {
+    Laminar_Viscosity = laminarViscosity;
+  }
+
+  /*!
+   * \brief Set the thermal conductivity of the mixture.
+   * \param[in] thermalConductivity - value of thermal conductivity to set
+   * \return Laminar viscoisty of the mixture
+   */
+  inline void SetThermalConductivity(su2double thermalConductivity) override {
+    Thermal_Conductivity = thermalConductivity;
+  }
+
+  /*!
   	 * \brief Set the temperature at the wall
+     * \param[in] temperature_wall - value of the wall temperature to set
   	 */
 	inline void SetWallTemperature(su2double temperature_wall) override {
     Primitive.at(T_INDEX_PRIM) = temperature_wall;
   }
-
-  /*!
-   * \brief Set all the primitive variables for compressible flows.
-   */
-  //bool SetPrimVar_Compressible(CConfig *config) ovveride;
-
-  /*!
-   * \brief Set gradient primitive variables for compressible flows.
-   */
-  //void SetPrimVar_Gradient(CConfig *config);
 
 };
 

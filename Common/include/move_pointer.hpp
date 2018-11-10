@@ -3,10 +3,8 @@
 
 namespace Common {
   template<typename T>
-  std::unique_ptr<T[]> wrap_in_unique( T*& t ) {
-    auto* tmp = t;
-    t = NULL;
-    return std::unique_ptr<T[]>(tmp);
+  std::unique_ptr<T[]> wrap_in_unique(T*& t) {
+    return std::unique_ptr<T[]>(t);
 }
 
 }

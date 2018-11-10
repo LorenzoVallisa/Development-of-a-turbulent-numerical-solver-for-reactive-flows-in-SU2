@@ -4,8 +4,6 @@
 #include "numerics_structure.hpp"
 #include "variable_reactive.hpp"
 #include "../../Common/include/reacting_model_library.hpp"
-#include "../../Common/include/datatypes/vectorT.hpp"
-#include "../../Common/include/datatypes/matrixT.hpp"
 
 #include <memory>
 
@@ -17,8 +15,8 @@
 class CUpwReactiveAUSM: public CNumerics {
 public:
 
-  using RealVec = Common::RealVec;
-  using RealMatrix = Common::RealMatrix;
+  using RealVec = CReactiveEulerVariable::RealVec;
+  using RealMatrix = CReactiveEulerVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
@@ -71,8 +69,8 @@ public:
 class CAvgGradReactive_Flow : public CNumerics {
 public:
 
-  using RealMatrix = Common::RealMatrix;
-  using RealVec = Common::RealVec;
+  using RealVec = CReactiveEulerVariable::RealVec;
+  using RealMatrix = CReactiveEulerVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
   using SmartArr = CReactiveEulerVariable::SmartArr;
 
@@ -163,8 +161,8 @@ public:
 class CSourceReactive: public CNumerics {
 public:
 
-  using RealVec = Common::RealVec;
-  using RealMatrix = Common::RealMatrix;
+  using RealVec = CReactiveEulerVariable::RealVec;
+  using RealMatrix = CReactiveEulerVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:

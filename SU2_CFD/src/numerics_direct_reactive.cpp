@@ -193,9 +193,6 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
 
     throw Common::NotImplemented("Implicit method still not implemented");
 
-    //GetInviscidProjFlux(&Density_i, Velocity_i.data(), &Pressure_i, &Enthalpy_i, Normal, ProjFlux_i.data());
-	  //GetInviscidProjFlux(&Density_j, Velocity_j.data(), &Pressure_j, &Enthalpy_j, Normal, ProjFlux_j.data());
-
   }
 
   //AD::SetPreaccOut(val_residual, nVar);
