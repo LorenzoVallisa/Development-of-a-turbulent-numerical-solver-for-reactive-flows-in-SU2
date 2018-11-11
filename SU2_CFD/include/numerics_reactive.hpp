@@ -57,6 +57,13 @@ public:
 	void ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i,
                        su2double** val_Jacobian_j, CConfig* config) override;
 
+  /*!
+   * \brief Set the simulation to explicit
+   */
+  inline void SetExplicit(void) {
+    implicit = false;
+  }
+
 };
 
 
@@ -82,11 +89,13 @@ protected:
   bool implicit; /*!< \brief Flag for implicit computations. */
   bool limiter; /*!< \brief Flag for limiter computations. */
 
-  unsigned short nPrimVarGrad; /*!< \brief Numbers of primitive variables to compute gradient. */
+  unsigned short nPrimVar; /*!< \brief Numbers of primitive variables. */
+  unsigned short nPrimVarAvgGrad; /*!< \brief Numbers of primitive variables to compute gradient for average computation. */
   const unsigned short nSpecies; /*!< \brief Total number of species. */
 
   RealVec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
   RealVec PrimVar_i, PrimVar_j;   /*!< \brief Primitives variables at point i and j. */
+  RealMatrix GradPrimVar_i, GradPrimVar_j; /*!< \brief Gradient of primitives variables at point i and j for average gradient computation. */
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
 
 public:
@@ -94,7 +103,7 @@ public:
   /*!
    * \brief Default constructor of the class.
    */
-  CAvgGradReactive_Flow():CNumerics(),implicit(),limiter(),nSpecies() {}
+  CAvgGradReactive_Flow():CNumerics(),implicit(),limiter(),nPrimVar(),nPrimVarAvgGrad(),nSpecies() {}
 
   /*!
    * \brief Constructor of the class.
@@ -127,7 +136,8 @@ public:
   /*!
    * \brief Approximation of Viscous NS Jacobians in Thermochemical Non Equilibrium.
    * \param[in] val_Mean_PrimVar - Mean value of the primitive variables.
-   * \param[in] val_gradprimvar - Mean value of the gradient of the primitive variables.
+   * \param[in] val_Mean_GradPriVar - Mean value of the gradient of the primitive variables.
+   * \param[in] val_diffusion_coeff - Value of diffusion coefficients for each species
    * \param[in] val_laminar_viscosity - Value of the laminar viscosity.
    * \param[in] val_thermal_conductivity - Value of the thermal conductivity.
    * \param[in] val_dist_ij - Distance between the points.
@@ -136,15 +146,13 @@ public:
    * \param[in] val_Proj_Visc_Flux - Pointer to the projected viscous flux.
    * \param[out] val_Proj_Jac_Tensor_i - Pointer to the projected viscous Jacobian at point i.
    * \param[out] val_Proj_Jac_Tensor_j - Pointer to the projected viscous Jacobian at point j.
-   * \param[in] config - Configuration file
+   * \param[in] config - Definition of the particular problem
   */
   virtual void GetViscousProjJacs(RealVec& val_Mean_PrimVar, RealMatrix& val_Mean_GradPrimVar,
                                   RealVec& val_diffusion_coeff, su2double val_laminar_viscosity,su2double val_thermal_conductivity,
-                                  su2double val_dist_ij, su2double* val_normal, su2double val_dS,
-                                  su2double* val_Proj_Visc_Flux,su2double**& val_Proj_Jac_Tensor_i,su2double**& val_Proj_Jac_Tensor_j,
+                                  su2double val_dist_ij, SmartArr val_normal, su2double val_dS,
+                                  su2double* val_Proj_Visc_Flux,su2double** val_Proj_Jac_Tensor_i,su2double** val_Proj_Jac_Tensor_j,
                                   CConfig* config);
-
-
 
  /*!
    * \brief Compute the viscous flow residual using an average of gradients.
@@ -155,6 +163,22 @@ public:
    */
   void ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i,
                        su2double** val_Jacobian_j, CConfig* config) override;
+
+  /*!
+   * \brief Set the Gradient of primitives for computing residual
+   */
+  inline void SetGradient_AvgPrimitive(const RealMatrix& Grad_i,const RealMatrix& Grad_j) {
+    GradPrimVar_i = Grad_i;
+    GradPrimVar_j = Grad_j;
+  }
+
+  /*!
+   * \brief Set the simulation to explicit
+   */
+  inline void SetExplicit(void) {
+    implicit = false;
+  }
+
 };
 
 
@@ -203,6 +227,13 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   //void ComputeResidual_Axisymmetric(su2double* val_residual, CConfig* config) override;
+
+  /*!
+   * \brief Set the simulation to explicit
+   */
+  inline void SetExplicit(void) {
+    implicit = false;
+  }
 
 };
 

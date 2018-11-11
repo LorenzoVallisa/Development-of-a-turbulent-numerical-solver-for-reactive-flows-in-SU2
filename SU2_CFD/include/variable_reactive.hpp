@@ -50,6 +50,11 @@ public:
   enum {RHO_INDEX_SOL=0, RHOVX_INDEX_SOL=1, RHOVY_INDEX_SOL=2,RHOVZ_INDEX_SOL=3,
         RHOE_INDEX_SOL=RHOVZ_INDEX_SOL+1, RHOS_INDEX_SOL=RHOE_INDEX_SOL+1};
 
+  /**
+   * Enumerator defining the mapping between the primitive variable gradient name
+   * and its position in the physical data
+   */
+  enum {T_INDEX_GRAD=0, VX_INDEX_GRAD=1, VY_INDEX_GRAD=2,VZ_INDEX_GRAD=3,P_INDEX_GRAD = 4};
 
   /*!
 	 * \brief Default constructor of the class.
@@ -175,6 +180,14 @@ public:
    * \return Value of the primitive variables gradient.
    */
   su2double** GetGradient_Primitive(void) override;
+
+  /*!
+   * \brief Get the value of the primitive variables gradient.
+   * \return Value of the primitive variables gradient.
+   */
+  //inline RealMatrix GetGradient_Primitive(void) const {
+  //  return Gradient_Primitive;
+  //}
 
   /*!
 	 * \brief Add val_value to the gradient of the val_var primitive variable.
@@ -371,7 +384,7 @@ public:
    * \brief Set the velocity vector from the old solution.
    * \param[in] val_velocity - Pointer to the velocity.
    */
-  inline void SetVelocity_Old(su2double* val_velocity) override;
+  void SetVelocity_Old(su2double* val_velocity) override;
   /*!
    * \brief Set the temperature.
    * \param[in] config - Configuration parameters.
@@ -390,14 +403,24 @@ class CReactiveNSVariable:public CReactiveEulerVariable {
 protected:
 	RealVec    Diffusion_Coeffs;    /*!< \brief Diffusion coefficients of the mixture. */
   su2double  Laminar_Viscosity;	/*!< \brief Viscosity of the fluid. */
-  su2double  Thermal_Conductivity;       /*!< \brief Thermal conductivity of the gas mixture. */
+  su2double  Thermal_Conductivity;   /*!< \brief Thermal conductivity of the gas mixture. */
+
+  unsigned short nPrimVarAvgGrad;
+  RealMatrix AvgGradient_Primitive; /*!< \brief Gradient of the primitive for average computation (T, vx, vy, vz, P, rho,rho1...rhoNs). */
 
 public:
+
+  /**
+   * Enumerator defining the mapping between the primitive variable gradient name
+   * and its position in the physical data
+   */
+  enum {T_INDEX_AVGGRAD=0,VX_INDEX_AVGGRAD=1,VY_INDEX_AVGGRAD=2,VZ_INDEX_AVGGRAD=3,RHO_INDEX_AVGGRAD=4,RHOS_INDEX_AVGGRAD=5};
+
 
   /*!
 	 * \brief Default constructor of the class.
 	 */
-  CReactiveNSVariable(): CReactiveEulerVariable(),Laminar_Viscosity(),Thermal_Conductivity() {}
+  CReactiveNSVariable(): CReactiveEulerVariable(),Laminar_Viscosity(),Thermal_Conductivity(),nPrimVarAvgGrad() {}
 
   /*!
    * \overloaded Constructor
@@ -432,6 +455,60 @@ public:
 	 * \brief Destructor of the class.
 	 */
 	virtual ~CReactiveNSVariable() {};
+
+  /*!
+	 *\ Set value of gradient for average computations
+	 * \param[in] iVar - Index of the desired variable
+	 * \param[in] iDim - Index of dimension.
+	 * \param[in] value - Value to set.
+   */
+  inline void SetAvgGradient(unsigned short iVar,unsigned short iDim,su2double value) {
+    AvgGradient_Primitive.at(iVar,iDim) = value;
+  }
+
+  /*!
+	 *\ Set the whole matrix for average gradient computations to zero
+	 */
+  inline void SetAvgGradient_Zero(void) {
+    std::fill(AvgGradient_Primitive.begin(),AvgGradient_Primitive.end(),0.0);
+  }
+
+  /*!
+	 *\ Get value of gradient for average computations
+	 * \param[in] iVar - Index of the desired variable
+	 * \param[in] iDim - Index of dimension.
+   */
+  inline su2double GetAvgGradient(unsigned short iVar,unsigned short iDim) {
+    return AvgGradient_Primitive.at(iVar,iDim);
+  }
+
+  /*!
+	 *\ Get value of gradient for average computations
+	 */
+  inline RealMatrix GetAvgGradient() {
+    return AvgGradient_Primitive;
+  }
+
+
+  /*!
+	 *\ Add value of gradient for average computations
+	 * \param[in] iVar - Index of the desired variable
+	 * \param[in] iDim - Index of dimension.
+	 * \param[in] value - Value to add.
+   */
+  inline void AddAvgGradient(unsigned short iVar,unsigned short iDim,su2double value) {
+    AvgGradient_Primitive.at(iVar,iDim) += value;
+  }
+
+  /*!
+	 *\ Subtract value of gradient for average computations
+	 * \param[in] iVar - Index of the desired variable
+	 * \param[in] iDim - Index of dimension.
+	 * \param[in] value - Value to add.
+   */
+  inline void SubtractAvgGradient(unsigned short iVar,unsigned short iDim,su2double value) {
+    AvgGradient_Primitive.at(iVar,iDim) -= value;
+  }
 
   /*!
    * \brief Get the laminar viscosity of the mixture.

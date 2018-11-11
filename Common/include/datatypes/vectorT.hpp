@@ -28,6 +28,8 @@ namespace Common {
   public:
 
     using Type = T;
+    using value_type = T;
+    typedef typename std::vector<T>::size_type size_type;
 
     /*!
       * \brief Default constructor
@@ -74,10 +76,34 @@ namespace Common {
 
     /*!
       * \brief Copy Constructor with range
+      * \param[in] init - pointer to first datum
+      * \param[in] end - pointer to one past last datum
+    */
+    explicit SU2Vec(Type* init,Type* end) {
+      N = end - init;
+      allocate();
+      for (std::size_t i = 0; i < size(); ++i)
+        m_data[i] = *init++;
+    }
+
+    /*!
+      * \brief Copy Constructor with range (non const version)
       * \param[in] init - begin iterator
       * \param[in] end - end iterator
     */
-    SU2Vec(Type* init,Type* end) {
+    explicit SU2Vec(decltype(std::declval<std::vector<Type>>().begin()) init,decltype(std::declval<std::vector<Type>>().end()) end) {
+      N = end - init;
+      allocate();
+      for (std::size_t i = 0; i < size(); ++i)
+        m_data[i] = *init++;
+    }
+
+    /*!
+      * \brief Copy Constructor with range (const version)
+      * \param[in] init - begin iterator
+      * \param[in] end - end iterator
+    */
+    explicit SU2Vec(decltype(std::declval<std::vector<Type>>().cbegin()) init,decltype(std::declval<std::vector<Type>>().cend()) end) {
       N = end - init;
       allocate();
       for (std::size_t i = 0; i < size(); ++i)
@@ -212,6 +238,13 @@ namespace Common {
     }
 
     /*!
+     * \brief Clears the vector
+    */
+    inline void clear(void) {
+      free_mem();
+    }
+
+    /*!
      * \brief Resize of the vector
      * \param[in] _N - new size of the vector
      * \param[in] init - value to initialize (default provided)
@@ -262,14 +295,14 @@ namespace Common {
     /*!
      * \brief Begin iterator (const version)
     */
-    inline auto cbegin()->decltype(std::declval<std::vector<Type>>().cbegin()) const {
+    inline decltype(std::declval<std::vector<Type>>().cbegin()) cbegin() const {
       return static_cast<decltype(std::declval<std::vector<Type>>().cbegin())>(m_data);
     }
 
     /*!
      * \brief End iterator (const version)
     */
-    inline auto cend()->decltype(std::declval<std::vector<Type>>().cend()) const {
+    inline decltype(std::declval<std::vector<Type>>().cend()) cend() const {
       return static_cast<decltype(std::declval<std::vector<Type>>().cend())>(m_data + N);
     }
 
@@ -325,7 +358,7 @@ namespace Common {
   template<typename T>
   void SU2Vec<T>::free_mem(void) {
     if (m_data!= NULL) {
-      delete [] m_data;
+      delete[] m_data;
       m_data = NULL;
       N = 0;
     }

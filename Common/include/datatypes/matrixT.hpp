@@ -28,6 +28,8 @@ namespace Common {
   public:
 
     using Type = T;
+    using value_type = T;
+    typedef typename std::vector<std::vector<T>>::size_type size_type;
 
     /*!
       * \brief Default constructor
@@ -379,14 +381,14 @@ namespace Common {
     /*!
      * \brief Begin iterator (const version)
     */
-    inline auto cbegin()->decltype(std::declval<std::vector<Type>>().cbegin()) const {
+    inline decltype(std::declval<std::vector<Type>>().cbegin()) cbegin() const {
       return static_cast<decltype(std::declval<std::vector<Type>>().cbegin())>(m_data);
     }
 
     /*!
      * \brief End iterator (const version)
     */
-    inline auto cend()->decltype(std::declval<std::vector<Type>>().cend()) const {
+    inline decltype(std::declval<std::vector<Type>>().cend()) cend() const {
       return static_cast<decltype(std::declval<std::vector<Type>>().cend())>(m_data + n_rows*n_cols);
     }
 
