@@ -28,6 +28,8 @@ namespace Common {
   public:
 
     using Type = T;
+    using value_type = T;
+    typedef typename std::vector<T>::size_type size_type;
 
     /*!
       * \brief Default constructor
@@ -74,10 +76,34 @@ namespace Common {
 
     /*!
       * \brief Copy Constructor with range
+      * \param[in] init - pointer to first datum
+      * \param[in] end - pointer to one past last datum
+    */
+    explicit SU2Vec(Type* init,Type* end) {
+      N = end - init;
+      allocate();
+      for (std::size_t i = 0; i < size(); ++i)
+        m_data[i] = *init++;
+    }
+
+    /*!
+      * \brief Copy Constructor with range (non const version)
       * \param[in] init - begin iterator
       * \param[in] end - end iterator
     */
-    SU2Vec(Type* init,Type* end) {
+    explicit SU2Vec(decltype(std::declval<std::vector<Type>>().begin()) init,decltype(std::declval<std::vector<Type>>().end()) end) {
+      N = end - init;
+      allocate();
+      for (std::size_t i = 0; i < size(); ++i)
+        m_data[i] = *init++;
+    }
+
+    /*!
+      * \brief Copy Constructor with range (const version)
+      * \param[in] init - begin iterator
+      * \param[in] end - end iterator
+    */
+    explicit SU2Vec(decltype(std::declval<std::vector<Type>>().cbegin()) init,decltype(std::declval<std::vector<Type>>().cend()) end) {
       N = end - init;
       allocate();
       for (std::size_t i = 0; i < size(); ++i)

@@ -36,6 +36,13 @@ CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned 
   Gradient_Primitive.resize(nPrimVarGrad,nDim);
   Limiter_Primitive.resize(nPrimVarGrad);
 
+  Limiter = new su2double [nVar];
+  std::fill(Limiter,Limiter + nVar,0.0);
+  Solution_Max = new su2double[nPrimVarGrad];
+  std::fill(Solution_Max,Solution_Max + nPrimVarGrad,0.0);
+  Solution_Min = new su2double[nPrimVarGrad];
+  std::fill(Solution_Min,Solution_Min + nPrimVarGrad,0.0);
+
 }
 
 //
@@ -63,11 +70,11 @@ CReactiveEulerVariable::CReactiveEulerVariable(su2double val_pressure,RealVec& v
 
   RealVec Yi = val_massfrac;
   //library->SetRiGas(Yi);
-  su2double Rgas = library->GetRgas();
+  //su2double Rgas = library->GetRgas();
   su2double rho,rhoE;
 
   /*--- Compute mixture density ---*/
-  rho = P/(Rgas*T);
+  //rho = library->ComputeDensity(T,P);
 
   su2double Gamma = 0.0,Sound_Speed = 0.0;
   library->Gamma_FrozenSoundSpeed(T,P,rho,Gamma,Sound_Speed);
@@ -406,6 +413,7 @@ su2double** CReactiveEulerVariable::GetGradient_Primitive(void) {
   return tmp.data();
 }
 
+
 //
 //
 /*!
@@ -519,8 +527,7 @@ inline void CReactiveEulerVariable::SetVelocity_Old(su2double* val_velocity) {
 //
 CReactiveNSVariable::CReactiveNSVariable(unsigned short val_nDim,unsigned short val_nvar, std::shared_ptr<CConfig> config):
                      CReactiveEulerVariable(val_nDim,val_nvar,config),Laminar_Viscosity(),Thermal_Conductivity() {
-  nPrimVarGrad = nSpecies + nDim + 2;
-  Gradient_Primitive.resize(nPrimVarGrad,nDim);
+  nSecondaryVarGrad = nSpecies + nDim + 1;
   Diffusion_Coeffs.resize(nSpecies);
 }
 
@@ -535,8 +542,9 @@ CReactiveNSVariable::CReactiveNSVariable(su2double val_density, RealVec& val_mas
                                          su2double val_temperature,unsigned short val_nDim, unsigned short val_nvar,
                                          std::shared_ptr<CConfig> config): CReactiveEulerVariable(val_density,val_massfrac,val_velocity,
                                                                            val_temperature,val_nDim,val_nvar,config) {
-  nPrimVarGrad = nSpecies + nDim + 2;
-  Gradient_Primitive.resize(nPrimVarGrad,nDim);
+  nPrimVarAvgGrad = nSpecies + nDim + 2;
+  AvgGradient_Primitive.resize(nPrimVarAvgGrad);
+
   Diffusion_Coeffs.resize(nSpecies);
   Laminar_Viscosity = 0.0;
   Thermal_Conductivity = 0.0;
@@ -551,8 +559,9 @@ CReactiveNSVariable::CReactiveNSVariable(su2double val_density, RealVec& val_mas
 //
 CReactiveNSVariable::CReactiveNSVariable(RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar,
                                          std::shared_ptr<CConfig> config): CReactiveEulerVariable(val_solution,val_nDim,val_nvar,config) {
-  nPrimVarGrad = nSpecies + nDim + 2;
-  Gradient_Primitive.resize(nPrimVarGrad,nDim);
+  nPrimVarAvgGrad = nSpecies + nDim + 2;
+  AvgGradient_Primitive.resize(nPrimVarAvgGrad);
+
   Diffusion_Coeffs.resize(nSpecies);
   Laminar_Viscosity = 0.0;
   Thermal_Conductivity = 0.0;

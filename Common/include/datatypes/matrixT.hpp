@@ -28,6 +28,8 @@ namespace Common {
   public:
 
     using Type = T;
+    using value_type = T;
+    typedef typename std::vector<std::vector<T>>::size_type size_type;
 
     /*!
       * \brief Default constructor
