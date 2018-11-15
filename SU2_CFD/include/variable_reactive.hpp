@@ -37,24 +37,36 @@ protected:
 public:
 
   /**
-   * Enumerator defining the mapping between the primitive variable name
-   * and its position in the physical data
+   * Mapping between the primitive variable name and its position in the physical data
    */
-  enum {T_INDEX_PRIM=0, VX_INDEX_PRIM=1, VY_INDEX_PRIM=2, VZ_INDEX_PRIM=3,P_INDEX_PRIM=VZ_INDEX_PRIM+1, RHO_INDEX_PRIM=P_INDEX_PRIM+1,
-        H_INDEX_PRIM=RHO_INDEX_PRIM+1, A_INDEX_PRIM=H_INDEX_PRIM+1, RHOS_INDEX_PRIM=A_INDEX_PRIM+1};
+  static constexpr unsigned T_INDEX_PRIM = 0;
+  static constexpr unsigned VX_INDEX_PRIM = 1;
+  static const unsigned P_INDEX_PRIM;
+  static const unsigned RHO_INDEX_PRIM;
+  static const unsigned H_INDEX_PRIM;
+  static const unsigned A_INDEX_PRIM;
+  static const unsigned RHOS_INDEX_PRIM;
+
+  //enum {T_INDEX_PRIM=0, VX_INDEX_PRIM=1, VY_INDEX_PRIM=2, VZ_INDEX_PRIM=3,P_INDEX_PRIM=VZ_INDEX_PRIM+1, RHO_INDEX_PRIM=P_INDEX_PRIM+1,
+  //      H_INDEX_PRIM=RHO_INDEX_PRIM+1, A_INDEX_PRIM=H_INDEX_PRIM+1, RHOS_INDEX_PRIM=A_INDEX_PRIM+1};
 
   /**
-   * Enumerator defining the mapping between the solution variable name
-   * and its position in the physical data
+   * Mapping between the solution variable name and its position in the physical data
    */
-  enum {RHO_INDEX_SOL=0, RHOVX_INDEX_SOL=1, RHOVY_INDEX_SOL=2,RHOVZ_INDEX_SOL=3,
-        RHOE_INDEX_SOL=RHOVZ_INDEX_SOL+1, RHOS_INDEX_SOL=RHOE_INDEX_SOL+1};
+  static constexpr unsigned RHO_INDEX_SOL = 0;
+  static constexpr unsigned RHOVX_INDEX_SOL = 1;
+  static const unsigned RHOE_INDEX_SOL;
+  static const unsigned RHOS_INDEX_SOL;
+  //enum {RHO_INDEX_SOL=0, RHOVX_INDEX_SOL=1, RHOVY_INDEX_SOL=2,RHOVZ_INDEX_SOL=3,
+  //      RHOE_INDEX_SOL=RHOVZ_INDEX_SOL+1, RHOS_INDEX_SOL=RHOE_INDEX_SOL+1};
 
   /**
-   * Enumerator defining the mapping between the primitive variable gradient name
-   * and its position in the physical data
+   * Mapping between the primitive variable gradient name and its position in the physical data
    */
-  enum {T_INDEX_GRAD=0, VX_INDEX_GRAD=1, VY_INDEX_GRAD=2,VZ_INDEX_GRAD=3,P_INDEX_GRAD = 4};
+  static constexpr unsigned T_INDEX_GRAD = 0;
+  static constexpr unsigned VX_INDEX_GRAD = 1;
+  static const unsigned P_INDEX_GRAD;
+  //enum {T_INDEX_GRAD=0, VX_INDEX_GRAD=1, VY_INDEX_GRAD=2,VZ_INDEX_GRAD=3,P_INDEX_GRAD = 4};
 
   /*!
 	 * \brief Default constructor of the class.
@@ -65,9 +77,12 @@ public:
    * \overload
    * \param[in] val_nDim - Number of dimensions of the problem.
    * \param[in] val_nvar - Number of variables of the problem.
+   * \param[in] val_nprimvar - Number of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
+  CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
+                         unsigned short val_nprimvargrad,std::shared_ptr<CConfig> config);
 
   /*!
 	 * \overload
@@ -76,19 +91,25 @@ public:
 	 * \param[in] val_temperature - Value of the flow energy (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of conserved variables.
+   * \param[in] val_nprimvar - Number of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveEulerVariable(su2double val_pressure,RealVec& val_massfrac,RealVec& val_velocity, su2double val_temperature,
-                         unsigned short val_nDim,unsigned short val_nvar,std::shared_ptr<CConfig> config);
+	CReactiveEulerVariable(su2double val_pressure, RealVec& val_massfrac, RealVec& val_velocity, su2double val_temperature,
+                         unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
+                         unsigned short val_nprimvargrad, std::shared_ptr<CConfig> config);
 
 	/*!
 	 * \overload
 	 * \param[in] val_solution - Vector with the flow value (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of variables of the problem.
-	 * \param[in] config - Definition of the particular problem.
+   * \param[in] val_nprimvar - Number of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of variables of the problem.
+   * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveEulerVariable(RealVec& val_solution, unsigned short val_nDim,unsigned short val_nvar, std::shared_ptr<CConfig> config);
+	CReactiveEulerVariable(RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
+                         unsigned short val_nprimvargrad, std::shared_ptr<CConfig> config);
 
 
   /*!
@@ -392,11 +413,20 @@ public:
   bool SetTemperature(CConfig* config) override;
 
 };
+const unsigned CReactiveEulerVariable::P_INDEX_PRIM = CReactiveEulerVariable::VX_INDEX_PRIM + CReactiveEulerVariable::nDim;
+const unsigned CReactiveEulerVariable::RHO_INDEX_PRIM = CReactiveEulerVariable::P_INDEX_PRIM + 1;
+const unsigned CReactiveEulerVariable::H_INDEX_PRIM = CReactiveEulerVariable::RHO_INDEX_PRIM + 1;
+const unsigned CReactiveEulerVariable::A_INDEX_PRIM = CReactiveEulerVariable::H_INDEX_PRIM + 1;
+const unsigned CReactiveEulerVariable::RHOS_INDEX_PRIM = CReactiveEulerVariable::A_INDEX_PRIM + 1;
+
+const unsigned CReactiveEulerVariable::RHOE_INDEX_SOL = CReactiveEulerVariable::RHOVX_INDEX_SOL + CReactiveEulerVariable::nDim;
+const unsigned CReactiveEulerVariable::RHOS_INDEX_SOL = CReactiveEulerVariable::RHOE_INDEX_SOL + 1;
+
+const unsigned CReactiveEulerVariable::P_INDEX_GRAD = CReactiveEulerVariable::VX_INDEX_GRAD + CReactiveEulerVariable::nDim;
 
 
-
-/*! \class CReactiveEulerVariable
- *  \brief Main class for defining a variable for chemically reacting inviscid flows.
+/*! \class CReactiveNSVariable
+ *  \brief Main class for defining a variable for chemically reacting viscous flows.
  *  \author G. Orlando.
  */
 class CReactiveNSVariable:public CReactiveEulerVariable {
@@ -412,10 +442,13 @@ public:
 
   /**
    * Enumerator defining the mapping between the primitive variable gradient name
-   * and its position in the physical data
+   * for average computations and its position in the physical data
    */
-  enum {T_INDEX_AVGGRAD=0,VX_INDEX_AVGGRAD=1,VY_INDEX_AVGGRAD=2,VZ_INDEX_AVGGRAD=3,RHO_INDEX_AVGGRAD=4,RHOS_INDEX_AVGGRAD=5};
-
+  static constexpr unsigned T_INDEX_AVGGRAD = 0;
+  static constexpr unsigned VX_INDEX_AVGGRAD = 1;
+  static const unsigned RHO_INDEX_AVGGRAD;
+  static const unsigned RHOS_INDEX_AVGGRAD;
+  //enum {T_INDEX_AVGGRAD=0,VX_INDEX_AVGGRAD=1,VY_INDEX_AVGGRAD=2,VZ_INDEX_AVGGRAD=3,RHO_INDEX_AVGGRAD=4,RHOS_INDEX_AVGGRAD=5};
 
   /*!
 	 * \brief Default constructor of the class.
@@ -426,9 +459,13 @@ public:
    * \overloaded Constructor
    * \param[in] val_nDim - Number of dimensions of the problem.
    * \param[in] val_nvar - Number of variables of the problem.
+   * \param[in] val_nprimvar - Number of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
+  CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
+                      unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, std::shared_ptr<CConfig> config);
 
   /*!
 	 * \overload
@@ -437,19 +474,27 @@ public:
 	 * \param[in] val_temperature - Value of the flow temperature (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of conserved variables.
-	 * \param[in] config - Definition of the particular problem.
+   * \param[in] val_nprimvar - Number of gradient of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of variables of the problem.
+   * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
+   * \param[in] config - Definition of the particular problem.
 	 */
 	CReactiveNSVariable(su2double val_density, RealVec& val_massfrac, RealVec& val_velocity,su2double val_temperature,
-                      unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
+                      unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
+                      unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, std::shared_ptr<CConfig> config);
 
   /*!
 	 * \overload
 	 * \param[in] val_solution - Pointer to the flow value (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of conserved variables.
+   * \param[in] val_nprimvar - Number of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
    * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveNSVariable(RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, std::shared_ptr<CConfig> config);
+	CReactiveNSVariable(RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
+                      unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, std::shared_ptr<CConfig> config);
 
   /*!
 	 * \brief Destructor of the class.
@@ -561,5 +606,7 @@ public:
   }
 
 };
+const unsigned CReactiveNSVariable::RHO_INDEX_AVGGRAD = CReactiveNSVariable::VX_INDEX_AVGGRAD + CReactiveNSVariable::nDim;
+const unsigned CReactiveNSVariable::RHOS_INDEX_AVGGRAD = CReactiveNSVariable::VX_INDEX_AVGGRAD + 1;
 
 #endif

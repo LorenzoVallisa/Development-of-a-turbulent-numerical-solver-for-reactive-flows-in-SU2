@@ -78,14 +78,14 @@ public:
   //void Read_Restart(std::shared_ptr<CGeometry> geometry,std::shared_ptr<CConfig>,std::string val_filename);
 
   /*!
-   * \brief Set gradient primitive variables using Green Gauss.
+   * \brief Set gradient primitive variables static const unsigned Green Gauss.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
   void SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* config) override;
 
   /*!
-   * \brief Set gradient primitive variables using weighted least squares.
+   * \brief Set gradient primitive variables static const unsigned weighted least squares.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
@@ -120,6 +120,27 @@ public:
   void SetNondimensionalization(CGeometry* geometry, CConfig* config, unsigned short iMesh) override;
 
   /*!
+   * \brief Call MPI to set solution in case of parallel simulation
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   */
+  void Set_MPI_Solution(CGeometry* geometry,CConfig* config) override;
+
+  /*!
+   * \brief Call MPI to set limiter of primitive variables in case of parallel simulation.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   */
+  void Set_MPI_Primitive_Limiter(CGeometry* geometry,CConfig* config) override;
+
+  /*!
+   * \brief Call MPI to set gradient of primitive variables in case of parallel simulation.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   */
+  void Set_MPI_Primitive_Gradient(CGeometry* geometry,CConfig* config) override;
+
+  /*!
    * \brief Preprocessing.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solver_container - Container vector with all the solutions.
@@ -144,7 +165,7 @@ public:
                     unsigned short iMesh, unsigned long Iteration) override;
 
   /*!
-   * \brief Compute the spatial integration using a centered scheme.
+   * \brief Compute the spatial integration static const unsigned a centered scheme.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solver_container - Container vector with all the solutions.
    * \param[in] numerics - Description of the numerical method.
@@ -156,7 +177,7 @@ public:
                          CConfig* config, unsigned short iMesh, unsigned short iRKStep) override;
 
   /*!
-   * \brief Compute the spatial integration using a upwind scheme.
+   * \brief Compute the spatial integration static const unsigned a upwind scheme.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solver_container - Container vector with all the solutions.
    * \param[in] numerics - Description of the numerical method.
@@ -248,7 +269,7 @@ public:
 
 
    /*!
-    * \brief Update the solution using a Runge-Kutta scheme.
+    * \brief Update the solution static const unsigned a Runge-Kutta scheme.
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container vector with all the solutions.
     * \param[in] config - Definition of the particular problem.
@@ -258,7 +279,7 @@ public:
                              unsigned short iRKStep) override;
 
    /*!
-    * \brief Update the solution using the explicit Euler scheme.
+    * \brief Update the solution static const unsigned the explicit Euler scheme.
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container vector with all the solutions.
     * \param[in] config - Definition of the particular problem.
@@ -266,7 +287,7 @@ public:
    void ExplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) override;
 
    /*!
-    * \brief Update the solution using an implicit Euler scheme.
+    * \brief Update the solution static const unsigned an implicit Euler scheme.
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container vector with all the solutions.
     * \param[in] config - Definition of the particular problem.
@@ -306,18 +327,25 @@ public:
 	virtual ~CReactiveNSSolver() {}
 
   /*!
-   * \brief Set gradient primitive variables using Green Gauss.
+   * \brief Set gradient primitive variables static const unsigned Green Gauss.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
    void SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* config) override;
 
   /*!
-   * \brief Set gradient primitive variables using weighted least squares.
+   * \brief Set gradient primitive variables static const unsigned weighted least squares.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
    void SetPrimitive_Gradient_LS(CGeometry* geometry, CConfig* config) override;
+
+   /*!
+    * \brief Call MPI to set gradient of primitive variables in case of parallel simulation.
+    * \param[in] geometry - Geometrical definition of the problem.
+    * \param[in] config - Definition of the particular problem.
+    */
+   void Set_MPI_Primitive_Gradient(CGeometry* geometry,CConfig* config) override;
 
   /*!
    * \brief \overload

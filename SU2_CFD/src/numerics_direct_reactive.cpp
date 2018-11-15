@@ -288,7 +288,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(RealVec& val_primvar, RealMatrix&
   RealVec Vec(nDim);
   for (iDim = 0; iDim < nDim; ++iDim) {
     for (iSpecies = 0; iSpecies < nSpecies; iSpecies++)
-      Vec[iDim] += rho*Ds[iSpecies]*GV(CReactiveNSVariable::RHOS_INDEX_GRAD+iSpecies,iDim);
+      Vec[iDim] += rho*Ds[iSpecies]*GV(CReactiveNSVariable::RHOS_INDEX_AVGGRAD+iSpecies,iDim);
   }
 
   /*--- Compute the viscous stress tensor ---*/
@@ -319,7 +319,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(RealVec& val_primvar, RealMatrix&
 
     /*--- Species diffusion velocity ---*/
     for (iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-      Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] = rho*Ds[iSpecies]*GV(CReactiveNSVariable::RHOS_INDEX_GRAD+iSpecies,iDim)
+      Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] = rho*Ds[iSpecies]*GV(CReactiveNSVariable::RHOS_INDEX_AVGGRAD+iSpecies,iDim)
                                                                           - V[CReactiveNSVariable::RHOS_INDEX_PRIM+iSpecies]*Vec[iDim];
 
     /*--- Diffusion terms ---*/
@@ -384,8 +384,8 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   su2double Mean_Laminar_Viscosity; /*!< \brief Mean value of laminar viscosity. */
   su2double Mean_Thermal_Conductivity;  /*!< \brief Mean value of thermal conductivity. */
 
-  //library->GetRhoUdiff(Diffusion_Coefficient_Species_i);
-  //library->GetRhoUdiff(Diffusion_Coefficient_Species_j);
+  //Diffusion_Coefficient_Species_i = library->GetRhoUdiff(rho,kappa);
+  //Diffusion_Coefficient_Species_i = library->GetRhoUdiff(rho,kappa);
 
   ::Compute_Outward_UnitNormal(nDim,Normal,UnitNormal);
 
@@ -415,7 +415,7 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
     Mean_PrimVar[CReactiveNSVariable::RHOS_INDEX_PRIM+iSpecies] = 0.5*(PrimVar_i[CReactiveNSVariable::RHOS_INDEX_PRIM+iSpecies] +
                                                                        PrimVar_j[CReactiveNSVariable::RHOS_INDEX_PRIM+iSpecies]);
     for (iDim = 0; iDim < nDim; ++iDim) {
-      Mean_GradPrimVar(CReactiveNSVariable::RHOS_INDEX_GRAD,iDim) = 0.5*(1.0/V_i[CReactiveNSVariable::RHO_INDEX_PRIM]*
+      Mean_GradPrimVar(CReactiveNSVariable::RHOS_INDEX_AVGGRAD,iDim) = 0.5*(1.0/V_i[CReactiveNSVariable::RHO_INDEX_PRIM]*
                                                                     (GradPrimVar_i(CReactiveNSVariable::RHOS_INDEX_AVGGRAD + iSpecies,iDim) -
                                                                      PrimVar_i[CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies]*
                                                                      GradPrimVar_i(CReactiveNSVariable::RHO_INDEX_AVGGRAD,iDim)) +
@@ -495,7 +495,8 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
 
   /*--- Nonequilibrium chemistry from library ---*/
   RealVec Ys(U_i + CReactiveEulerVariable::RHOS_INDEX_SOL,U_i + (CReactiveEulerVariable::RHOS_INDEX_SOL + nSpecies));
-  //library->GetSourceTerm(Ys,......);
+  //auto res = library->GetMassProductionTerm(temp,rho,Ys);
+  //std::copy(res.cbegin(),res.cend(),val_residual);
   std::for_each(val_residual,val_residual + nDim,[=](su2double elem){return elem *= -Volume;});
   //L'UNICA COSA A CUI STARE ATTENTI SONO I SEGNI PERCHE' QUESTO E' UN RESIDUO QUINDI MI SA CHE DEVO INVERTIRLI
 
