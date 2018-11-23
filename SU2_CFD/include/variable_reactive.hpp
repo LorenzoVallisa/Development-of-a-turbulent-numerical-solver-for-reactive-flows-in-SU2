@@ -82,7 +82,7 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
-                         unsigned short val_nprimvargrad,std::shared_ptr<CConfig> config);
+                         unsigned short val_nprimvargrad,CConfig* config);
 
   /*!
 	 * \overload
@@ -97,7 +97,7 @@ public:
 	 */
 	CReactiveEulerVariable(su2double val_pressure, RealVec& val_massfrac, RealVec& val_velocity, su2double val_temperature,
                          unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
-                         unsigned short val_nprimvargrad, std::shared_ptr<CConfig> config);
+                         unsigned short val_nprimvargrad, CConfig* config);
 
 	/*!
 	 * \overload
@@ -109,7 +109,7 @@ public:
    * \param[in] config - Definition of the particular problem.
 	 */
 	CReactiveEulerVariable(RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
-                         unsigned short val_nprimvargrad, std::shared_ptr<CConfig> config);
+                         unsigned short val_nprimvargrad, CConfig* config);
 
 
   /*!
@@ -465,7 +465,7 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
-                      unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, std::shared_ptr<CConfig> config);
+                      unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, CConfig* config);
 
   /*!
 	 * \overload
@@ -481,7 +481,7 @@ public:
 	 */
 	CReactiveNSVariable(su2double val_density, RealVec& val_massfrac, RealVec& val_velocity,su2double val_temperature,
                       unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
-                      unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, std::shared_ptr<CConfig> config);
+                      unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, CConfig* config);
 
   /*!
 	 * \overload
@@ -494,7 +494,7 @@ public:
    * \param[in] config - Definition of the particular problem.
 	 */
 	CReactiveNSVariable(RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
-                      unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, std::shared_ptr<CConfig> config);
+                      unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, CConfig* config);
 
   /*!
 	 * \brief Destructor of the class.

@@ -2763,6 +2763,9 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
       (Kind_Turb_Model != NONE))
     Kind_Solver = RANS;
 
+  if (Kind_Solver == EULER || Kind_Solver == REACTIVE_EULER)
+    Kind_Turb_Model = NONE;
+
   Kappa_1st_Flow = Kappa_Flow[0];
   Kappa_2nd_Flow = Kappa_Flow[1];
   Kappa_4th_Flow = Kappa_Flow[2];
@@ -2942,6 +2945,7 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
   Viscous = (( Kind_Solver == NAVIER_STOKES          ) ||
              ( Kind_Solver == ADJ_NAVIER_STOKES      ) ||
              ( Kind_Solver == RANS                   ) ||
+             ( Kind_Solver == REACTIVE_NAVIER_STOKES ) ||
              ( Kind_Solver == ADJ_RANS               ) );
 
   /*--- To avoid boundary intersections, let's add a small constant to the planes. ---*/
@@ -3675,9 +3679,15 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible Euler equations." << endl;
         if (Kind_Regime == INCOMPRESSIBLE) cout << "Incompressible Euler equations." << endl;
         break;
+      case REACTIVE_EULER:
+        if (Kind_Regime == COMPRESSIBLE) cout << "Compressible reacting flow Euler equations." << endl;
+        break;
       case NAVIER_STOKES: case DISC_ADJ_NAVIER_STOKES:
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible Laminar Navier-Stokes' equations." << endl;
         if (Kind_Regime == INCOMPRESSIBLE) cout << "Incompressible Laminar Navier-Stokes' equations." << endl;
+        break;
+      case REACTIVE_NAVIER_STOKES:
+        if (Kind_Regime == COMPRESSIBLE) cout << "Compressible reacting flow Navier-Stokes equations." << endl;
         break;
       case RANS: case DISC_ADJ_RANS:
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible RANS equations." << endl;
@@ -3722,7 +3732,7 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
         (Kind_Solver != HEAT_EQUATION) && (Kind_Solver != WAVE_EQUATION)) {
       cout << "Mach number: " << Mach <<"."<< endl;
       cout << "Angle of attack (AoA): " << AoA <<" deg, and angle of sideslip (AoS): " << AoS <<" deg."<< endl;
-      if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == ADJ_NAVIER_STOKES) ||
+      if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == ADJ_NAVIER_STOKES) || (Kind_Solver == REACTIVE_NAVIER_STOKES) ||
           (Kind_Solver == RANS) || (Kind_Solver == ADJ_RANS))
         cout << "Reynolds number: " << Reynolds <<". Reference length "  << Length_Reynolds << "." << endl;
       if (Fixed_CL_Mode) cout << "Fixed CL mode, target value: " << Target_CL << "." << endl;
@@ -5640,6 +5650,8 @@ unsigned short CConfig::GetContainerPosition(unsigned short val_eqsystem) {
     case RUNTIME_ADJFLOW_SYS:   return ADJFLOW_SOL;
     case RUNTIME_ADJTURB_SYS:   return ADJTURB_SOL;
     case RUNTIME_MULTIGRID_SYS: return 0;
+    // simulation addition
+    case RUNTIME_REACTIVE_SYS:  return REACTIVE_SOL;
   }
   return 0;
 }
@@ -5676,6 +5688,14 @@ void CConfig::SetGlobalParam(unsigned short val_solver,
       break;
     case NAVIER_STOKES:
       if (val_system == RUNTIME_FLOW_SYS) {
+        SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,
+                              Kind_Upwind_Flow, Kind_SlopeLimit_Flow,
+                              SpatialOrder_Flow);
+        SetKind_TimeIntScheme(Kind_TimeIntScheme_Flow);
+      }
+      break;
+    case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
+      if (val_system == RUNTIME_REACTIVE_SYS) {
         SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,
                               Kind_Upwind_Flow, Kind_SlopeLimit_Flow,
                               SpatialOrder_Flow);

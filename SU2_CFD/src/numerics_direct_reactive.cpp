@@ -1,4 +1,6 @@
 #include "../include/numerics_reactive.hpp"
+
+#include "../../Common/include/reacting_model_library.hpp"
 #include "../../Common/include/not_implemented_exception.hpp"
 #include "../../Common/include/move_pointer.hpp"
 #include "../../Common/include/su2_assert.hpp"
@@ -29,8 +31,8 @@ namespace {
 /*!
  * \brief Constructor of the class CUpwReactiveAUSM
  */
-CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, std::shared_ptr<CConfig> config):
-    CNumerics(val_nDim,val_nVar,config.get()),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),
+CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
+    CNumerics(val_nDim,val_nVar,config),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),
     nSpecies(library->GetNSpecies()) {
 
   implicit = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
@@ -221,8 +223,8 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
 //
 //
 
-CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, std::shared_ptr<CConfig> config):
-  CNumerics(val_nDim,val_nVar,config.get()),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),nSpecies(library->GetNSpecies()) {
+CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
+  CNumerics(val_nDim,val_nVar,config),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),nSpecies(library->GetNSpecies()) {
 
   nPrimVar = nSpecies + nDim + 5;
   nPrimVarAvgGrad = nSpecies + nDim + 1;
@@ -471,8 +473,8 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
 //
 //
 
-CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, std::shared_ptr<CConfig> config):
-  CNumerics(val_nDim,val_nVar,config.get()),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),
+CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
+  CNumerics(val_nDim,val_nVar,config),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),
   nSpecies(library->GetNSpecies()) {
 
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);

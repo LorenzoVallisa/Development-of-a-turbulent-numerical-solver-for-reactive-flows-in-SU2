@@ -25,8 +25,8 @@ CReactiveEulerVariable::CReactiveEulerVariable():CVariable(),nSpecies() {
 //
 
 CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned short val_nvar, unsigned short val_nprimvar,
-                                               unsigned short val_nprimvargrad,std::shared_ptr<CConfig> config):
-                        CVariable(val_nDim,val_nvar,config.get()),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),
+                                               unsigned short val_nprimvargrad,CConfig* config):
+                        CVariable(val_nDim,val_nvar,config),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),
                         nSpecies(library->GetNSpecies()) {
   nPrimVar = val_nprimvar;
   nPrimVarGrad = val_nprimvargrad;
@@ -52,7 +52,7 @@ CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned 
 //
 CReactiveEulerVariable::CReactiveEulerVariable(su2double val_pressure,RealVec& val_massfrac,RealVec& val_velocity,
                                                su2double val_temperature,unsigned short val_nDim,unsigned short val_nvar,
-                                               unsigned short val_nprimvar, unsigned short val_nprimvargrad, std::shared_ptr<CConfig> config):
+                                               unsigned short val_nprimvar, unsigned short val_nprimvargrad, CConfig* config):
                                                CReactiveEulerVariable(val_nDim,val_nvar,val_nprimvar,val_nprimvargrad,config) {
 
   /*--- Load variables from the config class --*/
@@ -115,8 +115,8 @@ CReactiveEulerVariable::CReactiveEulerVariable(su2double val_pressure,RealVec& v
 //
 CReactiveEulerVariable::CReactiveEulerVariable(RealVec& val_solution,unsigned short val_nDim,unsigned short val_nvar,
                                                unsigned short val_nprimvar, unsigned short val_nprimvargrad,
-                                               std::shared_ptr<CConfig> config): CReactiveEulerVariable(val_nDim,val_nvar,val_nprimvar,
-                                                                                                        val_nprimvargrad,config) {
+                                               CConfigé config): CReactiveEulerVariable(val_nDim,val_nvar,val_nprimvar,
+                                                                                        val_nprimvargrad,config) {
 
   /*--- Initialize Solution and Solution_Old vectors ---*/
   SU2_Assert(Solution != NULL,"The array Solution has not been allocated");
@@ -504,7 +504,7 @@ inline void CReactiveEulerVariable::SetVelocity_Old(su2double* val_velocity) {
 //
 //
 CReactiveNSVariable::CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
-                                         unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, std::shared_ptr<CConfig> config):
+                                         unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, CConfig* config):
                      CReactiveEulerVariable(val_nDim,val_nvar,val_nprimvar,val_nprimvargrad,config),Laminar_Viscosity(),Thermal_Conductivity() {
 
   nPrimVarAvgGrad = val_nprimvar_avggrad;
@@ -524,7 +524,7 @@ CReactiveNSVariable::CReactiveNSVariable(unsigned short val_nDim, unsigned short
 CReactiveNSVariable::CReactiveNSVariable(su2double val_density, RealVec& val_massfrac, RealVec& val_velocity,
                                          su2double val_temperature, unsigned short val_nDim, unsigned short val_nvar,
                                          unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad,
-                                         std::shared_ptr<CConfig> config):
+                                         CConfig* config):
                                          CReactiveEulerVariable(val_density,val_massfrac,val_velocity,val_temperature,val_nDim,
                                                                 val_nvar,val_nprimvar,val_nprimvargrad,config) {
   nPrimVarAvgGrad = val_nprimvar_avggrad;
@@ -543,7 +543,7 @@ CReactiveNSVariable::CReactiveNSVariable(su2double val_density, RealVec& val_mas
 //
 //
 CReactiveNSVariable::CReactiveNSVariable(RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nprimvar,
-                                         unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, std::shared_ptr<CConfig> config):
+                                         unsigned short val_nprimvargrad, unsigned short val_nprimvar_avggrad, CConfig* config):
                                          CReactiveEulerVariable(val_solution,val_nDim,val_nvar,val_nprimvar,val_nprimvargrad,config) {
   nPrimVarAvgGrad = val_nprimvar_avggrad;
   AvgGradient_Primitive.resize(nPrimVarAvgGrad,nDim);

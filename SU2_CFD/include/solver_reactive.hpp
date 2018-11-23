@@ -4,8 +4,6 @@
 #include "solver_structure.hpp"
 #include "variable_reactive.hpp"
 
-#include <memory>
-
 /*! \class CReactiveEulerSolver
  *  \brief Main class for defining a solver for chemically reacting inviscid flows.
  *  \author G. Orlando.
@@ -56,7 +54,7 @@ public:
 	 * \param[in] geometry - Geometrical definition of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry,std::shared_ptr<CConfig> config,unsigned short iMesh);
+	CReactiveEulerSolver(CGeometry* geometry,CConfig* config,unsigned short iMesh);
 
 	/*!
 	 * \brief Destructor of the class.
@@ -67,7 +65,7 @@ public:
  	 * \brief Looking for non physical points in the initial solution
  	 * \param[in] config - Definition of the particular problem.
  	 */
- 	void Check_FreeStream_Solution(std::shared_ptr<CConfig> config);
+ 	void Check_FreeStream_Solution(CConfig* config);
 
   /*!
 	 * \brief Reading files in case of restart
@@ -75,7 +73,7 @@ public:
 	 * \param[in] config - Definition of the particular problem.
    * \param[in] val_filename - Name of the file for the restart
 	 */
-  //void Read_Restart(std::shared_ptr<CGeometry> geometry,std::shared_ptr<CConfig>,std::string val_filename);
+  //void Read_Restart(CGeometry* geometry,CConfig* config,std::string val_filename);
 
   /*!
    * \brief Set gradient primitive variables static const unsigned Green Gauss.
@@ -90,13 +88,6 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   void SetPrimitive_Gradient_LS(CGeometry* geometry, CConfig* config) override;
-
-  /*!
-   * \brief A virtual member to compute gradients.
-   * \param[in] geometry - Geometrical definition of the problem.
-   * \param[in] config - Definition of the particular problem.
-   */
-  //virtual void SetPrimitive_Gradient(std::shared_ptr<CConfig> config);
 
   /*!
    * \brief Compute the limiter of the primitive variables.
@@ -319,7 +310,7 @@ public:
 	 * \param[in] config - Definition of the particular problem.
    * \param[in] iMesh - Index of the mesh in multigrid computations.
 	 */
-	CReactiveNSSolver(std::shared_ptr<CGeometry> geometry, std::shared_ptr<CConfig> config, unsigned short iMesh);
+	CReactiveNSSolver(CGeometry* geometry, CConfig* config, unsigned short iMesh);
 
 	/*!
 	 * \brief Destructor of the class.
@@ -346,13 +337,6 @@ public:
     * \param[in] config - Definition of the particular problem.
     */
    void Set_MPI_Primitive_Gradient(CGeometry* geometry,CConfig* config) override;
-
-  /*!
-   * \brief \overload
-   * \param[in] geometry - Geometrical definition of the problem.
-   * \param[in] config - Definition of the particular problem.
-   */
-   //void SetPrimitive_Gradient(std::shared_ptr<CConfig> config) override;
 
    /*!
     * \brief Set the fluid solver nondimensionalization.

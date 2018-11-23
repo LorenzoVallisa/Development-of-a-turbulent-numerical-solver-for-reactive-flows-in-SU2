@@ -46,9 +46,12 @@
 #include "../../Common/include/config_structure.hpp"
 #include "../../Common/include/interpolation_structure.hpp"
 
+#include "solver_reactive.hpp"
+#include "numerics_reactive.hpp"
+
 using namespace std;
 
-/*! 
+/*!
  * \class CDriver
  * \brief Parent class for driving an iteration of a single or multi-zone problem.
  * \author T. Economon
@@ -86,8 +89,8 @@ protected:
   su2double APINodalForceDensity[3];            /*!< \brief This is used to store the force density at each node. */
 
 public:
-	
-  /*! 
+
+  /*!
    * \brief Constructor of the class.
    * \param[in] confFile - Configuration file name.
    * \param[in] val_nZone - Total number of zones.
@@ -106,7 +109,7 @@ public:
 
   /*!
    * \brief A virtual member.
-   */  
+   */
   virtual void Run() { };
 
   /*!
@@ -477,8 +480,8 @@ public:
  */
 class CGeneralDriver : public CDriver {
 public:
-  
-  /*! 
+
+  /*!
    * \brief Constructor of the class.
    * \param[in] confFile - Configuration file name.
    * \param[in] val_nZone - Total number of zones.
@@ -495,9 +498,9 @@ public:
    */
   ~CGeneralDriver(void);
 
-  /*! 
+  /*!
    * \brief Run a single iteration of the physics within a single zone.
-   */  
+   */
   void Run();
 
   /*!
@@ -535,7 +538,7 @@ public:
  */
 class CFluidDriver : public CDriver {
 public:
-  
+
   /*!
    * \brief Constructor of the class.
    * \param[in] confFile - Configuration file name.

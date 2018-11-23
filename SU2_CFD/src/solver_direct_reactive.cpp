@@ -48,7 +48,7 @@ CReactiveEulerSolver::CReactiveEulerSolver():CSolver(),nSpecies(),space_centered
   */
 //
 //
-CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, std::shared_ptr<CConfig> config,unsigned short iMesh):
+CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,unsigned short iMesh):
                       CSolver(),library(new Framework::ReactingModelLibrary(config->GetLibraryName())),nSpecies(library->GetNSpecies()) {
   unsigned long iPoint;
   unsigned short iVar,iDim;
@@ -68,7 +68,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, 
     }
 
     /*--- Read and store the restart metadata. ---*/
-    //Read_SU2_Restart_Metadata(geometry.get(), config.get(), false, file_name);
+    //Read_SU2_Restart_Metadata(geometry, config, false, file_name);
   }
 
   Max_Delta_Time = 0.0;
@@ -83,7 +83,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, 
   nPrimVarGrad = nDim + 2; /*--- Gradient Primitive variables (T,vx,vy,vz,P,rho)^T ---*/
 
   /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
-  SetNondimensionalization(geometry.get(), config.get(), iMesh);
+  SetNondimensionalization(geometry, config, iMesh);
 
 	/*--- Allocate a CVariable array foreach node of the mesh ---*/
 	node = new CVariable*[nPoint];
@@ -122,7 +122,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, 
     OutputVariables.Initialize(nPoint, nPointDomain, nOutputVariables, 0.0);
   }
 
-	/*--- Allocate Jacobians forimplicit time-stepping ---*/
+	/*--- Allocate Jacobians for implicit time-stepping ---*/
 	if(config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT) {
     implicit = true;
 		Jacobian_i = new su2double* [nVar];
@@ -180,7 +180,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, 
   Check_FreeStream_Solution(config);
 
   /*--- MPI solution ---*/
-	Set_MPI_Solution(geometry.get(), config.get());
+	Set_MPI_Solution(geometry, config);
 
 }
 //
@@ -193,7 +193,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(std::shared_ptr<CGeometry> geometry, 
  */
 //
 //
-void CReactiveEulerSolver::Check_FreeStream_Solution(std::shared_ptr<CConfig> config) {
+void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
 
   int rank = MASTER_NODE;
   #ifdef HAVE_MPI
@@ -202,12 +202,12 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(std::shared_ptr<CConfig> co
 
   RealVec Solution(nVar);
 
-  bool check_infty = node_infty->SetPrimVar(config.get());
+  bool check_infty = node_infty->SetPrimVar(config);
 
   unsigned long counter_local = 0, counter_global;
   for(unsigned long iPoint = 0; iPoint < nPoint; ++iPoint) {
 
-    bool nonPhys = node[iPoint]->SetPrimVar(config.get());
+    bool nonPhys = node[iPoint]->SetPrimVar(config);
 
     if(nonPhys) {
 
@@ -391,8 +391,7 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(std::shared_ptr<CConfig> co
 
      bool SI_Measurement = config->GetSystemMeasurements() == SI;
      bool US_Measuremanet = config->GetSystemMeasurements() == US;
-     if(!SI_Measurement && !US_Measuremanet)
-      throw std::out_of_range("Unknown option in the unit measure for adimensionalitazion");
+
 
      std::cout << "Reference specific gas constant: " << Gas_Constant_Ref;
      if(SI_Measurement)
@@ -493,8 +492,6 @@ void CReactiveEulerSolver::Preprocessing(CGeometry* geometry, CSolver** solver_c
       SetPrimitive_Gradient_LS(geometry, config);
     else if(config->GetKind_Gradient_Method() == GREEN_GAUSS)
       SetPrimitive_Gradient_GG(geometry, config);
-    else
-      throw std::out_of_range("Unknown option in the computation of the gradient");
 
     /*--- Limiter computation ---*/
     if(limiter && iMesh == MESH_0 && !Output)
@@ -506,8 +503,12 @@ void CReactiveEulerSolver::Preprocessing(CGeometry* geometry, CSolver** solver_c
       throw Common::NotImplemented("Centered convective scheme not implemented\n");
 
   /*--- Initialize the Jacobian matrices ---*/
-  if(implicit)
+  if(implicit) {
     Jacobian.SetValZero();
+    std::cout<<"Setting explicit"<<std::endl;
+    implicit = false;
+    Jacobian.SetValZero();
+  }
 
   /*--- Error message ---*/
   if(config->GetConsole_Output_Verb() == VERB_HIGH) {
@@ -2040,7 +2041,7 @@ void CReactiveEulerSolver::BC_Far_Field(CGeometry* geometry, CSolver** solver_co
   */
 //
 //
-CReactiveNSSolver::CReactiveNSSolver(std::shared_ptr<CGeometry> geometry, std::shared_ptr<CConfig> config,unsigned short iMesh):
+CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config,unsigned short iMesh):
                    CReactiveEulerSolver() {
   unsigned long iPoint;
   unsigned short iVar,iDim;
@@ -2063,7 +2064,7 @@ CReactiveNSSolver::CReactiveNSSolver(std::shared_ptr<CGeometry> geometry, std::s
     }
 
     /*--- Read and store the restart metadata. ---*/
-    //Read_SU2_Restart_Metadata(geometry.get(), config.get(), false, file_name);
+    //Read_SU2_Restart_Metadata(geometry, config, false, file_name);
   }
 
   Max_Delta_Time = 0.0;
@@ -2079,7 +2080,7 @@ CReactiveNSSolver::CReactiveNSSolver(std::shared_ptr<CGeometry> geometry, std::s
   nPrimVarAvgGrad = nSpecies + nDim + 1; /*--- Gradient variables for average gradient computation (T,vx,vy,vz,Y1....YNs)^T ---*/
 
   /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
-  SetNondimensionalization(geometry.get(), config.get(), iMesh);
+  SetNondimensionalization(geometry, config, iMesh);
 
 	/*--- Allocate a CVariable array foreach node of the mesh ---*/
 	node = new CVariable*[nPoint];
@@ -2191,7 +2192,7 @@ CReactiveNSSolver::CReactiveNSSolver(std::shared_ptr<CGeometry> geometry, std::s
   Check_FreeStream_Solution(config);
 
   /*--- MPI solution ---*/
-	Set_MPI_Solution(geometry.get(), config.get());
+	Set_MPI_Solution(geometry, config);
 
 }
 //

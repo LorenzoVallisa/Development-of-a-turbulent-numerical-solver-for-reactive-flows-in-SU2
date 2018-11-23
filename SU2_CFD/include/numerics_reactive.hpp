@@ -3,9 +3,6 @@
 
 #include "numerics_structure.hpp"
 #include "variable_reactive.hpp"
-#include "../../Common/include/reacting_model_library.hpp"
-
-#include <memory>
 
 /*!
  * \class CUpwReactiveAUSM
@@ -40,7 +37,7 @@ public:
 	 * \param[in] val_nVar - Number of variables of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
-  CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, std::shared_ptr<CConfig> config);
+  CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, CConfig* config);
 
   /*!
 	 * \brief Destructor of the class.
@@ -111,7 +108,7 @@ public:
    * \param[in] val_nVar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, std::shared_ptr<CConfig> config);
+  CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, CConfig* config);
 
   /*!
    * \brief Destructor of the class.
@@ -205,7 +202,7 @@ public:
    * \param[in] val_nVar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, std::shared_ptr<CConfig> config);
+  CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config);
 
   /*!
    * \brief Destructor of the class.
