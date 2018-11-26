@@ -17,9 +17,10 @@ public:
   using SmartArr = CReactiveEulerVariable::SmartArr;
 
 protected:
-  LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
+  static LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
   unsigned short nSpecies; /*!< \brief Total number of species. */
+  unsigned short nPrimVarLim; /*!< \brief Number of primitive variables to limit. */
 
   bool  space_centered,  /*!< \brief True if space centered scheeme used. */
         implicit,      /*!< \brief True if euler implicit scheme used. */
@@ -60,6 +61,13 @@ public:
 	 * \brief Destructor of the class.
 	 */
 	virtual ~CReactiveEulerSolver() {}
+
+  /*!
+  * \brief Set the simulation to explicit
+  */
+  inline void SetExplicit(void) {
+    implicit = false;
+  }
 
    /*!
  	 * \brief Looking for non physical points in the initial solution
@@ -293,7 +301,6 @@ public:
  */
 class CReactiveNSSolver:public CReactiveEulerSolver {
 protected:
-  unsigned short nPrimVarAvgGrad; /*!< \brief Number of varaibles for average gradient */
 
   su2double Viscosity_Inf;	/*!< \brief Viscosity at the infinity. */
 
@@ -302,7 +309,7 @@ public:
   /*!
 	 * \brief Default constructor of the class.
 	 */
-   CReactiveNSSolver(): CReactiveEulerSolver(),nPrimVarAvgGrad(),Viscosity_Inf() {}
+  CReactiveNSSolver(): CReactiveEulerSolver(), Viscosity_Inf() {}
 
 	/*!
 	 * \overloaded constructor of the class
@@ -330,13 +337,6 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
    void SetPrimitive_Gradient_LS(CGeometry* geometry, CConfig* config) override;
-
-   /*!
-    * \brief Call MPI to set gradient of primitive variables in case of parallel simulation.
-    * \param[in] geometry - Geometrical definition of the problem.
-    * \param[in] config - Definition of the particular problem.
-    */
-   void Set_MPI_Primitive_Gradient(CGeometry* geometry,CConfig* config) override;
 
    /*!
     * \brief Set the fluid solver nondimensionalization.

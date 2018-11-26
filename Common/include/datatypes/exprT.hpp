@@ -27,7 +27,7 @@ namespace Common {
   template <class Derived, typename T>
   struct ExprT {
 
-    using Type = T;
+    using value_type = T;
 
     /*!
       *\brief Cast operator to derived class (const version)
@@ -46,30 +46,30 @@ namespace Common {
    /*!
     * \brief Access operator (const version)
    */
-   //inline const Type& operator[](std::size_t i) const
-   inline Type operator[](std::size_t i) const {
+   //inline const T& operator[](std::size_t i) const
+   inline T operator[](std::size_t i) const {
      return this->operator const Derived&().operator[](i);
    }
 
    /*!
     * \brief Access operator (non const version)
    */
-   inline Type& operator[](std::size_t i) {
+   inline T& operator[](std::size_t i) {
      return this->operator Derived&().operator[](i);
    }
 
    /*!
     * \brief Access operator (const version)
    */
-   inline Type& at(std::size_t i) {
+   inline T& at(std::size_t i) {
      return this->operator Derived&().at(i);
    }
 
    /*!
     * \brief Access operator (non const version)
    */
-   //inline const Type& at(std::size_t i) const
-   inline Type at(std::size_t i) const {
+   //inline const T& at(std::size_t i) const
+   inline T at(std::size_t i) const {
      return this->operator const Derived&().at(i);
    }
 
@@ -92,7 +92,7 @@ namespace Common {
    * \author G. Orlando
    */
 
-   #define TYPE(a) typename a::Type
+   #define TYPE(a) typename a::value_type
    #define VET_TYPE(a) ExprT<a,TYPE(a)>
 
    #define ETVEC_BINARY(OpName,__op__) \

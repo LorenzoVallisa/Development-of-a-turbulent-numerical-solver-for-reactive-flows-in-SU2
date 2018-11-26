@@ -533,6 +533,10 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\brief LIB_NAME \n  DESCRIPTION: Library name for physical-chemical properties */
   addStringOption("LIB_NAME",Library_Name,"");
 
+  /*!\brief CONFIG_LIB_FILE \n  DESCRIPTION: Name of file to configure the library */
+  addStringOption("CONFIG_LIB_FILE",Config_File_Lib,"");
+
+
   /*!\brief REGIME_TYPE \n  DESCRIPTION: Regime type \n OPTIONS: see \link Regime_Map \endlink \ingroup Config*/
   addEnumOption("REGIME_TYPE", Kind_Regime, Regime_Map, COMPRESSIBLE);
 

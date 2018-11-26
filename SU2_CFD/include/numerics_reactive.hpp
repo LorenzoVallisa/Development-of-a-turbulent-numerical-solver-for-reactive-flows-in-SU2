@@ -6,7 +6,7 @@
 
 /*!
  * \class CUpwReactiveAUSM
- * \brief Class for solving using AUSM method.
+ * \brief Class for computing convective flux using AUSM method.
  * \author G. Orlando
  */
 class CUpwReactiveAUSM: public CNumerics {
@@ -22,7 +22,7 @@ protected:
 
   bool implicit; /*!< \brief Flag for implicit scheme. */
 
-  const unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
+  unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
 
 public:
 
@@ -45,14 +45,13 @@ public:
 	virtual ~CUpwReactiveAUSM() {};
 
   /*!
-	 * \brief Compute the flux between two nodes i and j.
+	 * \brief Compute the residual associated to convective flux between two nodes i and j.
 	 * \param[out] val_residual - Pointer to the total residual.
 	 * \param[out] val_Jacobian_i - Jacobian of the numerical method at node i (implicit computation).
 	 * \param[out] val_Jacobian_j - Jacobian of the numerical method at node j (implicit computation).
 	 * \param[in] config - Definition of the particular problem.
 	 */
-	void ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i,
-                       su2double** val_Jacobian_j, CConfig* config) override;
+	void ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i, su2double** val_Jacobian_j, CConfig* config) override;
 
   /*!
    * \brief Set the simulation to explicit
@@ -66,7 +65,7 @@ public:
 
 /*!
  * \class CAvgGradReactive_Flow
- * \brief Class for computing viscous term using the average of gradients for a chemically reactive flow.
+ * \brief Class for computing viscous flux using the average gradients for a chemically reactive flow.
  * \author G. Orlando
  */
 
@@ -78,7 +77,6 @@ public:
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
   using SmartArr = CReactiveEulerVariable::SmartArr;
 
-
 protected:
 
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
@@ -88,14 +86,30 @@ protected:
 
   unsigned short nPrimVar; /*!< \brief Numbers of primitive variables. */
   unsigned short nPrimVarAvgGrad; /*!< \brief Numbers of primitive variables to compute gradient for average computation. */
-  const unsigned short nSpecies; /*!< \brief Total number of species. */
+  unsigned short nSpecies; /*!< \brief Total number of species. */
 
   RealVec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
   RealVec PrimVar_i, PrimVar_j;   /*!< \brief Primitives variables at point i and j. */
   RealMatrix GradPrimVar_i, GradPrimVar_j; /*!< \brief Gradient of primitives variables at point i and j for average gradient computation. */
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
 
+  /**
+   * \brief Mapping between the primitive variable gradient name and its position in the physical data
+   */
+  static constexpr unsigned short T_INDEX_GRAD = 0;
+  static constexpr unsigned short VX_INDEX_GRAD = 1;
+  static const unsigned short RHO_INDEX_GRAD;
+  static const unsigned short RHOS_INDEX_GRAD;
+
 public:
+
+  /**
+   * Mapping between the primitive variable gradient name
+   * for average computations and its position in the physical data
+   */
+  static constexpr unsigned short T_INDEX_AVGGRAD = 0;
+  static const unsigned short VX_INDEX_AVGGRAD = 1;
+  static const unsigned short RHOS_INDEX_AVGGRAD;
 
   /*!
    * \brief Default constructor of the class.
@@ -125,9 +139,9 @@ public:
    * \param[in] val_thermal_conductivity - Thermal Conductivity.
    * \param[in] config - Configuration file
    */
-  virtual void GetViscousProjFlux(RealVec& val_primvar, RealMatrix& val_grad_primvar,
-                                  SmartArr val_normal, RealVec& val_diffusioncoeff,
-                                  su2double val_viscosity,su2double val_therm_conductivity);
+  virtual void GetViscousProjFlux(const RealVec& val_primvar, const RealMatrix& val_grad_primvar,
+                                  SmartArr val_normal, const RealVec& val_diffusioncoeff,
+                                  const su2double val_viscosity,const su2double val_therm_conductivity);
 
 
   /*!
@@ -138,31 +152,44 @@ public:
    * \param[in] val_laminar_viscosity - Value of the laminar viscosity.
    * \param[in] val_thermal_conductivity - Value of the thermal conductivity.
    * \param[in] val_dist_ij - Distance between the points.
-   * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
+   * \param[in] val_normal - Normal vector
    * \param[in] val_dS - Area of the face between two nodes.
    * \param[in] val_Proj_Visc_Flux - Pointer to the projected viscous flux.
    * \param[out] val_Proj_Jac_Tensor_i - Pointer to the projected viscous Jacobian at point i.
    * \param[out] val_Proj_Jac_Tensor_j - Pointer to the projected viscous Jacobian at point j.
    * \param[in] config - Definition of the particular problem
   */
-  virtual void GetViscousProjJacs(RealVec& val_Mean_PrimVar, RealMatrix& val_Mean_GradPrimVar,
-                                  RealVec& val_diffusion_coeff, su2double val_laminar_viscosity,su2double val_thermal_conductivity,
-                                  su2double val_dist_ij, SmartArr val_normal, su2double val_dS,
-                                  su2double* val_Proj_Visc_Flux,su2double** val_Proj_Jac_Tensor_i,su2double** val_Proj_Jac_Tensor_j,
-                                  CConfig* config);
+  virtual void GetViscousProjJacs(const RealVec& val_Mean_PrimVar, const RealMatrix& val_Mean_GradPrimVar,
+                                  const RealVec& val_diffusion_coeff, const su2double val_laminar_viscosity, const su2double val_thermal_conductivity,
+                                  const su2double val_dist_ij, SmartArr val_normal, const su2double val_dS, su2double* val_Proj_Visc_Flux,
+                                  su2double** val_Proj_Jac_Tensor_i, su2double** val_Proj_Jac_Tensor_j, CConfig* config);
 
  /*!
-   * \brief Compute the viscous flow residual using an average of gradients.
+   * \brief Compute the viscous flow residual using average gradient method.
    * \param[out] val_residual - Pointer to the total residual.
    * \param[out] val_Jacobian_i - Jacobian of the numerical method at node i (implicit computation).
    * \param[out] val_Jacobian_j - Jacobian of the numerical method at node j (implicit computation).
    * \param[in] config - Definition of the particular problem.
    */
-  void ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i,
-                       su2double** val_Jacobian_j, CConfig* config) override;
+  void ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i, su2double** val_Jacobian_j, CConfig* config) override;
+
 
   /*!
    * \brief Set the Gradient of primitives for computing residual
+   * \param[in] val_nvar - Index of desired variable
+   * \param[in] val_nDim - Index of the desired dimension.
+   * \param[in] val_grad_i - Value to assign at point i.
+   * \param[in] val_grad_j - Value to assign at point j.
+   */
+  inline void SetGradient_AvgPrimitive(unsigned short val_nvar, unsigned short val_nDim, su2double val_grad_i, su2double val_grad_j) {
+    GradPrimVar_i.at(val_nvar,val_nDim) = val_grad_i;
+    GradPrimVar_j.at(val_nvar,val_nDim) = val_grad_j;
+  }
+
+  /*!
+   * \brief Set the Gradient of primitives for computing residual
+   * \param[in] Grad_i - Gradient of Primitive variables.
+   * \param[in] Grad_j - Gradient of Primitive variables.
    */
   inline void SetGradient_AvgPrimitive(const RealMatrix& Grad_i,const RealMatrix& Grad_j) {
     GradPrimVar_i = Grad_i;
@@ -177,7 +204,10 @@ public:
   }
 
 };
+const unsigned short CAvgGradReactive_Flow::RHO_INDEX_GRAD = CAvgGradReactive_Flow::VX_INDEX_GRAD + CReactiveNSVariable::GetnDim();
+const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_GRAD = CAvgGradReactive_Flow::RHO_INDEX_GRAD + 1;
 
+const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_AVGGRAD = CAvgGradReactive_Flow::VX_INDEX_AVGGRAD + CReactiveNSVariable::GetnDim();
 
 class CSourceReactive: public CNumerics {
 public:
@@ -192,7 +222,7 @@ protected:
 
   bool implicit; /*!< \brief Flag for implicit scheme. */
 
-  const unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
+  unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
 
 public:
 
@@ -207,19 +237,18 @@ public:
   /*!
    * \brief Destructor of the class.
    */
-  ~CSourceReactive() {};
+  virtual ~CSourceReactive() {};
 
   /*!
-   * \brief Calculation of the chemistry source term
-   * \param[in] config - Definition of the particular problem.
-   * \param[out] val_residual - residual of the source terms
+   * \brief Calculation of the residual of chemistry source term
+   * \param[out] val_residual - Residual of the source terms
    * \param[out] val_Jacobian_i - Jacobian of the source terms
+   * \param[in] config - Definition of the particular problem.
    */
   void ComputeChemistry(su2double* val_residual, su2double** val_Jacobian_i, CConfig* config) override;
 
-
   /*!
-   * \brief Residual for source term integration.
+   * \brief Residual for source term integration in case of axisymmetric simulation.
    * \param[out] val_residual - Pointer to the source residual containing chemistry terms.
    * \param[in] config - Definition of the particular problem.
    */

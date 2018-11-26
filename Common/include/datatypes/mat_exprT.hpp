@@ -14,7 +14,7 @@ namespace Common {
   */
   template<class Derived,typename T>
   struct MatExprT: public ExprT<Derived,T> {
-    using Type = T;
+    using value_type = T;
 
     /*!
      * \brief Gets the number of rows

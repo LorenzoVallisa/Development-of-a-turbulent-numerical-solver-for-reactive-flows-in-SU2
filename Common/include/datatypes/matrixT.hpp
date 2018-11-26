@@ -27,7 +27,6 @@ namespace Common {
   class SU2Mat : public MatExprT<SU2Mat<T>,T> {
   public:
 
-    using Type = T;
     using value_type = T;
     typedef typename std::vector<std::vector<T>>::size_type size_type;
 
@@ -42,7 +41,7 @@ namespace Common {
       * \param[in] _n_cols - number of columns in the matrix
       * \param[in] init - value to initialize (default provided)
     */
-    SU2Mat(std::size_t _n_rows,std::size_t _n_cols,Type init = Type());
+    SU2Mat(std::size_t _n_rows,std::size_t _n_cols,value_type init = value_type());
 
     /*!
       * \brief Class destructor
@@ -77,11 +76,11 @@ namespace Common {
 
     /*!
       * \brief Copy Constructor from already allocated memory
-      * \param[in] data - pointer to pointer to Type (stored elements)
+      * \param[in] data - pointer to pointer to value_type (stored elements)
       * \param[in] _n_rows - number of rows of the resulting matrix
       * \param[in] _n_cols - number of columns of the resulting matrix
     */
-    SU2Mat(Type** data,std::size_t _n_rows,std::size_t _n_cols):n_rows(_n_cols),n_cols(_n_cols) {
+    SU2Mat(value_type** data,std::size_t _n_rows,std::size_t _n_cols):n_rows(_n_cols),n_cols(_n_cols) {
       allocate();
       for (std::size_t i = 0; i < _n_rows; ++i)
         for (std::size_t j = 0; j < _n_cols; ++j)
@@ -93,14 +92,14 @@ namespace Common {
       * \brief Copy Constructor from standard library vector (matrix as vector of vectors)
       * \param[in] v - std::vector to copy from
     */
-    explicit SU2Mat(const std::vector<std::vector<Type>>& mat);
+    explicit SU2Mat(const std::vector<std::vector<value_type>>& mat);
 
     /*!
       * \brief Coyp constructor from MatExprT;
       * \param[in] e - MatExprT to copy from
      */
     template <class Derived>
-    SU2Mat(const MatExprT<Derived,Type>& e):n_rows(e.nbRows()),n_cols(e.nbCols()) {
+    SU2Mat(const MatExprT<Derived,value_type>& e):n_rows(e.nbRows()),n_cols(e.nbCols()) {
       //const Derived& et(e);
       allocate();
       for(std::size_t i = 0; i < n_rows; ++i) {
@@ -114,7 +113,7 @@ namespace Common {
       * \param[in] e - MatExprT to copy from
      */
     template <class Derived>
-    SU2Mat& operator=(MatExprT<Derived,Type>& e) {
+    SU2Mat& operator=(MatExprT<Derived,value_type>& e) {
       //const Derived& et(e);
       n_rows = e.nbRows();
       n_cols = e.nbCols();
@@ -133,7 +132,7 @@ namespace Common {
     */
 
     #define SU2MAT_ASSIGN_OP_CONST(__op__) \
-    SU2Mat& operator __op__ (Type value) { \
+    SU2Mat& operator __op__ (value_type value) { \
       SU2_Assert(strcmp(#__op__ ,"/=") && std::abs(value)>0,"You can't divide by zero"); \
       for(std::size_t i = 0; i < size(); ++i) \
         m_data[i] __op__ value; \
@@ -151,7 +150,7 @@ namespace Common {
 
     #define SU2MAT_ASSIGN_OP_EXPR(__op__) \
     template<class Derived> \
-    SU2Mat& operator __op__ (const MatExprT<Derived,Type>& e) { \
+    SU2Mat& operator __op__ (const MatExprT<Derived,value_type>& e) { \
       SU2_Assert(this->nbRows() == e.nbRows() && this->nbCols() == e.nbCols(), \
                 "The dimension of the matrixes is not compatible and so you can't operate with them"); \
       for(std::size_t i = 0; i < nbRows(); ++i) { \
@@ -172,9 +171,9 @@ namespace Common {
     */
 
     template<class Derived>
-    SU2Mat& operator*=(const MatExprT<Derived,Type>& e) {
+    SU2Mat& operator*=(const MatExprT<Derived,value_type>& e) {
       SU2_Assert(this->nbCols() == e.nbRows(), "The dimension of the matrixes is not compatible and so you can't multiply them"); \
-      std::vector<Type> tmp(m_data, m_data + size());
+      std::vector<value_type> tmp(m_data, m_data + size());
       n_cols = e.nbCols();
       this->resize(n_rows,n_cols);
       for (std::size_t i = 0; i < n_rows; ++i) {
@@ -191,7 +190,7 @@ namespace Common {
      * \param[in] i - index of row
      * \param[in] j - index of columns
     */
-    inline Type& operator()(std::size_t i,std::size_t j) {
+    inline value_type& operator()(std::size_t i,std::size_t j) {
       return m_data[sub2ind(i,j)];
     }
 
@@ -200,8 +199,8 @@ namespace Common {
      * \param[in] i - index of row
      * \param[in] j - index of columns
     */
-    //inline Type operator()(std::size_t i,std::size_t j) const
-    inline const Type& operator()(std::size_t i,std::size_t j) const {
+    //inline value_type operator()(std::size_t i,std::size_t j) const
+    inline const value_type& operator()(std::size_t i,std::size_t j) const {
       return m_data[sub2ind(i,j)];
     }
 
@@ -210,7 +209,7 @@ namespace Common {
      * \param[in] i - index of row
      * \param[in] j - index of columns
     */
-    inline Type& at(std::size_t i,std::size_t j) {
+    inline value_type& at(std::size_t i,std::size_t j) {
       SU2_Assert(i < n_rows,"Index of row is beyond the number of rows in the matrix");
       SU2_Assert(j < n_cols,"Index of col is beyond the number of columns in the matrix");
       return m_data[sub2ind(i,j)];
@@ -221,8 +220,8 @@ namespace Common {
      * \param[in] i - index of row
      * \param[in] j - index of columns
     */
-    //inline Type at(std::size_t i,std::size_t j) const
-    inline const Type& at(std::size_t i,std::size_t j) const {
+    //inline value_type at(std::size_t i,std::size_t j) const
+    inline const value_type& at(std::size_t i,std::size_t j) const {
       SU2_Assert(i < n_rows,"Index of row is beyond the number of rows in the matrix");
       SU2_Assert(j < n_cols,"Index of col is beyond the number of columns in the matrix");
       return m_data[sub2ind(i,j)];
@@ -255,24 +254,24 @@ namespace Common {
      * \param[in] _n_cols - new number of columns in the matrix
      * \param[in] init - value to initialize (default provided)
     */
-    void resize(std::size_t _n_rows, std::size_t _n_cols,Type init = Type());
+    void resize(std::size_t _n_rows, std::size_t _n_cols,value_type init = value_type());
 
     /*!
      * \brief Returns the underlined pointer
     */
-    inline Type* data(void) const {
+    inline value_type* data(void) const {
       return m_data;
     }
 
     /*!
      * \brief Compute the determinant of a 2 x 2 matrix
     */
-    Type determ2(void) const;
+    value_type determ2(void) const;
 
     /*!
      * \brief Compute the determinant of a 3 x 3 matrix
     */
-    Type determ3(void) const;
+    value_type determ3(void) const;
 
     /*!
      * \brief Returns the transpose of the matrix (the original matrix remains untouched).
@@ -348,8 +347,8 @@ namespace Common {
     /*!
      * \brief Cast to standard library vector of vectors ("standard matrix")
     */
-    operator std::vector<std::vector<Type>> () const {
-      auto result = std::vector<Type>(n_rows,std::vector<Type>(n_cols));
+    operator std::vector<std::vector<value_type>> () const {
+      auto result = std::vector<value_type>(n_rows,std::vector<value_type>(n_cols));
       for(std::size_t i = 0; i < n_rows; ++i) {
         for(std::size_t j = 0; j < n_cols; ++j)
           result[i][j] = m_data[sub2ind(i,j)];
@@ -361,47 +360,47 @@ namespace Common {
      * \brief Check if there are zeros in the matrix
     */
     inline bool check_notzero(void) {
-      return std::none_of(this->cbegin(), this->cend(), [&](const Type& x){return x == Type();});
+      return std::none_of(this->cbegin(), this->cend(), [&](const value_type& x){return x == value_type();});
     }
 
     /*!
      * \brief Begin iterator (non const version)
     */
-    inline auto begin()->decltype(std::declval<std::vector<Type>>().begin()) {
-      return static_cast<decltype(std::declval<std::vector<Type>>().begin())>(m_data);
+    inline auto begin()->decltype(std::declval<std::vector<value_type>>().begin()) {
+      return static_cast<decltype(std::declval<std::vector<value_type>>().begin())>(m_data);
     }
 
     /*!
      * \brief End iterator (non const version)
     */
-    inline auto end()->decltype(std::declval<std::vector<Type>>().end()) {
-      return static_cast<decltype(std::declval<std::vector<Type>>().end())>(m_data + n_rows*n_cols);
+    inline auto end()->decltype(std::declval<std::vector<value_type>>().end()) {
+      return static_cast<decltype(std::declval<std::vector<value_type>>().end())>(m_data + n_rows*n_cols);
     }
 
     /*!
      * \brief Begin iterator (const version)
     */
-    inline decltype(std::declval<std::vector<Type>>().cbegin()) cbegin() const {
-      return static_cast<decltype(std::declval<std::vector<Type>>().cbegin())>(m_data);
+    inline decltype(std::declval<std::vector<value_type>>().cbegin()) cbegin() const {
+      return static_cast<decltype(std::declval<std::vector<value_type>>().cbegin())>(m_data);
     }
 
     /*!
      * \brief End iterator (const version)
     */
-    inline decltype(std::declval<std::vector<Type>>().cend()) cend() const {
-      return static_cast<decltype(std::declval<std::vector<Type>>().cend())>(m_data + n_rows*n_cols);
+    inline decltype(std::declval<std::vector<value_type>>().cend()) cend() const {
+      return static_cast<decltype(std::declval<std::vector<value_type>>().cend())>(m_data + n_rows*n_cols);
     }
 
     /*!
      * \brief Overloading of output stream operator
     */
-    friend std::ostream& operator<< TF (std::ostream& out,const SU2Mat<Type>& A);
+    friend std::ostream& operator<< TF (std::ostream& out,const SU2Mat<value_type>& A);
 
   private:
 
     std::size_t n_rows;  /*!< \brief Number of rows of the matrix. */
     std::size_t n_cols;  /*!< \brief Number of columns of the matrix. */
-    Type* m_data;  /*!< \brief Stored elements. */
+    value_type* m_data;  /*!< \brief Stored elements. */
 
     /*!
      * \brief Helper function to allocate memory
@@ -412,7 +411,7 @@ namespace Common {
      * \brief Helper function to initialize vector
      * \param[in] value - Value initialization
     */
-    void initialize(Type value);
+    void initialize(value_type value);
 
     /*!
      * \brief Helper function to free memory

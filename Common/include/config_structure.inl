@@ -33,7 +33,9 @@
 
 #pragma once
 
-inline string CConfig::GetLibraryName(void) {return Library_Name;}
+inline string CConfig::GetLibraryName(void) const {return Library_Name;}
+
+inline string CConfig::GetConfigLibFile(void) const {return Config_File_Lib;}
 
 inline su2double CConfig::GetHTP_Axis(unsigned short val_index) { return HTP_Axis[val_index]; }
 

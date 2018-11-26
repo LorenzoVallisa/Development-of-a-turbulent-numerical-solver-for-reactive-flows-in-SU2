@@ -27,7 +27,6 @@ namespace Common {
   class SU2Vec : public ExprT<SU2Vec<T>,T> {
   public:
 
-    using Type = T;
     using value_type = T;
     typedef typename std::vector<T>::size_type size_type;
 
@@ -41,7 +40,7 @@ namespace Common {
       * \param[in] _N - size of the vector
       * \param[in] init - value to initialize (default provided)
     */
-    SU2Vec(std::size_t _N,Type init = Type());
+    SU2Vec(std::size_t _N,value_type init = value_type());
 
     /*!
       * \brief Class destructor
@@ -79,7 +78,7 @@ namespace Common {
       * \param[in] init - pointer to first datum
       * \param[in] end - pointer to one past last datum
     */
-    explicit SU2Vec(Type* init,Type* end) {
+    explicit SU2Vec(value_type* init,value_type* end) {
       N = end - init;
       allocate();
       for (std::size_t i = 0; i < size(); ++i)
@@ -91,7 +90,7 @@ namespace Common {
       * \param[in] init - begin iterator
       * \param[in] end - end iterator
     */
-    explicit SU2Vec(decltype(std::declval<std::vector<Type>>().begin()) init,decltype(std::declval<std::vector<Type>>().end()) end) {
+    explicit SU2Vec(decltype(std::declval<std::vector<value_type>>().begin()) init,decltype(std::declval<std::vector<value_type>>().end()) end) {
       N = end - init;
       allocate();
       for (std::size_t i = 0; i < size(); ++i)
@@ -103,7 +102,7 @@ namespace Common {
       * \param[in] init - begin iterator
       * \param[in] end - end iterator
     */
-    explicit SU2Vec(decltype(std::declval<std::vector<Type>>().cbegin()) init,decltype(std::declval<std::vector<Type>>().cend()) end) {
+    explicit SU2Vec(decltype(std::declval<std::vector<value_type>>().cbegin()) init,decltype(std::declval<std::vector<value_type>>().cend()) end) {
       N = end - init;
       allocate();
       for (std::size_t i = 0; i < size(); ++i)
@@ -114,14 +113,14 @@ namespace Common {
       * \brief Copy Constructor from standard library vector
       * \param[in] v - std::vector to copy from
     */
-    explicit SU2Vec(const std::vector<Type>& v);
+    explicit SU2Vec(const std::vector<value_type>& v);
 
     /*!
       * \brief Copy constructor from ExprT;
       * \param[in] e - ExprT to copy from
      */
     template <class Derived>
-    SU2Vec(const ExprT<Derived,Type>& e):N(e.size()) {
+    SU2Vec(const ExprT<Derived,value_type>& e):N(e.size()) {
       //const Derived& et(e);
       allocate();
       for(std::size_t i = 0; i < N; ++i)
@@ -134,7 +133,7 @@ namespace Common {
      */
 
     template <class Derived>
-    SU2Vec& operator=(ExprT<Derived,Type>& e) {
+    SU2Vec& operator=(ExprT<Derived,value_type>& e) {
       //const Derived& et(e);
       N = e.size();
       if(m_data!=NULL)
@@ -150,7 +149,7 @@ namespace Common {
      */
 
     #define SU2VEC_ASSIGN_OP_CONST(__op__) \
-    SU2Vec& operator __op__ (Type value) { \
+    SU2Vec& operator __op__ (value_type value) { \
       SU2_Assert(strcmp(#__op__ ,"/=") && std::abs(value)>0,"You can't divide by zero"); \
       for(std::size_t i = 0; i < size(); ++i) \
         m_data[i] __op__ value; \
@@ -167,7 +166,7 @@ namespace Common {
     */
     #define SU2VEC_ASSIGN_OP_EXPR(__op__) \
     template<class Derived> \
-    SU2Vec& operator __op__ (const ExprT<Derived,Type>& e) { \
+    SU2Vec& operator __op__ (const ExprT<Derived,value_type>& e) { \
       SU2_Assert(this->size() == e.size(),"The size of the vectors is not the same and so you can't operate with them"); \
       for(std::size_t i = 0; i < size(); ++i) \
         m_data[i] __op__ e[i]; \
@@ -184,7 +183,7 @@ namespace Common {
      * \brief Overloaded /= operator with ExprT (checks if rhs contains zeros);
     */
     template<class Derived>
-    SU2Vec& operator /= (const ExprT<Derived,Type>& e) {
+    SU2Vec& operator /= (const ExprT<Derived,value_type>& e) {
       SU2_Assert(this->size() == e.size(),"The size of the vectors is not the same and so you can't operate with them");
       SU2Vec tmp(e);
       SU2_Assert(tmp.check_notzero(),"The vector on rhs contains zeros and so you can't divide by it");
@@ -198,7 +197,7 @@ namespace Common {
      * \brief Returns i-th element (non const version)
      * \param[in] i - index of the element
     */
-    inline Type& operator[](std::size_t i) {
+    inline value_type& operator[](std::size_t i) {
       return m_data[i];
     }
 
@@ -206,8 +205,8 @@ namespace Common {
      * \brief Returns i-th element (const version)
      * \param[in] i - index of the element
     */
-    //inline Type operator[](std::size_t i) const
-    inline const Type& operator[](std::size_t i) const {
+    //inline value_type operator[](std::size_t i) const
+    inline const value_type& operator[](std::size_t i) const {
       return m_data[i];
     }
 
@@ -215,7 +214,7 @@ namespace Common {
      * \brief Returns i-th element (non const version)
      * \param[in] i - index of the element
     */
-    inline Type& at(std::size_t i) {
+    inline value_type& at(std::size_t i) {
       SU2_Assert(i < size(),"Index is beyond the size of the vector");
       return m_data[i];
     }
@@ -224,8 +223,8 @@ namespace Common {
      * \brief Returns i-th element (const version)
      * \param[in] i - index of the element
     */
-    //inline Type at(std::size_t i) const
-    inline const Type& at(std::size_t i) const {
+    //inline value_type at(std::size_t i) const
+    inline const value_type& at(std::size_t i) const {
       SU2_Assert(i < size(),"Index is beyond the size of the vector");
       return m_data[i];
     }
@@ -249,72 +248,72 @@ namespace Common {
      * \param[in] _N - new size of the vector
      * \param[in] init - value to initialize (default provided)
     */
-    void resize(std::size_t _N, Type init = Type());
+    void resize(std::size_t _N, value_type init = value_type());
 
     /*!
      * \brief Add an element at the end of the vector
      * \param[in] value - value to add
     */
-    void push_back(const Type& value);
+    void push_back(const value_type& value);
 
     /*!
      * \brief Check if there are zeros in the vector
     */
     inline bool check_notzero(void) {
-      return std::none_of(this->cbegin(), this->cend(), [&](const Type& x){return x == Type();});
+      return std::none_of(this->cbegin(), this->cend(), [&](const value_type& x){return x == value_type();});
     }
 
     /*!
      * \brief Returns the underlined pointer
     */
-    inline Type* data(void) const {
+    inline value_type* data(void) const {
       return m_data;
     }
 
     /*!
      * \brief Cast to standard library vector
     */
-    inline operator std::vector<Type> () const {
-      return std::vector<Type>(m_data,m_data + N);
+    inline operator std::vector<value_type> () const {
+      return std::vector<value_type>(m_data,m_data + N);
     }
 
     /*!
      * \brief Begin iterator (non const version)
     */
-    inline auto begin()->decltype(std::declval<std::vector<Type>>().begin()) {
-      return static_cast<decltype(std::declval<std::vector<Type>>().begin())>(m_data);
+    inline auto begin()->decltype(std::declval<std::vector<value_type>>().begin()) {
+      return static_cast<decltype(std::declval<std::vector<value_type>>().begin())>(m_data);
     }
 
     /*!
      * \brief End iterator (non const version)
     */
-    inline auto end()->decltype(std::declval<std::vector<Type>>().end()) {
-      return static_cast<decltype(std::declval<std::vector<Type>>().end())>(m_data + N);
+    inline auto end()->decltype(std::declval<std::vector<value_type>>().end()) {
+      return static_cast<decltype(std::declval<std::vector<value_type>>().end())>(m_data + N);
     }
 
     /*!
      * \brief Begin iterator (const version)
     */
-    inline decltype(std::declval<std::vector<Type>>().cbegin()) cbegin() const {
-      return static_cast<decltype(std::declval<std::vector<Type>>().cbegin())>(m_data);
+    inline decltype(std::declval<std::vector<value_type>>().cbegin()) cbegin() const {
+      return static_cast<decltype(std::declval<std::vector<value_type>>().cbegin())>(m_data);
     }
 
     /*!
      * \brief End iterator (const version)
     */
-    inline decltype(std::declval<std::vector<Type>>().cend()) cend() const {
-      return static_cast<decltype(std::declval<std::vector<Type>>().cend())>(m_data + N);
+    inline decltype(std::declval<std::vector<value_type>>().cend()) cend() const {
+      return static_cast<decltype(std::declval<std::vector<value_type>>().cend())>(m_data + N);
     }
 
     /*!
      * \brief Overloading of output stream operator
     */
-    friend std::ostream& operator<< TF (std::ostream& out,const SU2Vec<Type>& v);
+    friend std::ostream& operator<< TF (std::ostream& out,const SU2Vec<value_type>& v);
 
   private:
 
     std::size_t N;  /*!< \brief Size of the vector. */
-    Type* m_data;  /*!< \brief Stored elements. */
+    value_type* m_data;  /*!< \brief Stored elements. */
 
     /*!
      * \brief Helper function to allocate memory
@@ -325,7 +324,7 @@ namespace Common {
      * \brief Helper function to initialize vector
      * \param[in] value - Value initialization
     */
-    void initialize(Type value);
+    void initialize(value_type value);
 
     /*!
      * \brief Helper function to free memory

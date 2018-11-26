@@ -67,7 +67,8 @@ using namespace std;
 
 class CConfig {
 private:
-  string Library_Name; /*!< Name of library for physical-chemical options.*/
+  string Library_Name; /*!< \brief Name of library for physical-chemical options.*/
+  string Config_File_Lib; /*!< \brief Name of the to configure the library.*/
 
   SU2_Comm SU2_Communicator; /*!< \brief MPI communicator of SU2.*/
   int rank;
@@ -1177,10 +1178,16 @@ public:
   bool TokenizeString(string & str, string & option_name,
                       vector<string> & option_value);
 
-/*!
- * \brief Get library name for physical-chemical properties.
- */
-  string GetLibraryName(void);
+  /*!
+   * \brief Get library name for physical-chemical properties.
+  */
+  string GetLibraryName(void) const;
+
+  /*!
+   * \brief Get library name for physical-chemical properties.
+  */
+  string GetConfigLibFile(void) const;
+
 
   /*!
    * \brief Get reference origin for moment computation.

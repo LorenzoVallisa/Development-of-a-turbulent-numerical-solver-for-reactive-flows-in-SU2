@@ -786,13 +786,31 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
     if(reactive_euler) {
       if(compressible) {
         solver_container[iMGlevel][REACTIVE_SOL] = new CReactiveEulerSolver(geometry[iMGlevel], config, iMGlevel);
-        solver_container[iMGlevel][REACTIVE_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
-                                                                iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
+        try {
+          solver_container[iMGlevel][REACTIVE_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
+                                                                  iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
+        }
+        catch(const std::exception& e) {
+          std::cout<<e.what()<<std::endl;
+          static_cast<CReactiveEulerSolver*>(solver_container[iMGlevel][REACTIVE_SOL])->SetExplicit();
+          solver_container[iMGlevel][REACTIVE_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
+                                                                  iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
+        }
       }
     }
     if(reactive_ns) {
       if(compressible) {
         solver_container[iMGlevel][REACTIVE_SOL] = new CReactiveNSSolver(geometry[iMGlevel], config, iMGlevel);
+        try {
+          solver_container[iMGlevel][REACTIVE_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
+                                                                  iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
+        }
+        catch(const std::exception& e) {
+          std::cout<<e.what()<<std::endl;
+          static_cast<CReactiveNSSolver*>(solver_container[iMGlevel][REACTIVE_SOL])->SetExplicit();
+          solver_container[iMGlevel][REACTIVE_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
+                                                                  iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
+        }
       }
     }
     // Previous contribution
@@ -1334,7 +1352,7 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
               break;
 
             case AUSM:
-              for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); iMGlevel++) {
+              for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
                 numerics_container[iMGlevel][FLOW_SOL][CONV_TERM] = new CUpwAUSM_Flow(nDim, nVar_Flow, config);
                 numerics_container[iMGlevel][FLOW_SOL][CONV_BOUND_TERM] = new CUpwAUSM_Flow(nDim, nVar_Flow, config);
               }
