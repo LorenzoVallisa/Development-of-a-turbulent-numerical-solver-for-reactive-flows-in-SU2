@@ -312,7 +312,7 @@ public:
   CReactiveNSSolver(): CReactiveEulerSolver(), Viscosity_Inf() {}
 
 	/*!
-	 * \overloaded constructor of the class
+	 * \overloaded Constructor of the class
 	 * \param[in] geometry - Geometrical definition of the problem.
 	 * \param[in] config - Definition of the particular problem.
    * \param[in] iMesh - Index of the mesh in multigrid computations.

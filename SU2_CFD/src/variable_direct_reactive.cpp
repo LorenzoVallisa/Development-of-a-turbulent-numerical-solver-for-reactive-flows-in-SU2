@@ -122,7 +122,7 @@ CReactiveEulerVariable::CReactiveEulerVariable(const RealVec& val_solution, unsi
   std::copy(val_solution.cbegin(),val_solution.cend(),Solution);
   std::copy(val_solution.cbegin(),val_solution.cend(),Solution_Old);
 
-  /*--- Initialize T and P to the free stream for Newton-Raphson method ---*/
+  /*--- Initialize T and P to the free stream for Secant method ---*/
   Primitive[T_INDEX_PRIM] = config->GetTemperature_FreeStream();
   Primitive[P_INDEX_PRIM] = config->GetPressure_FreeStream();
 
@@ -463,8 +463,9 @@ inline void CReactiveEulerVariable::SetVelocity_Old(su2double* val_velocity) {
 //
 CReactiveNSVariable::CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies, unsigned short val_nprimvar,
                                          unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config):
-                                         CReactiveEulerVariable(val_nDim,val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,val_nprimvarlim,config),
-                                         Laminar_Viscosity(),Thermal_Conductivity() {
+                                         CReactiveEulerVariable(val_nDim,val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,val_nprimvarlim,config) {
+  Laminar_Viscosity = 0.0;
+  Thermal_Conductivity = 0.0;
   Diffusion_Coeffs.resize(nSpecies);
 }
 
@@ -481,9 +482,12 @@ CReactiveNSVariable::CReactiveNSVariable(const su2double val_density, const Real
                                          unsigned short val_nprimvarlim, CConfig* config):
                                          CReactiveEulerVariable(val_density,val_massfrac,val_velocity,val_temperature,val_nDim,
                                                                 val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,val_nprimvarlim,config) {
-  Diffusion_Coeffs.resize(nSpecies);
   Laminar_Viscosity = 0.0;
+  //Laminar_Viscosity = library->GetLambda(val_temperature,val_massfrac);
   Thermal_Conductivity = 0.0;
+  //Thermal_Conductivity = library->GetEta(val_temperature,val_massfrac)
+  Diffusion_Coeffs.resize(nSpecies);
+  //Diffusion_Coeffs = library->GetDiffCoeffs(val_temperature,val_pressure,val_massfrac);
 }
 
 //
@@ -497,8 +501,13 @@ CReactiveNSVariable::CReactiveNSVariable(const RealVec& val_solution, unsigned s
                                          unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim,
                                          CConfig* config):
                                          CReactiveEulerVariable(val_solution,val_nDim,val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,
-                                                                val_nprimvarlim,lib,config) {
-  Diffusion_Coeffs.resize(nSpecies);
+                                                                val_nprimvarlim,config) {
+  //RealVec YS(val_solution.begin() + CReactiveEulerVariable::RHOS_INDEX_PRIM,val_solution.end());
+  //Ys /= val_solution[CReactiveEulerVariable::RHO_INDEX_SOL];
   Laminar_Viscosity = 0.0;
+  //Laminar_Viscosity = library->GetLambda(Primitive[T_INDEX_PRIM],Ys);
   Thermal_Conductivity = 0.0;
+  //Thermal_Conductivity = library->GetEta(Primitive[T_INDEX_PRIM],Ys)
+  Diffusion_Coeffs.resize(nSpecies);
+  //Diffusion_Coeffs = library->GetDiffCoeffs(Primitive[T_INDEX_PRIM],,Primitive[P_INDEX_PRIM],Ys);
 }

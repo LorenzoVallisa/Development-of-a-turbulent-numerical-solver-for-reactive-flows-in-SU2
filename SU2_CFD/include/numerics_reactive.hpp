@@ -93,22 +93,23 @@ protected:
   RealMatrix GradPrimVar_i, GradPrimVar_j; /*!< \brief Gradient of primitives variables at point i and j for average gradient computation. */
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
 
+public:
+
   /**
    * \brief Mapping between the primitive variable gradient name and its position in the physical data
    */
   static constexpr unsigned short T_INDEX_GRAD = 0;
   static constexpr unsigned short VX_INDEX_GRAD = 1;
-  static const unsigned short RHO_INDEX_GRAD;
+  //static const unsigned short RHO_INDEX_GRAD;
   static const unsigned short RHOS_INDEX_GRAD;
 
-public:
 
   /**
    * Mapping between the primitive variable gradient name
    * for average computations and its position in the physical data
    */
   static constexpr unsigned short T_INDEX_AVGGRAD = 0;
-  static const unsigned short VX_INDEX_AVGGRAD = 1;
+  static constexpr unsigned short VX_INDEX_AVGGRAD = 1;
   static const unsigned short RHOS_INDEX_AVGGRAD;
 
   /*!
@@ -130,19 +131,37 @@ public:
   virtual ~CAvgGradReactive_Flow() {};
 
   /*!
-   * \brief Compute projection of the viscous fluxes into a direction
+   * \brief Compute the diffusive flux along a certain direction
+   * \param[in] val_density - Density of the mixture
+   * \param[in] val_xs - Molar fractions.
+   * \param[in] val_grad_xs - Component along the desired dimension of gradient of molar fractions.
+   * \param[in] val_diffusioncoeff - Corrected diffusion coefficients for each species ((1-Xs)/Ds).
+   */
+  RealVec Solve_SM(const su2double val_density, const RealVec& val_xs, const RealVec& val_grad_xs, const RealVec& val_diffusioncoeff);
+
+  /*!
+   * \brief Compute projection of the viscous fluxes using Ramshaw self-consisten modification
    * \param[in] val_primvar - Primitive variables.
    * \param[in] val_grad_primvar - Gradient of the primitive variables.
    * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
-   * \param[in] val_diffusioncoeff - Diffusion coefficients for each species in the mixture.
    * \param[in] val_viscosity - Laminar viscosity.
    * \param[in] val_thermal_conductivity - Thermal Conductivity.
-   * \param[in] config - Configuration file
+   * \param[in] val_diffusioncoeff - Effective diffusion coefficients for each species in the mixture.
    */
-  virtual void GetViscousProjFlux(const RealVec& val_primvar, const RealMatrix& val_grad_primvar,
-                                  SmartArr val_normal, const RealVec& val_diffusioncoeff,
-                                  const su2double val_viscosity,const su2double val_therm_conductivity);
+  virtual void GetViscousProjFlux_Ramshaw(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+                                          const su2double val_viscosity, const su2double val_therm_conductivity, const RealVec& val_diffusioncoeff);
 
+  /*!
+   * \brief Compute projection of the viscous fluxes solving Stefan-Maxwell equations
+   * \param[in] val_primvar - Primitive variables.
+   * \param[in] val_grad_primvar - Gradient of the primitive variables.
+   * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
+   * \param[in] val_viscosity - Laminar viscosity.
+   * \param[in] val_thermal_conductivity - Thermal Conductivity.
+   * \param[in] val_diffusioncoeff - Effective diffusion coefficients for each species in the mixture.
+   */
+  virtual void GetViscousProjFlux_SM(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+                                     const su2double val_viscosity,const su2double val_therm_conductivity, const RealVec& val_diffusioncoeff);
 
   /*!
    * \brief Approximation of Viscous NS Jacobians in Thermochemical Non Equilibrium.
@@ -204,10 +223,16 @@ public:
   }
 
 };
-const unsigned short CAvgGradReactive_Flow::RHO_INDEX_GRAD = CAvgGradReactive_Flow::VX_INDEX_GRAD + CReactiveNSVariable::GetnDim();
-const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_GRAD = CAvgGradReactive_Flow::RHO_INDEX_GRAD + 1;
+//const unsigned short CAvgGradReactive_Flow::RHO_INDEX_GRAD = CAvgGradReactive_Flow::VX_INDEX_GRAD + CReactiveNSVariable::GetnDim();
+const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_GRAD = CAvgGradReactive_Flow::VX_INDEX_GRAD + CReactiveNSVariable::GetnDim();
 
 const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_AVGGRAD = CAvgGradReactive_Flow::VX_INDEX_AVGGRAD + CReactiveNSVariable::GetnDim();
+
+/*!
+ * \class CSourceReactive
+ * \brief Class for computing residual due to chemistry source term.
+ * \author G. Orlando
+ */
 
 class CSourceReactive: public CNumerics {
 public:

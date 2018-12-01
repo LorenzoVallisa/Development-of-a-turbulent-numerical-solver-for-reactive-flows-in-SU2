@@ -92,6 +92,7 @@ public:
    * \param[in] val_nSpecies - Number of species in the mixture
    * \param[in] val_nprimvar - Number of primitive variables of the problem.
    * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
+   * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
    * \param[in] config - Definition of the particular problem.
 	 */
 	CReactiveEulerVariable(const su2double val_pressure, const RealVec& val_massfrac, const RealVec& val_velocity, const su2double val_temperature,
@@ -439,7 +440,7 @@ protected:
 
 public:
 
-  static const unsigned short RHO_INDEX_GRAD;
+  //static const unsigned short RHO_INDEX_GRAD;
   static const unsigned short RHOS_INDEX_GRAD;
 
   /*!
@@ -547,7 +548,7 @@ public:
   }
 
 };
-const unsigned short CReactiveNSVariable::RHO_INDEX_GRAD = CReactiveNSVariable::P_INDEX_GRAD + 1;
-const unsigned short CReactiveNSVariable::RHOS_INDEX_GRAD = CReactiveNSVariable::RHO_INDEX_GRAD + 1;
+//const unsigned short CReactiveNSVariable::RHO_INDEX_GRAD = CReactiveNSVariable::P_INDEX_GRAD + 1;
+const unsigned short CReactiveNSVariable::RHOS_INDEX_GRAD = CReactiveNSVariable::P_INDEX_GRAD + 1;
 
 #endif

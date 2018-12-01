@@ -34,7 +34,7 @@ CReactiveEulerSolver::LibraryPtr CReactiveEulerSolver::library = CReactiveEulerV
   */
 //
 //
-CReactiveEulerSolver::CReactiveEulerSolver():CSolver(),nSpecies(),space_centered(),implicit(),least_squares(),second_order(),limiter(),
+CReactiveEulerSolver::CReactiveEulerSolver():CSolver(),nSpecies(),nPrimVarLim(),space_centered(),implicit(),least_squares(),second_order(),limiter(),
                                              Density_Inf(),Pressure_Inf(),Temperature_Inf() {
   std::tie(nSecondaryVar,nSecondaryVarGrad,nVarGrad,IterLinSolver) = Common::repeat<4,decltype(nVarGrad)>(decltype(nVarGrad)());
 
@@ -586,8 +586,8 @@ void CReactiveEulerSolver::SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig
         	}
         }
   		}
-  	}
-  }
+  	} /*--- End of iVertex for loop ---*/
+  } /*--- End of iMarker for loop ---*/
 
   /*--- Update gradient value ---*/
   for(iPoint = 0; iPoint < nPointDomain; ++iPoint) {
@@ -1891,10 +1891,12 @@ void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver
 
   /*--- Loop over all points ---*/
   for(iPoint = 0; iPoint < nPointDomain; ++iPoint) {
-    /*--- Load the conservative variables ---*/
-    numerics->SetConservative(node[iPoint]->GetSolution(),node[iPoint]->GetSolution());
+    /*--- Load the primitive variables ---*/
+    numerics->SetPrimitive(node[iPoint]->GetPrimitive(),node[iPoint]->GetPrimitive());
+
     /*--- Load the volume of the dual mesh cell ---*/
     numerics->SetVolume(geometry->node[iPoint]->GetVolume());
+
     /*--- Compute the source residual ---*/
     try {
       numerics->ComputeChemistry(Res_Sour, Jacobian_i, config);
@@ -1912,10 +1914,10 @@ void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver
     /*--- Add the source residual to the total ---*/
     if(!err) {
       LinSysRes.AddBlock(iPoint, Residual);
+
       /*--- Add the implicit Jacobian contribution ---*/
       if(implicit)
         throw Common::NotImplemented("Implicit computation for source residual not implemented");
-        //Jacobian.AddBlock(iPoint, iPoint, Jacobian_i);
     }
     else
       throw std::runtime_error("NaN found in the source residual");
@@ -2058,8 +2060,9 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config,unsign
 
   nVar = nSpecies + nDim + 2; /*--- Conserved variables (rho,rho*vx,rho*vy,rho*vz,rho*E,rho1,...rhoNs)^T ---*/
   nPrimVar = nSpecies + nDim + 5; /*--- Primitive variables (T,vx,vy,vz,P,rho,h,a,rho1,...rhoNs)^T ---*/
-  nPrimVarLim = nDim + 2;
-  nPrimVarGrad = nSpecies + nDim + 3; /*--- Gradient Primitive variables (T,vx,vy,vz,P,rho,Y1....YNs)^T ---*/
+  nPrimVarLim = nDim + 2;  /*--- Primitive variables to limit (T,vx,vy,vz,P)^T ---*/
+  nPrimVarGrad = nSpecies + nDim + 3; /*--- Gradient Primitive variables (T,vx,vy,vz,P,X1....XNs)^T ---*/
+  //nPrimVarGrad = nSpecies + nDim + 3; /*--- Gradient Primitive variables (T,vx,vy,vz,P,rho,Y1....YNs)^T ---*/
 
   /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
   SetNondimensionalization(geometry, config, iMesh);
@@ -2243,7 +2246,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
   su2double Local_Delta_Time_Visc;
   su2double Mean_SoundSpeed, Mean_ProjVel;
   su2double Mean_LaminarVisc, Mean_ThermalCond, Mean_Density,Mean_CV;
-  RealVec Mass_Frac_i(nSpecies),Mass_Frac_j(nSpecies);
+  RealVec Ys_i(nSpecies),Ys_j(nSpecies);
   su2double Lambda, Lambda_1, Lambda_2, K_v = 0.5;
   unsigned long iEdge, iVertex, iPoint, jPoint;
   unsigned short iMarker;
@@ -2276,11 +2279,11 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
     Mean_ThermalCond = 0.5 * (node[iPoint]->GetThermalConductivity() + node[jPoint]->GetThermalConductivity());
     Mean_LaminarVisc = 0.5*(node[iPoint]->GetLaminarViscosity() + node[jPoint]->GetLaminarViscosity());
     for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      Mass_Frac_i[iSpecies] = node[iPoint]->GetMassFraction(iSpecies);
-      Mass_Frac_j[iSpecies] = node[jPoint]->GetMassFraction(iSpecies);
+      Ys_i[iSpecies] = node[iPoint]->GetMassFraction(iSpecies);
+      Ys_j[iSpecies] = node[jPoint]->GetMassFraction(iSpecies);
     }
-    //Mean_CV = 0.5*(library->ComputeCV(node[iPoint]->GetTemperature(),Mass_Frac_i) +
-    //               library->ComputeCV(node[jPoint]->GetTemperature(),Mass_Frac_j));
+    //Mean_CV = 0.5*(library->ComputeCV(node[iPoint]->GetTemperature(),Ys_i) +
+    //               library->ComputeCV(node[jPoint]->GetTemperature(),Ys_j));
 
     /*--- Inviscid contribution ---*/
     Lambda = std::abs(Mean_ProjVel) + Mean_SoundSpeed*Area;
@@ -2317,11 +2320,11 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
         Mean_ThermalCond = 0.5 * (node[iPoint]->GetThermalConductivity() + node[jPoint]->GetThermalConductivity());
         Mean_LaminarVisc = 0.5*(node[iPoint]->GetLaminarViscosity() + node[jPoint]->GetLaminarViscosity());
         for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-          Mass_Frac_i[iSpecies] = node[iPoint]->GetMassFraction(iSpecies);
-          Mass_Frac_j[iSpecies] = node[jPoint]->GetMassFraction(iSpecies);
+          Ys_i[iSpecies] = node[iPoint]->GetMassFraction(iSpecies);
+          Ys_j[iSpecies] = node[jPoint]->GetMassFraction(iSpecies);
         }
-        //Mean_CV = 0.5*(library->ComputeCV(node[iPoint]->GetTemperature(),Mass_Frac_i) +
-        //               library->ComputeCV(node[jPoint]->GetTemperature(),Mass_Frac_j));
+        //Mean_CV = 0.5*(library->ComputeCV(node[iPoint]->GetTemperature(),Ys_i) +
+        //               library->ComputeCV(node[jPoint]->GetTemperature(),Ys_j));
 
         /*--- Inviscid contribution ---*/
         Lambda = std::abs(Mean_ProjVel) + Mean_SoundSpeed;
@@ -2507,19 +2510,23 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
     numerics->SetPrimitive(node[iPoint]->GetPrimitive(), node[jPoint]->GetPrimitive());
     for(iDim = 0; iDim < nDim; ++iDim) {
       //Temperature gradient
-      dynamic_cast<CAvgGradReactive_Flow*>(numerics)->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::T_INDEX_AVGGRAD,iDim,
+      dynamic_cast<CAvgGradReactive_Flow*>(numerics)->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::T_INDEX_GRAD,iDim,
                                                      node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::T_INDEX_GRAD,iDim),
                                                      node[jPoint]->GetGradient_Primitive(CReactiveNSVariable::T_INDEX_GRAD,iDim));
       //Velocity gradient
       for(jDim = 0; jDim < nDim; ++jDim)
-        dynamic_cast<CAvgGradReactive_Flow*>(numerics)->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::RHOS_INDEX_AVGGRAD + nSpecies + jDim,iDim,
+        dynamic_cast<CAvgGradReactive_Flow*>(numerics)->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::VX_INDEX_GRAD + jDim,iDim,
                                                        node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + jDim,iDim),
                                                        node[jPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + jDim,iDim));
       //Mass fractions gradient
       for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-        dynamic_cast<CAvgGradReactive_Flow*>(numerics)->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::RHOS_INDEX_AVGGRAD + iSpecies,iDim,
+        dynamic_cast<CAvgGradReactive_Flow*>(numerics)->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::RHOS_INDEX_GRAD + iSpecies,iDim,
                                                        node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies,iDim),
                                                        node[jPoint]->GetGradient_Primitive(CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies,iDim));
+      //Density gradient
+      //dynamic_cast<CAvgGradReactive_Flow*>(numerics)->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::RHO_INDEX_GRAD,iDim,
+      //                                                node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::RHO_INDEX_GRAD,iDim),
+      //                                                node[jPoint]->GetGradient_Primitive(CReactiveNSVariable::RHO_INDEX_GRAD,iDim));
     }
 
     /*--- Species diffusion coefficients ---*/
@@ -2567,7 +2574,7 @@ void CReactiveNSSolver::SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* c
   unsigned long iPoint, jPoint, iEdge, iVertex;
   unsigned short iDim, jDim, iSpecies, iVar, iMarker;
   su2double Volume;
-  RealVec PrimVar_Vertex(nPrimVarGrad), /*--- Gradient of the following primitive variables: [T,u,v,w,p,rho,Y1,YNs]^T ---*/
+  RealVec PrimVar_Vertex(nPrimVarGrad), /*--- Gradient of the following primitive variables: [T,u,v,w,p,X1,...,XNs]^T ---*/
           PrimVar_i(nPrimVarGrad),
           PrimVar_j(nPrimVarGrad);
   RealVec PrimVar_Average(nPrimVarGrad), Partial_Res(nPrimVarGrad);
@@ -2590,14 +2597,23 @@ void CReactiveNSSolver::SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* c
       PrimVar_i[CReactiveNSVariable::VX_INDEX_GRAD + iDim] = node[iPoint]->GetPrimitive(CReactiveNSVariable::VX_INDEX_PRIM + iDim);
       PrimVar_j[CReactiveNSVariable::VX_INDEX_GRAD + iDim] = node[jPoint]->GetPrimitive(CReactiveNSVariable::VX_INDEX_PRIM + iDim);
     }
-    PrimVar_i[CReactiveNSVariable::RHO_INDEX_GRAD] = node[iPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
-    PrimVar_j[CReactiveNSVariable::RHO_INDEX_GRAD] = node[jPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
+    //PrimVar_i[CReactiveNSVariable::RHO_INDEX_GRAD] = node[iPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
+    //PrimVar_j[CReactiveNSVariable::RHO_INDEX_GRAD] = node[jPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
       PrimVar_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies] =
-      node[iPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_i[CReactiveNSVariable::RHO_INDEX_GRAD];
+      node[iPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_i[CReactiveNSVariable::RHO_INDEX_PRIM];
       PrimVar_j[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies] =
-      node[iPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_j[CReactiveNSVariable::RHO_INDEX_GRAD];
+      node[iPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_j[CReactiveNSVariable::RHO_INDEX_PRIM];
     }
+
+    /*--- Compute molar fractions for iPoint and jPoint ---*/
+    RealVec Xs_i, Xs_j;
+    //Xs_i = library->GetMolarFractions(RealVec(PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD,
+    //                                          PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD + nSpecies));
+    //Xs_j = library->GetMolarFractions(RealVec(PrimVar_j.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD,
+    //                                          PrimVar_j.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD + nSpecies));
+    std::copy(Xs_i.cbegin(), Xs_i.cend(), PrimVar_i.begin() + CReactiveNSVariable::RHOS_INDEX_GRAD);
+    std::copy(Xs_j.cbegin(), Xs_j.cend(), PrimVar_j.begin() + CReactiveNSVariable::RHOS_INDEX_GRAD);
 
   	auto Normal = Common::wrap_in_unique(geometry->edge[iEdge]->GetNormal());
     std::transform(PrimVar_i.cbegin(),PrimVar_i.cend(),PrimVar_j.cbegin(),PrimVar_Average.begin(),[&](double l,double r){return 0.5*(l+r);});
@@ -2624,10 +2640,16 @@ void CReactiveNSSolver::SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* c
         PrimVar_Vertex[CReactiveNSVariable::P_INDEX_GRAD] = node[iPoint]->GetPrimitive(CReactiveNSVariable::P_INDEX_PRIM);
         for(iDim = 0; iDim < nDim; ++iDim)
           PrimVar_Vertex[CReactiveNSVariable::VX_INDEX_GRAD + iDim] = node[iPoint]->GetPrimitive(CReactiveNSVariable::VX_INDEX_PRIM + iDim);
-        PrimVar_Vertex[CReactiveNSVariable::RHO_INDEX_GRAD] = node[iPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
+        //PrimVar_Vertex[CReactiveNSVariable::RHO_INDEX_GRAD] = node[iPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
         for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
           PrimVar_Vertex[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies] =
-          node[iPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_Vertex[CReactiveNSVariable::RHO_INDEX_GRAD];
+          node[iPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_Vertex[CReactiveNSVariable::RHO_INDEX_PRIM];
+
+        /*--- Compute molar fractions ---*/
+        RealVec Xs;
+        //Xs = library->GetMolar(RealVec(PrimVar_Vertex.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD,
+        //                               PrimVar_Vertex.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD + nSpecies));
+        std::copy(Xs.cbegin(), Xs.cend(), PrimVar_Vertex.begin() + CReactiveNSVariable::RHOS_INDEX_GRAD);
 
         auto Normal = Common::wrap_in_unique(geometry->vertex[iMarker][iVertex]->GetNormal());
         for(iVar = 0; iVar < nPrimVarGrad; ++iVar) {
@@ -2637,8 +2659,8 @@ void CReactiveNSSolver::SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* c
         	}
         }
   		}
-  	}
-  }
+  	} /*--- End of iVertex for loop ---*/
+  } /*--- End of iMarker for loop ---*/
 
   /*--- Update gradient value ---*/
   for(iPoint = 0; iPoint < nPointDomain; ++iPoint) {
@@ -2687,10 +2709,16 @@ void CReactiveNSSolver::SetPrimitive_Gradient_LS(CGeometry* geometry, CConfig* c
     PrimVar_i[CReactiveNSVariable::P_INDEX_GRAD] = node[iPoint]->GetPrimitive(CReactiveNSVariable::P_INDEX_PRIM);
     for(iDim = 0; iDim < nDim; ++iDim)
       PrimVar_i[CReactiveEulerVariable::VX_INDEX_GRAD + iDim] = node[iPoint]->GetPrimitive(CReactiveNSVariable::VX_INDEX_PRIM + iDim);
-    PrimVar_i[CReactiveNSVariable::RHO_INDEX_GRAD] = node[iPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
+    //PrimVar_i[CReactiveNSVariable::RHO_INDEX_GRAD] = node[iPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
       PrimVar_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies] =
-      node[iPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_i[CReactiveNSVariable::RHO_INDEX_GRAD];
+      node[iPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_i[CReactiveNSVariable::RHO_INDEX_PRIM];
+
+    /*--- Compute molar fractions for iPoint ---*/
+    RealVec Xs_i;
+    //Xs_i = library->GetMolar(RealVec(PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD,
+    //                                 PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD + nSpecies));
+    std::copy(Xs_i.cbegin(), Xs_i.cend(), PrimVar_i.begin() + CReactiveNSVariable::RHOS_INDEX_GRAD);
 
     /*--- Inizialization of variables ---*/
 		std::fill(C_Mat.begin(),C_Mat.end(),0.0);
@@ -2712,12 +2740,18 @@ void CReactiveNSSolver::SetPrimitive_Gradient_LS(CGeometry* geometry, CConfig* c
       PrimVar_j[CReactiveNSVariable::P_INDEX_GRAD] = node[jPoint]->GetPrimitive(CReactiveNSVariable::P_INDEX_PRIM);
       for(iDim = 0; iDim < nDim; ++iDim)
         PrimVar_j[CReactiveNSVariable::VX_INDEX_GRAD + iDim] = node[jPoint]->GetPrimitive(CReactiveNSVariable::VX_INDEX_PRIM + iDim);
-      PrimVar_j[CReactiveNSVariable::RHO_INDEX_GRAD] = node[jPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
+      //PrimVar_j[CReactiveNSVariable::RHO_INDEX_GRAD] = node[jPoint]->GetPrimitive(CReactiveNSVariable::RHO_INDEX_PRIM);
       for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
         PrimVar_j[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies] =
-        node[jPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_j[CReactiveNSVariable::RHO_INDEX_GRAD];
+        node[jPoint]->GetPrimitive(CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies) / PrimVar_j[CReactiveNSVariable::RHO_INDEX_PRIM];
 
-			//AD::SetPreaccIn(Coord_j, nDim);
+      /*--- Compute molar fractions for jPoint ---*/
+      RealVec Xs_j;
+      //Xs_j = library->GetMolar(RealVec(PrimVar_j.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD,
+      //                                 PrimVar_j.cbegin() + CReactiveNSVariable::RHOS_INDEX_GRAD + nSpecies));
+      std::copy(Xs_j.cbegin(), Xs_i.cend(), PrimVar_j.begin() + CReactiveNSVariable::RHOS_INDEX_GRAD);
+
+      //AD::SetPreaccIn(Coord_j, nDim);
       //AD::SetPreaccIn(PrimVar_j, nPrimVarGrad);
 
       RealVec Coord_ij(nDim);

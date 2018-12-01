@@ -9,59 +9,62 @@ namespace Common {
     * Definition of a wrapper base expression class MatExprT which deruves from
     * ExprT. The expression template accepts two template parameters:
     * 1- the derived expression (the matrix)
-    * 2- the return type of the epxression
+    * 2- the type of the epxression
     * \author G. Orlando
   */
   template<class Derived,typename T>
   struct MatExprT: public ExprT<Derived,T> {
     using value_type = T;
+    using size_type  = std::size_t;
 
     /*!
      * \brief Gets the number of rows
     */
-    inline std::size_t nbRows() const {
+    inline size_type nbRows() const {
       return this->operator const Derived&().nbRows();
     }
 
     /*!
      * \brief Gets the number of rows
     */
-    inline std::size_t nbCols() const {
+    inline size_type nbCols() const {
       return this->operator const Derived&().nbCols();
     }
 
     /*!
      * \brief Access to the individual entry (non const version)
     */
-    inline T& operator()(std::size_t i, size_t j) {
-      return this->operator Derived&().at(i,j);
+    inline value_type& operator()(size_type i, size_type j) {
+      return this->operator Derived&().operator()(i,j);
     }
 
     /*!
      * \brief Access to the individual entry (const version)
     */
-    //inline const T& operator()(std::size_t i, size_t j) const
-    inline T operator()(std::size_t i, size_t j) const {
-      return this->operator const Derived&().at(i,j);
+    //inline const T& operator()(size_type i, size_type j) const
+    inline value_type operator()(size_type i, size_type j) const {
+      return this->operator const Derived&().operator()(i,j);
     }
 
 
     /*!
      * \brief Access to the individual entry (non const version)
     */
-    inline T& at(std::size_t i, size_t j) {
+    inline value_type& at(size_type i, size_type j) {
       return this->operator Derived&().at(i,j);
     }
 
     /*!
      * \brief Access to the individual entry (const version)
     */
-    //inline const T& at(std::size_t i, size_t j) const
-    inline T at(std::size_t i, size_t j) const {
+    //inline const T& at(size_type i, size_type j) const
+    inline value_type at(size_type i, size_type j) const {
       return this->operator const Derived&().at(i,j);
     }
 
   };
+
+  #define MET_TYPE(a) MatExprT<a,TYPE(a)>
 
   /**
    * Definition of an expression template class for basic binary operations between matrixes
@@ -72,12 +75,11 @@ namespace Common {
    * \author G. Orlando
    */
 
-  #define MET_TYPE(a) MatExprT<a,TYPE(a)>
-
   #define ETMAT_BINARY(OpName,__op__) \
   template <class Left, class Right>			\
   struct OpName: public MatExprT<OpName<Left,Right>, TYPE(Left)> { \
-    static_assert(std::is_convertible<TYPE(Left),TYPE(Right)>::value,"The types of the two matrixes are not compatible"); \
+    static_assert(std::is_arithmetic<TYPE(Left)>::value,"The type of left matrix is not arithmetic"); \
+    static_assert(std::is_arithmetic<TYPE(Right)>::value,"The type of right matrix is not arithmetic"); \
                                                 \
     OpName(const MET_TYPE(Left)& l, const MET_TYPE(Right)& r): e1(l), e2(r) { \
       SU2_Assert(e1.nbRows() == e2.nbRows(),"The number of rows of the two matrixes is not the same"); \
@@ -94,15 +96,15 @@ namespace Common {
       return e1.at(i,j) __op__ e2.at(i,j); \
     } \
     									               \
-    std::size_t size() const { \
+    std::size_t size(void) const { \
       return e1.size(); \
     }	\
                                         \
-    std::size_t nbCols() const { \
+    std::size_t nbCols(void) const { \
       return e1.nbCols(); \
     } \
                                           \
-    std::size_t nbRows() const { \
+    std::size_t nbRows(void) const { \
       return e1.nbRows(); \
     }  \
 									                     \
@@ -130,7 +132,7 @@ namespace Common {
   #define ETMAT_BINARY_CR(OpName,__op__) \
   template <class Left>			\
   struct OpName: public MatExprT<OpName<Left>, TYPE(Left)> { \
-    static_assert(std::is_convertible<TYPE(Left),double>::value,"The types of the matrix is not compatible with double"); \
+    static_assert(std::is_arithmetic<TYPE(Left)>::value,"The type of the matrix is not arithmetic"); \
                                                  \
     OpName (const MET_TYPE(Left)& l, const double& r): e(l), c(r) { \
       SU2_Assert(strcmp(#__op__ ,"/") && std::abs(c)>0,"You can't divide by zero"); \
@@ -142,15 +144,15 @@ namespace Common {
       return e.at(i,j) __op__ c; \
     } \
                                       \
-    std::size_t size() const { \
+    std::size_t size(void) const { \
       return e.size(); \
     }	\
                                          \
-    std::size_t nbCols() const { \
+    std::size_t nbCols(void) const { \
       return e.nbCols(); \
     } \
                                            \
-    std::size_t nbRows() const { \
+    std::size_t nbRows(void) const { \
        return e.nbRows(); \
     }  \
                                         \
@@ -186,7 +188,7 @@ namespace Common {
   #define ETMAT_BINARY_CL(OpName,__op__) \
   template <class Right>			\
   struct OpName: public MatExprT<OpName<Right>, TYPE(Right)> { \
-    static_assert(std::is_convertible<double,TYPE(Right)>::value,"The types of the matrix is not compatible with double"); \
+    static_assert(std::is_arithmetic<TYPE(Right)>::value,"The type of the matrix is not arithmetic"); \
                                                  \
     OpName (const double& l,const MET_TYPE(Right)& r): c(l), e(r) {}	\
                                         \
@@ -196,15 +198,15 @@ namespace Common {
       return c __op__ e.at(i,j); \
     } \
                                       \
-    std::size_t size() const { \
+    std::size_t size(void) const { \
       return e.size(); \
     }	\
                                          \
-    std::size_t nbCols() const { \
+    std::size_t nbCols(void) const { \
       return e.nbCols(); \
     } \
                                            \
-    std::size_t nbRows() const { \
+    std::size_t nbRows(void) const { \
        return e.nbRows(); \
     }  \
                                         \
@@ -216,7 +218,6 @@ namespace Common {
   ETMAT_BINARY_CL(MAdd_CL, +)
   ETMAT_BINARY_CL(MSub_CL, -)
   ETMAT_BINARY_CL(MMul_CL, *)
-  //ETMAT_BINARY_CL(MDiv_CL, /)
 
   #undef ETMAT_BINARY_CL
 
@@ -229,17 +230,14 @@ namespace Common {
   template <class Right>
   inline MMul_CL<Right> operator *(const double& l,const MET_TYPE(Right)& r){return MMul_CL<Right>(l,r);}
 
-  //template <class Right>
-  //inline MDiv_CL<Right> operator /(const double& l,const MET_TYPE(Right)& r){return MDiv_CL<Right>(l,r);}
-
-
   /**
     * Expression class for multiplication between two matrixes
     * \author G. Orlando
   */
   template <class Left,class Right>
   struct Mat_Mult :public MatExprT<Mat_Mult<Left,Right>, TYPE(Left)> {
-    static_assert(std::is_convertible<TYPE(Left),TYPE(Right)>::value,"The types of the two matrixes are not compatible");
+    static_assert(std::is_arithmetic<TYPE(Left)>::value,"The type of left matrix is not arithmetic");
+    static_assert(std::is_arithmetic<TYPE(Right)>::value,"The type of right matrix is not arithmetic");
 
     /*!
      * \brief Class constructor
@@ -275,28 +273,28 @@ namespace Common {
     /*!
      * \brief Size of the resulting matrix
     */
-    inline std::size_t size() const {
+    inline std::size_t size(void) const {
       return e1.nbRows()*e2.nbCols();
     }
 
     /*!
      * \brief Gets the number of columns of the resulting matrix
     */
-    inline std::size_t nbCols() const {
+    inline std::size_t nbCols(void) const {
       return e2.nbCols();
     }
 
     /*!
      * \brief Gets the number of rows of the resulting matrix
     */
-    inline std::size_t nbRows() const {
+    inline std::size_t nbRows(void) const {
       return e1.nbRows();
     }
 
   private:
 
-    const MET_TYPE(Left)& e1;
-    const MET_TYPE(Right)& e2;
+    const MET_TYPE(Left)& e1; /*! *\brief Left matrix */
+    const MET_TYPE(Right)& e2; /*! *\brief Right matrix */
   };
 
   template <class Left, class Right>
@@ -308,7 +306,8 @@ namespace Common {
   */
   template <class Mat, class Vec>
   struct MatVec_Mult :public MatExprT<MatVec_Mult<Mat,Vec>, TYPE(Vec)> {
-    static_assert(std::is_convertible<TYPE(Mat),TYPE(Vec)>::value,"The types of matrix and vector are not compatible");
+    static_assert(std::is_arithmetic<TYPE(Mat)>::value,"The type of the matrix is not arithmetic");
+    static_assert(std::is_arithmetic<TYPE(Vec)>::value,"The type of the vector is not arithmetic");
 
     /*!
      * \brief Class constructor
@@ -343,14 +342,14 @@ namespace Common {
     /*!
      * \brief Size of the resulting vector
     */
-    inline std::size_t size() const {
+    inline std::size_t size(void) const {
       return e1.nbRows();
     }
 
   private:
 
-    const MET_TYPE(Mat)& e1;
-    const VET_TYPE(Vec)& e2;
+    const MET_TYPE(Mat)& e1; /*! *\brief Matrix */
+    const VET_TYPE(Vec)& e2; /*! *\brief Vector */
   };
 
   template <class Mat, class Vec>

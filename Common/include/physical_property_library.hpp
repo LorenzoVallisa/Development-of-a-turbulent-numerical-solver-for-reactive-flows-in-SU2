@@ -1,8 +1,8 @@
 #ifndef SU2_PHYSICAL_PROPERTY_LIBRARY
 #define SU2_PHYSICAL_PROPERTY_LIBRARY
 
-#include "concrete_provider.hpp"
-#include "builder_provider.hpp"
+#include "./Framework/concrete_provider.hpp"
+#include "./Framework/builder_provider.hpp"
 #include "datatype_structure.hpp"
 
 namespace Framework  {
