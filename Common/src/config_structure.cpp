@@ -536,6 +536,20 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\brief CONFIG_LIB_FILE \n  DESCRIPTION: Name of file to configure the library */
   addStringOption("CONFIG_LIB_FILE",Config_File_Lib,"");
 
+  /*!\brief FREESTREAM_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
+  addDoubleListOption("FREESTREAM_MASS_FRAC", nSpecies, MassFrac_FreeStream);
+
+  /*!\brief REF_AREA\n DESCRIPTION: Reference density for adimensionalitazion (1.0 kg/m3 by default) \ingroup Config*/
+  addDoubleOption("REF_DENSITY", Density_Ref, 1.0);
+
+  /*!\brief REF_AREA\n DESCRIPTION: Reference temperature for adimensionalitazion (298.15 K by default) \ingroup Config*/
+  addDoubleOption("REF_TEMPERATURE", Temperature_Ref, 298.15);
+
+  /*!\brief REF_AREA\n DESCRIPTION: Reference pressure for adimensionalitazion (101325.0 Pa by default) \ingroup Config*/
+  addDoubleOption("REF_PRESSURE", Pressure_Ref, 101325.0);
+
+  //Opzione Mass Fractions inlet dopo mail di domani
+
 
   /*!\brief REGIME_TYPE \n  DESCRIPTION: Regime type \n OPTIONS: see \link Regime_Map \endlink \ingroup Config*/
   addEnumOption("REGIME_TYPE", Kind_Regime, Regime_Map, COMPRESSIBLE);
@@ -694,6 +708,8 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*--- Options related to reference values for nondimensionalization ---*/
 
   Length_Ref = 1.0; //<---- NOTE: this should be given an option or set as a const
+  /*!\brief REF_LENGTH\n DESCRIPTION: Reference length for adimensionalitazion (1.0 m by default) \ingroup Config*/
+  addDoubleOption("REF_LENGTH", Length_Ref, 1.0);
 
   /*!\brief REF_ORIGIN_MOMENT_X\n DESCRIPTION: X Reference origin for moment computation \ingroup Config*/
   addDoubleListOption("REF_ORIGIN_MOMENT_X", nRefOriginMoment_X, RefOriginMoment_X);

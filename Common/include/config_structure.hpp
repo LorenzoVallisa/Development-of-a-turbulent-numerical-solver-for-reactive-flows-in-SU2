@@ -69,6 +69,7 @@ class CConfig {
 private:
   string Library_Name; /*!< \brief Name of library for physical-chemical options.*/
   string Config_File_Lib; /*!< \brief Name of the to configure the library.*/
+  unsigned short nSpecies; /*!< \brief Number of species in the mixture.*/
 
   SU2_Comm SU2_Communicator; /*!< \brief MPI communicator of SU2.*/
   int rank;

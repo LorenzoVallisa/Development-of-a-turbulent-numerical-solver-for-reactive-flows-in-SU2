@@ -4,6 +4,7 @@
 #include "../../Common/include/not_implemented_exception.hpp"
 #include "../../Common/include/move_pointer.hpp"
 #include "../../Common/include/su2_assert.hpp"
+#include "../../Common/include/default_initialization.hpp"
 
 #include <algorithm>
 #include <iterator>
@@ -47,7 +48,6 @@ CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_n
  */
 //
 //
-
 void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i,
                                        su2double** val_Jacobian_j, CConfig* config) {
   //AD::StartPreacc();
@@ -57,12 +57,12 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
 
   SU2_Assert(val_residual != NULL,"The array of residual for convective flux has not been allocated");
   SU2_Assert(V_i != NULL,"The array of primitive variables at node i has not been allocated");
-  SU2_Assert(V_i != NULL,"The array of primitive variables at node j has not been allocated");
+  SU2_Assert(V_j != NULL,"The array of primitive variables at node j has not been allocated");
 
   unsigned short iDim, iVar, iSpecies; /*!< \brief Indexes for iterations. */
   su2double sq_vel_i,sq_vel_j,  /*!< \brief squared velocity. */
-            Gamma_i, Gamma_j, /*!< \brief Energy at node i and at node j. */
             Temperature_i, Temperature_j, /*!< \brief Temperature at node i and at node j. */
+            Sound_Speed_i, Sound_Speed_j, /*!< \brief Sound speed at node i and at node j. */
 	          ProjVelocity_i, ProjVelocity_j; /*!< \brief Projected velocities at node i and at node j. */
 
   ::Compute_Outward_UnitNormal(nDim,Normal,UnitNormal);
@@ -72,18 +72,18 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
                                 V_i + CReactiveEulerVariable::VX_INDEX_PRIM,0.0);
   Density_i = V_i[CReactiveEulerVariable::RHO_INDEX_SOL];
   Pressure_i = V_i[CReactiveEulerVariable::P_INDEX_PRIM];
-  Enthalpy_i = V_i[CReactiveEulerVariable::H_INDEX_PRIM] + 0.5*sq_vel_i;
+  Enthalpy_i = V_i[CReactiveEulerVariable::H_INDEX_PRIM];
   Temperature_i = V_i[CReactiveEulerVariable::T_INDEX_PRIM];
-  library->Gamma_FrozenSoundSpeed(Temperature_i,Pressure_i,Density_i,Gamma_i,SoundSpeed_i);
+  Sound_Speed_i = V_i[CReactiveEulerVariable::A_INDEX_PRIM];
 
   /*--- Point j: compute squared velocity,energy,pressure,sound speed and ethalpy  ---*/
   sq_vel_j = std::inner_product(V_j + CReactiveEulerVariable::VX_INDEX_PRIM,V_j + CReactiveEulerVariable::VX_INDEX_PRIM + nDim,
                                 V_j + CReactiveEulerVariable::VX_INDEX_PRIM,0.0);
   Density_j = V_j[CReactiveEulerVariable::RHO_INDEX_SOL];
   Pressure_j = V_j[CReactiveEulerVariable::P_INDEX_PRIM];
-  Enthalpy_j = V_j[CReactiveEulerVariable::H_INDEX_PRIM] + 0.5*sq_vel_j;
-  Temperature_i = V_i[CReactiveEulerVariable::T_INDEX_PRIM];
-  library->Gamma_FrozenSoundSpeed(Temperature_j,Pressure_j,Density_j,Gamma_j,SoundSpeed_j);
+  Enthalpy_j = V_j[CReactiveEulerVariable::H_INDEX_PRIM];
+  Temperature_j = V_j[CReactiveEulerVariable::T_INDEX_PRIM];
+  Sound_Speed_j = V_j[CReactiveEulerVariable::A_INDEX_PRIM];
 
   /*--- Projected velocities ---*/
   ProjVelocity_i = std::inner_product(V_i + CReactiveEulerVariable::VX_INDEX_PRIM,V_i + CReactiveEulerVariable::VX_INDEX_PRIM + nDim,
@@ -100,21 +100,18 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
 
   /*--- Calculate adjusted polynomial function AUSM +-Up ---*/
   su2double mRef,mF;
-  if(mL>=1.0 || mR >= 1.0)
+  if(mL >= 1.0 || mR >= 1.0)
     mRef = 1.0;
-  else {
-    mF = 0.5*(mL+mR);
-    mRef = std::min(1.0,std::max(mF*mF,1e-4));
-  }
-
-  mF = std::sqrt((sq_vel_i + sq_vel_j)/(2.0*MeanSoundSpeed*MeanSoundSpeed));
-  mRef = std::min(1.0,std::max(mF,mRef));
-  const su2double fa = mRef*(2.0-mRef);
-  const su2double alpha = 3.0/16.0*(5.0*fa*fa-4.0);
+  else
+    mRef = std::min(1.0,std::max(1e-4,(0.25*(mL+mR)*(mL+mR))));
 
   /*--- Calculate Normal L/R Mach numbers ---*/
   mL  = ProjVelocity_i/MeanSoundSpeed;
   mR  = ProjVelocity_j/MeanSoundSpeed;
+  mF = std::sqrt(0.5*(mL*mL + mR*mR));
+  mRef = std::min(1.0,std::max(mF,mRef));
+  const su2double fa = mRef*(2.0-mRef);
+  const su2double alpha = 3.0/16.0*(5.0*fa*fa-4.0);
 
   su2double mLP,mRM,pLP,pRM;
 
@@ -140,14 +137,14 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
   const su2double kP = 0.25;
   const su2double sigma = 1.0;
 
-  mF = mLP + mRM;
-  su2double mP = kP/fa*std::max(1.0-sigma*mF*mF,0.0)*(Pressure_i-Pressure_j)/(Pressure_i+Pressure_j);
-  mF += mP;
-  su2double mLF = 0.5*(mF+std::abs(mF));
-  su2double mRF = 0.5*(mF-std::abs(mF));
+  su2double m12 = mLP + mRM;
+  su2double mP = kP/fa*std::max(1.0-sigma*mF*mF,0.0)*(Pressure_j-Pressure_i)/(Pressure_i+Pressure_j);
+  m12 += mP;
+  su2double mLF = 0.5*(m12+std::abs(m12));
+  su2double mRF = 0.5*(m12-std::abs(m12));
 
   su2double pLF = pLP*Pressure_i + pRM*Pressure_j;
-  mF = MeanSoundSpeed*(mLF*Density_i + mRF*Density_j);
+  m12 = MeanSoundSpeed*(mLF*Density_i + mRF*Density_j);
 
   /*--- Compute the state at node i and at node j ---*/
   RealVec Phi_i(nVar),Phi_j(nVar);
@@ -158,7 +155,7 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
     Phi_j[CReactiveEulerVariable::RHOVX_INDEX_SOL + iDim] = Density_j*V_j[CReactiveEulerVariable::VX_INDEX_PRIM + iDim];
   }
   Phi_i[CReactiveEulerVariable::RHOE_INDEX_SOL] = Density_i*Enthalpy_i;
-  Phi_j[CReactiveEulerVariable::RHOE_INDEX_SOL] = Density_j*Enthalpy_j;
+  Phi_j[CReactiveEulerVariable::RHOE_INDEX_SOL] = Density_j*Enthalpy_i;
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
     Phi_i[CReactiveEulerVariable::RHOS_INDEX_SOL + iSpecies] = V_i[CReactiveEulerVariable::RHOS_INDEX_PRIM+iSpecies];
     Phi_j[CReactiveEulerVariable::RHOS_INDEX_SOL + iSpecies] = V_j[CReactiveEulerVariable::RHOS_INDEX_PRIM+iSpecies];
@@ -166,12 +163,12 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
 
   /*--- Calculate the numerical flux ---*/
   for(iVar = 0; iVar < nVar; ++iVar)
-    val_residual[iVar] = 0.5*(mF*(Phi_i[iVar]+Phi_j[iVar]) - std::abs(mF)*(Phi_j[iVar]-Phi_i[iVar]))*Area;
+    val_residual[iVar] = 0.5*(m12*(Phi_i[iVar]+Phi_j[iVar]) - std::abs(m12)*(Phi_j[iVar]-Phi_i[iVar]))*Area;
 
   const su2double Ku = 1.0;
   for(iDim = 0; iDim < nDim; ++iDim) {
-    val_residual[CReactiveEulerVariable::VX_INDEX_PRIM+iDim] +=
-    (pLF*UnitNormal[iDim] - Ku*pLP*pRM*(Density_i+Density_j)*mF*(ProjVelocity_i)*UnitNormal[iDim])*Area;
+    val_residual[CReactiveEulerVariable::VX_INDEX_PRIM + iDim] +=
+    (pLF*UnitNormal[iDim] - Ku*pLP*pRM*(Density_i+Density_j)*m12*(ProjVelocity_i)*UnitNormal[iDim])*Area;
   }
 
   if(implicit)
@@ -191,6 +188,9 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
 CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
   CNumerics(val_nDim,val_nVar,config),library(CReactiveNSVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
 
+  std::tie(Laminar_Viscosity_i,Laminar_Viscosity_j,Thermal_Conductivity_i,Thermal_Conductivity_j) =
+  Common::repeat<4,decltype(Laminar_Viscosity_i)>(decltype(Laminar_Viscosity_i)());
+
   nPrimVar = nSpecies + nDim + 5;
   nPrimVarAvgGrad = nSpecies + nDim + 1;
 
@@ -200,18 +200,25 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
   PrimVar_i.resize(nPrimVar);
   PrimVar_j.resize(nPrimVar);
 
-  //GradPrimVar_i.resize(nPrimVarAvgGrad + 1,nDim);
-  //GradPrimVar_j.resize(nPrimVarAvgGrad + 1,nDim);
+  Dij_i.resize(nSpecies, nSpecies);
+  Dij_j.resize(nSpecies, nSpecies);
   GradPrimVar_i.resize(nPrimVarAvgGrad, nDim);
   GradPrimVar_j.resize(nPrimVarAvgGrad, nDim);
   Mean_GradPrimVar.resize(nPrimVarAvgGrad, nDim);
 
 }
 
-CAvgGradReactive_Flow::RealVec CAvgGradReactive_Flow::Solve_SM(const su2double val_density, const RealVec& val_xs,
-                                                               const RealVec& val_grad_xs, const RealVec& val_diffusioncoeff) {
-  su2double toll = 1e-6;
-  unsigned short max_iter = 100;
+//
+//
+/*!
+ * \brief Solution of Stefan-Maxwell equation through Sutton procedure
+ */
+//
+//
+CAvgGradReactive_Flow::RealVec CAvgGradReactive_Flow::Solve_SM(const su2double val_density, const RealVec& val_xs, const RealVec& val_grad_xs,
+                                                               const RealVec& val_ys, const RealVec& val_diffusioncoeff, const RealMatrix& val_Dij) {
+  su2double toll = 1e-8;
+  unsigned short max_iter = 50;
   su2double curr_err = 2.0*toll;
   unsigned short curr_iter = 0;
 
@@ -219,21 +226,33 @@ CAvgGradReactive_Flow::RealVec CAvgGradReactive_Flow::Solve_SM(const su2double v
   su2double rho = val_density;
   RealVec Xs = val_xs;
   RealVec Grad_Xs = val_grad_xs;
+  RealVec Ys = val_ys;
   RealVec Ds = val_diffusioncoeff;
+  RealMatrix Dij = val_Dij;
 
   /*--- Compute vectors that do not change during iteration ---*/
-  RealVec v1,v2v4;
-  //v1 = library->ComputeV1(Grad_Xs,rho);
-  //v2 = library->ComputeV2(Xs,Ds);
-  //v2v4 = library->ComputeV2_V4(Xs,Ds,J);
+  RealVec v1,v2,mMasses;
+  //mMasses = library->GetMolarMasses();
+  su2double totMass = Xs[0]*mMasses[0]/Ys[0];
+  v1 = (rho/totMass)*mMasses*Ds*Grad_Xs;
+  v2 = Ys*Ds*totMass;
 
-  RealVec Jd = v1; /*--TODO ---*/
-  while(curr_iter < max_iter && curr_err < toll) {
+  RealVec tmp(nSpecies);
+  RealVec Jd = -v1;
+  while(curr_iter < max_iter && curr_err > toll) {
     RealVec Jold = Jd;
-    Jd = v1 + v2v4;
+    for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+      su2double temporary = 0.0;
+      for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+        temporary += Jold[jSpecies]/(mMasses[jSpecies]*Dij(iSpecies,jSpecies));
+      }
+      tmp[iSpecies] = temporary;
+    }
+    Jd = -v1 + v2*tmp;
     su2double totJ = std::accumulate(Jd.cbegin(),Jd.cend(),0.0);
-    Jd -= totJ;
-    curr_err = (Jd - Jold).norm2();
+    Jd -= Ys*totJ;
+    RealVec err = Jd - Jold;
+    curr_err = err.norm2();
     curr_iter++;
   }
   if(curr_iter == max_iter)
@@ -250,8 +269,9 @@ CAvgGradReactive_Flow::RealVec CAvgGradReactive_Flow::Solve_SM(const su2double v
  */
 //
 //
-void CAvgGradReactive_Flow::GetViscousProjFlux_Ramshaw(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
-                                          const su2double val_viscosity, const su2double val_therm_conductivity, const RealVec& val_diffusion_coeff) {
+void CAvgGradReactive_Flow::GetViscousProjFlux(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+                                               const su2double val_viscosity, const su2double val_therm_conductivity,
+                                               const RealVec& val_diffusion_coeff, CConfig* config) {
   SU2_Assert(Proj_Flux_Tensor != NULL, "The array for the projected viscous flux has not been allocated");
   SU2_Assert(Flux_Tensor != NULL, "The matrix for the viscous flux tensor has not been allocated");
   SU2_Assert(tau != NULL,"The matrix for the stress tensor has not been allocated");
@@ -261,7 +281,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux_Ramshaw(const RealVec& val_primva
   RealVec Ds, V;
   RealMatrix GV;
   su2double mu, ktr, div_vel;
-  su2double rho, T, P;
+  su2double rho, T;
 
   /*--- Initialize ---*/
   std::fill(Proj_Flux_Tensor,Proj_Flux_Tensor + nVar,0.0);
@@ -275,10 +295,15 @@ void CAvgGradReactive_Flow::GetViscousProjFlux_Ramshaw(const RealVec& val_primva
   mu  = val_viscosity;
   ktr = val_therm_conductivity;
   rho = val_primvar[CReactiveNSVariable::RHO_INDEX_PRIM];
-  //T   = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
-  //P   = val_primvar[CReactiveNSVariable::P_INDEX_PRIM];
+  T   = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
   RealVec hs(nSpecies);
-  //hs = library->ComputePartialEnthalpy(T);
+  bool US_System = config->GetSystemMeasurements() == SI;
+  su2double dim_temp = T*config->GetTemperature_Ref();
+  if(US_System)
+    dim_temp *= 5.0/9.0;
+  //hs = library->ComputePartialEnthalpy(dim_temp)/config->GetEnergy_Ref();
+  //if(US_System)
+  //  hs *= 3.28084*3.28084;
 
   /*--- Calculate the velocity divergence ---*/
   div_vel = 0.0;
@@ -296,8 +321,8 @@ void CAvgGradReactive_Flow::GetViscousProjFlux_Ramshaw(const RealVec& val_primva
   for(iDim = 0; iDim < nDim; ++iDim)
     std::fill(tau[iDim],tau[iDim] + nDim,0.0);
 
-  for(iDim = 0 ; iDim < nDim; ++iDim) {
-    for(jDim = 0 ; jDim < nDim; ++jDim)
+  for(iDim = 0; iDim < nDim; ++iDim) {
+    for(jDim = 0; jDim < nDim; ++jDim)
       tau[iDim][jDim] += mu * (GV(VX_INDEX_AVGGRAD+jDim,iDim) + GV(VX_INDEX_AVGGRAD+iDim,jDim));
     tau[iDim][iDim] -= TWO3*mu*div_vel;
   }
@@ -342,19 +367,20 @@ void CAvgGradReactive_Flow::GetViscousProjFlux_Ramshaw(const RealVec& val_primva
  */
 //
 //
-void CAvgGradReactive_Flow::GetViscousProjFlux_SM(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
-                                               const double val_viscosity, const double val_thermal_conductivity, const RealVec& val_diffusion_coeff) {
+void CAvgGradReactive_Flow::GetViscousProjFlux(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+                                               const double val_viscosity, const double val_thermal_conductivity,
+                                               const RealMatrix& val_Dij, CConfig* config) {
   SU2_Assert(Proj_Flux_Tensor != NULL, "The array for the projected viscous flux has not been allocated");
   SU2_Assert(Flux_Tensor != NULL, "The matrix for the viscous flux tensor has not been allocated");
   SU2_Assert(tau != NULL,"The matrix for the stress tensor has not been allocated");
 
   /*--- We need a non-standard primitive vector with molar fractions instead of partial densities ---*/
- 	unsigned short iSpecies, iVar, iDim, jDim;
+ 	unsigned short iSpecies, jSpecies, iVar, iDim, jDim;
   RealVec V;
   RealMatrix GV;
   su2double mu, ktr, div_vel;
-  su2double rho, T, P, C, tmp;
-  RealVec Ds;
+  su2double rho, T, tmp;
+  RealMatrix Dij;
 
   /*--- Initialize ---*/
   std::fill(Proj_Flux_Tensor,Proj_Flux_Tensor + nVar,0.0);
@@ -367,17 +393,34 @@ void CAvgGradReactive_Flow::GetViscousProjFlux_SM(const RealVec& val_primvar, co
   rho = val_primvar[CReactiveNSVariable::RHO_INDEX_PRIM];
   mu  = val_viscosity;
   ktr = val_thermal_conductivity;
-  Ds  = val_diffusion_coeff;
-  //T = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
-  //P = val_primvar[CReactiveNSVariable::P_INDEX_PRIM];
+  Dij = val_Dij;
+  T = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
   RealVec hs(nSpecies);
-  //hs = library->ComputePartialEnthalpy(T);
-  RealVec Xs(V.cbegin() + CReactiveNSVariable::RHOS_INDEX_SOL, V.cend());
+  bool US_System = config->GetSystemMeasurements() == SI;
+  su2double dim_temp = T*config->GetTemperature_Ref();
+  if(US_System)
+    dim_temp *= 5.0/9.0;
+  //hs = library->ComputePartialEnthalpy(dim_temp)/config->GetEnergy_Ref();
+  //if(US_System)
+  //  hs *= 3.28084*3.28084;
+
+  /*--- Extract molar fractions, their gradient and mass fractions ---*/
+  RealVec Xs(V.cbegin() + CReactiveNSVariable::RHOS_INDEX_SOL, V.cbegin() + CReactiveNSVariable::RHOS_INDEX_SOL + nSpecies);
   RealMatrix Grad_Xs(nSpecies,nDim);
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
     for(iDim = 0; iDim < nDim; ++iDim)
       Grad_Xs(iSpecies,iDim) = GV(RHOS_INDEX_AVGGRAD + iSpecies, iDim);
-  RealVec Ds_SM = (1-Xs)/Ds;
+  RealVec Ys;
+  //Ys = library->GetMassFromMolar(Xs);
+
+  /*---- Compute effective diffusion coefficients ---*/
+  RealVec Ds(nSpecies);
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    su2double tmp = 0.0;
+    for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
+      tmp += Xs[jSpecies]/Dij(iSpecies,jSpecies);
+    Ds[iSpecies] = 1.0/tmp;
+  }
 
   /*--- Compute the velocity divergence ---*/
   div_vel = 0.0;
@@ -394,7 +437,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux_SM(const RealVec& val_primvar, co
     tau[iDim][iDim] -= TWO3*mu*div_vel;
   }
 
-  /*--- Populate entries in the viscous flux vector ---*/
+  /*--- Populate entries in the viscous flux tensor ---*/
 
   /*--- Density contribution ---*/
   for(iDim = 0; iDim < nDim; ++iDim) {
@@ -413,7 +456,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux_SM(const RealVec& val_primvar, co
 
     /*--- Heat flux due to species diffusion term ---*/
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] = Solve_SM(rho, Xs, Grad_Xs.GetColumn<RealVec>(iDim), Ds_SM)[iSpecies];
+      Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] = -Solve_SM(rho, Xs, Grad_Xs.GetColumn<RealVec>(iDim), Ys, Ds, Dij)[iSpecies];
       Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] += Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] * hs[iSpecies];
     }
 
@@ -425,9 +468,10 @@ void CAvgGradReactive_Flow::GetViscousProjFlux_SM(const RealVec& val_primvar, co
   }
 
   //unsigned short jSpecies, kSpecies;
-  //C = library->ComputeConcentration(rho);
-  //RealMatrix Dij,Bij(nSpecies -1,nSpecies -1);
-  //Dij = library->GetDij_SM(T);
+  //su2double C,tmp;
+  //C = ->ComputeConcentration(rho);
+  //RealMatrix Bij(nSpecies -1,nSpecies -1);
+
   /*--- Populate matrix to solve system that computes diffusion flux each species ---*/
   /*
   for(iSpecies = 0; iSpecies < nSpecies - 1; ++iSpecies) {
@@ -471,15 +515,13 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const RealVec& val_Mean_PrimVar, 
  */
 //
 //
-
-void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i,
-                                            su2double** val_Jacobian_j,CConfig* config) {
+void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i, su2double** val_Jacobian_j, CConfig* config) {
   SU2_Assert(V_i != NULL,"The array for the primitive variables at node i has not been allocated");
   SU2_Assert(V_j != NULL,"The array for the primitive variables at node j has not been allocated");
 
-  SU2_Assert(GradPrimVar_i.nbRows() == nPrimVarAvgGrad + 1,"The number of rows in the gradient of varaible i is not correct");
+  SU2_Assert(GradPrimVar_i.nbRows() == nPrimVarAvgGrad, "The number of rows in the gradient of varaible i is not correct");
   SU2_Assert(GradPrimVar_i.nbCols() == nDim,"The number of columns in the gradient of varaible i is not correct");
-  SU2_Assert(GradPrimVar_j.nbRows() == nPrimVarAvgGrad + 1,"The number of rows in the gradient of varaible j is not correct");
+  SU2_Assert(GradPrimVar_j.nbRows() == nPrimVarAvgGrad, "The number of rows in the gradient of varaible j is not correct");
   SU2_Assert(GradPrimVar_j.nbCols() == nDim,"The number of columns in the gradient of varaible j is not correct");
   SU2_Assert(Mean_GradPrimVar.nbRows() == nPrimVarAvgGrad,"The number of rows in the mean gradient is not correct");
   SU2_Assert(Mean_GradPrimVar.nbCols() == nDim,"The number of columns in the mean gradient is not correct");
@@ -488,12 +530,12 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
 
   su2double Mean_Laminar_Viscosity; /*!< \brief Mean value of laminar viscosity. */
   su2double Mean_Thermal_Conductivity;  /*!< \brief Mean value of thermal conductivity. */
-  RealVec Mean_Diffusion_Coefficient(nSpecies); /*!< \brief Mean value of diffusion coefficient. */
+  RealMatrix Mean_Dij; /*!< \brief Mean value of binary diffusion coefficients. */
 
   /*--- Mean transport coefficients ---*/
   Mean_Laminar_Viscosity = 2.0/(1.0/Laminar_Viscosity_i + 1.0/Laminar_Viscosity_j);
   Mean_Thermal_Conductivity = 2.0/(1.0/Thermal_Conductivity_i + 1.0/Thermal_Conductivity_j);
-  Mean_Diffusion_Coefficient = 2.0/(1.0/Diffusion_Coeff_i + 1.0/Diffusion_Coeff_j[iSpecies]);
+  Mean_Dij = 2.0/(1.0/Dij_i + 1.0/Dij_j);
 
   /*--- Set the primitive variables and compute the mean ---*/
   std::copy(V_i, V_i + nPrimVar, PrimVar_i.begin());
@@ -506,10 +548,10 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   std::for_each(PrimVar_j.begin() + CReactiveNSVariable::RHOS_INDEX_PRIM, PrimVar_j.begin() + CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies,
                 [=](su2double elem){elem /= V_j[CReactiveNSVariable::RHO_INDEX_PRIM];});
   RealVec Xs_i, Xs_j;
-  //Xs_i = library->GetMolarFractions(RealVec(PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM,
-  //                                          PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies);
-  //Xs_j = library->GetMolarFractions(RealVec(PrimVar_j.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM,
-  //                                          PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies);
+  //Xs_i = library->GetMolarFromMass(RealVec(PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM,
+  //                                         PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies);
+  //Xs_j = library->GetMolarFromMass(RealVec(PrimVar_j.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM,
+  //                                         PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies);
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
     Mean_PrimVar[CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies] = 0.5*(Xs_i[iSpecies] + Xs_j[iSpecies]);
 
@@ -520,39 +562,17 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
 
     // Velocities
     for(jDim = 0; jDim < nDim; ++jDim)
-      Mean_GradPrimVar(VX_INDEX_AVGGRAD + iDim,jDim) = 0.5*(GradPrimVar_i(VX_INDEX_GRAD + iDim,jDim) + GradPrimVar_j(VX_INDEX_GRAD + iDim,jDim));
+      Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) = 0.5*(GradPrimVar_i(VX_INDEX_GRAD + jDim,iDim) + GradPrimVar_j(VX_INDEX_GRAD + jDim,iDim));
 
     // Molar Fractions
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-      Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(GradPrimVar_i(RHOS_INDEX_GRAD + iDim,jDim) +
-                                                                  GradPrimVar_j(RHOS_INDEX_GRAD + iDim,jDim));
-
+      Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(GradPrimVar_i(RHOS_INDEX_GRAD + iSpecies,iDim) +
+                                                                  GradPrimVar_j(RHOS_INDEX_GRAD + iSpecies,iDim));
   }
 
-  /*-- Use Mass fraction instead of partial densities ---*/
-  /*
-  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-    Mean_PrimVar[CReactiveNSVariable::RHOS_INDEX_PRIM+iSpecies] = 0.5*(PrimVar_i[CReactiveNSVariable::RHOS_INDEX_PRIM+iSpecies] +
-                                                                       PrimVar_j[CReactiveNSVariable::RHOS_INDEX_PRIM+iSpecies]);
-  */
-
-  // Mass fractions mean gradient
-  /*
-  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-    Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(1.0/V_i[CReactiveNSVariable::RHO_INDEX_PRIM]*
-                                                                (GradPrimVar_i(RHOS_INDEX_GRAD + iSpecies,iDim) -
-                                                                PrimVar_i[CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies]*
-                                                                GradPrimVar_i(RHO_INDEX_GRAD,iDim)) +
-                                                                1.0/V_j[CReactiveNSVariable::RHO_INDEX_PRIM]*
-                                                                (GradPrimVar_j(RHO_INDEX_GRAD,iDim) -
-                                                                PrimVar_j[CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies]*
-                                                                GradPrimVar_j(RHO_INDEX_GRAD,iDim)));
-
-  */
-
   /*--- Get projected flux tensor ---*/
-  GetViscousProjFlux_SM(Mean_PrimVar, Mean_GradPrimVar, Common::wrap_in_unique(Normal),
-                        Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, Mean_Diffusion_Coefficient);
+  GetViscousProjFlux(Mean_PrimVar, Mean_GradPrimVar, Common::wrap_in_unique(Normal), Mean_Laminar_Viscosity,
+                     Mean_Thermal_Conductivity, Mean_Dij, config);
 
 	/*--- Update viscous residual with the species projected flux ---*/
   std::copy(Proj_Flux_Tensor,Proj_Flux_Tensor + nVar,val_residual);
@@ -570,7 +590,6 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
  */
 //
 //
-
 CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
   CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
 
@@ -585,7 +604,6 @@ CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVa
  */
 //
 //
-
 void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_Jacobian_i, CConfig* config) {
   SU2_Assert(val_residual != NULL,"The array for residuals has not been allocated");
   SU2_Assert(V_i != NULL,"The array of primitive varaibles has not been allocated");

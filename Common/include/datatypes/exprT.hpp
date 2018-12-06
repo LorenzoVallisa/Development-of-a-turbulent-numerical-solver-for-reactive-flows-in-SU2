@@ -47,7 +47,6 @@ namespace Common {
    /*!
     * \brief Access operator (const version)
    */
-   //inline const value_type& operator[](std::size_t i) const
    inline value_type operator[](size_type i) const {
      return this->operator const Derived&().operator[](i);
    }
@@ -69,7 +68,6 @@ namespace Common {
    /*!
     * \brief Access operator (non const version)
    */
-   //inline const value_type& at(std::size_t i) const
    inline value_type at(size_type i) const {
      return this->operator const Derived&().at(i);
    }
@@ -154,7 +152,7 @@ namespace Common {
     static_assert(std::is_arithmetic<TYPE(Left)>::value,"The type of the vector is not arithmetic"); \
                          \
     OpName(const VET_TYPE(Left)& l,const double& r): e(l),c(r) { \
-      SU2_Assert(strcmp(#__op__ ,"/") && std::abs(c)>0,"You can't divide by zero"); \
+      SU2_Assert((strcmp(#__op__ ,"/=") == 0 && std::abs(c) > EPS) || (strcmp(#__op__,"/=") != 0),"You can't divide by zero"); \
     }	\
                               \
     inline TYPE(Left) operator[](std::size_t i) const { \

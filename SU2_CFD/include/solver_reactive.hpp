@@ -22,8 +22,9 @@ protected:
   unsigned short nSpecies; /*!< \brief Total number of species. */
   unsigned short nPrimVarLim; /*!< \brief Number of primitive variables to limit. */
 
-  bool  space_centered,  /*!< \brief True if space centered scheeme used. */
+  bool  space_centered,  /*!< \brief True if space centered scheme used. */
         implicit,      /*!< \brief True if euler implicit scheme used. */
+        grid_movement, /*!< \brief True if grid movement is used. */
         least_squares,  /*!< \brief True if computing gradients by least squares. */
         second_order, /*!< \brief True if second order recosntruction is applied. */
         limiter; /*!< \brief True if limiting strategy is applied. */
@@ -55,7 +56,7 @@ public:
 	 * \param[in] geometry - Geometrical definition of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveEulerSolver(CGeometry* geometry,CConfig* config,unsigned short iMesh);
+	CReactiveEulerSolver(CGeometry* geometry, CConfig* config, unsigned short iMesh);
 
 	/*!
 	 * \brief Destructor of the class.
@@ -81,7 +82,16 @@ public:
 	 * \param[in] config - Definition of the particular problem.
    * \param[in] val_filename - Name of the file for the restart
 	 */
-  //void Read_Restart(CGeometry* geometry,CConfig* config,std::string val_filename);
+  void Read_Restart(CGeometry* geometry, CConfig* config, std::string val_filename);
+
+  /*!
+   * \brief Set primitive variables in each point reporting non physical data
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config - Definition of the particular problem.
+   * \param[in] Output - boolean to determine whether to print output.
+   * \return - The number of non-physical points.
+   */
+  unsigned long SetPrimitive_Variables(CSolver **solver_container, CConfig *config, bool Output) override;
 
   /*!
    * \brief Set gradient primitive variables static const unsigned Green Gauss.
@@ -105,13 +115,6 @@ public:
   void SetPrimitive_Limiter(CGeometry* geometry, CConfig* config) override;
 
   /*!
-   * \brief Set the maximum value of the eigenvalue.
-   * \param[in] geometry - Geometrical definition of the problem.
-   * \param[in] config - Definition of the particular problem.
-   */
-  void SetMax_Eigenvalue(CGeometry* geometry, CConfig* config) override;
-
-  /*!
    * \brief Set the fluid solver nondimensionalization.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
@@ -123,21 +126,21 @@ public:
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  void Set_MPI_Solution(CGeometry* geometry,CConfig* config) override;
+  void Set_MPI_Solution(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Call MPI to set limiter of primitive variables in case of parallel simulation.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  void Set_MPI_Primitive_Limiter(CGeometry* geometry,CConfig* config) override;
+  void Set_MPI_Primitive_Limiter(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Call MPI to set gradient of primitive variables in case of parallel simulation.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
-  void Set_MPI_Primitive_Gradient(CGeometry* geometry,CConfig* config) override;
+  void Set_MPI_Primitive_Gradient(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Preprocessing.
@@ -148,9 +151,8 @@ public:
    * \param[in] RunTime_EqSystem - System of equations which is going to be solved.
    * \param[in] Output - boolean to determine whether to print output.
    */
-  void Preprocessing(CGeometry* geometry, CSolver** solver_container, CConfig* config,
-                     unsigned short iMesh, unsigned short iRKStep,
-                     unsigned short RunTime_EqSystem, bool Output) override;
+  void Preprocessing(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iMesh,
+                     unsigned short iRKStep, unsigned short RunTime_EqSystem, bool Output) override;
 
   /*!
    * \brief Compute the time step for solving the Euler equations.
@@ -160,8 +162,18 @@ public:
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    * \param[in] Iteration - Index of the current iteration.
    */
-  void SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config,
-                    unsigned short iMesh, unsigned long Iteration) override;
+  void SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iMesh, unsigned long Iteration) override;
+
+  /*!
+   * \brief Compute the time step for solving the Navier-Stokes equations.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] config - Definition of the particular problem.
+   * \param[in] iMesh - Index of the mesh in multigrid computations.
+   * \param[in] Iteration - Index of the current iteration.
+   */
+   void SetResidual_DualTime(CGeometry* geometry, CSolver** solver_container, CConfig* config,
+                             unsigned short iRKStep, unsigned short iMesh, unsigned short RunTime_EqSystem) override;
 
   /*!
    * \brief Compute the spatial integration static const unsigned a centered scheme.
@@ -183,8 +195,7 @@ public:
    * \param[in] config - Definition of the particular problem.
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    */
-  void Upwind_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
-                       CConfig* config, unsigned short iMesh) override;
+  void Upwind_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics, CConfig* config, unsigned short iMesh) override;
 
    /*!
     * \brief Source term integration.
@@ -206,8 +217,7 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Euler_Wall(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics, CConfig* config,
-                      unsigned short val_marker) override;
+   void BC_Euler_Wall(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics, CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose the far-field boundary condition.
@@ -219,7 +229,7 @@ public:
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
    void BC_Far_Field(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
-                     CConfig* config, unsigned short val_marker) override;
+                     CConfig* config, unsigned short val_marker) override {}
 
    /*!
     * \brief Impose the inlet boundary condition.
@@ -230,8 +240,32 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics, CConfig* config,
-                 unsigned short val_marker) override;
+   void BC_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
+                 CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) override;
+
+   /*!
+    * \brief Impose a supersonic inlet boundary condition.
+    * \param[in] geometry - Geometrical definition of the problem.
+    * \param[in] solver_container - Container vector with all the solutions.
+    * \param[in] conv_numerics - Description of the numerical method.
+    * \param[in] visc_numerics - Description of the numerical method.
+    * \param[in] config - Definition of the particular problem.
+    * \param[in] val_marker - Surface marker where the boundary condition is applied.
+    */
+   void BC_Supersonic_Inlet(CGeometry *geometry, CSolver **solver_container, CNumerics *conv_numerics, CNumerics *visc_numerics,
+                            CConfig *config, unsigned short val_marker) override;
+
+   /*!
+    * \brief Impose a supersonic outlet boundary condition.
+    * \param[in] geometry - Geometrical definition of the problem.
+    * \param[in] solver_container - Container vector with all the solutions.
+    * \param[in] conv_numerics - Description of the numerical method.
+    * \param[in] visc_numerics - Description of the numerical method.
+    * \param[in] config - Definition of the particular problem.
+    * \param[in] val_marker - Surface marker where the boundary condition is applied.
+    */
+   void BC_Supersonic_Outlet(CGeometry *geometry, CSolver **solver_container, CNumerics *conv_numerics, CNumerics *visc_numerics,
+                             CConfig *config, unsigned short val_marker) override {}
 
    /*!
     * \brief Impose the outlet boundary condition.
@@ -242,8 +276,8 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Outlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics, CConfig* config,
-                  unsigned short val_marker) override;
+   void BC_Outlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
+                  CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose the symmetry plane boundary condition.
@@ -255,7 +289,7 @@ public:
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
    void BC_Sym_Plane(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
-                     CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) override;
+                     CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) override {}
 
     /*!
      * \brief Set the initial conditions.
@@ -274,8 +308,7 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] iRKStep - Current step of the Runge-Kutta iteration.
     */
-   void ExplicitRK_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config,
-                             unsigned short iRKStep) override;
+   void ExplicitRK_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iRKStep) override;
 
    /*!
     * \brief Update the solution static const unsigned the explicit Euler scheme.
@@ -354,8 +387,7 @@ public:
    * \param[in] RunTime_EqSystem - System of equations which is going to be solved.
    * \param[in] Output - boolean to determine whether to print output.
    */
-   void Preprocessing(CGeometry* geometry, CSolver** solver_container, CConfig* config,
-                      unsigned short iMesh, unsigned short iRKStep,
+   void Preprocessing(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iMesh, unsigned short iRKStep,
                       unsigned short RunTime_EqSystem, bool Output) override;
 
   /*!
@@ -366,18 +398,17 @@ public:
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    * \param[in] Iteration - Index of the current iteration.
    */
-   void SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config,
-                     unsigned short iMesh, unsigned long Iteration) override;
+   void SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iMesh, unsigned long Iteration) override;
 
-   /*!
-    * \brief Compute the viscous residuals.
-    * \param[in] geometry - Geometrical definition of the problem.
-    * \param[in] solver_container - Container vector with all the solutions.
-    * \param[in] numerics - Description of the numerical method.
-    * \param[in] config - Definition of the particular problem.
-    * \param[in] iMesh - Index of the mesh in multigrid computations.
-    * \param[in] iRKStep - Current step of the Runge-Kutta iteration.
-    */
+  /*!
+   * \brief Compute the viscous residuals.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] solver_container - Container vector with all the solutions.
+   * \param[in] numerics - Description of the numerical method.
+   * \param[in] config - Definition of the particular problem.
+   * \param[in] iMesh - Index of the mesh in multigrid computations.
+   * \param[in] iRKStep - Current step of the Runge-Kutta iteration.
+   */
    void Viscous_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
                          CConfig* config, unsigned short iMesh, unsigned short iRKStep) override;
 

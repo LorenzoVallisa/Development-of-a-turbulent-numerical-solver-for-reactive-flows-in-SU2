@@ -90,6 +90,7 @@ protected:
 
   RealVec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
   RealVec PrimVar_i, PrimVar_j;   /*!< \brief Primitives variables at point i and j. */
+  RealMatrix Dij_i, Dij_j;       /*!< \brief Binary diffusion coefficients at point i and j. */
   RealMatrix GradPrimVar_i, GradPrimVar_j; /*!< \brief Gradient of primitives variables at point i and j for average gradient computation. */
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
 
@@ -100,7 +101,6 @@ public:
    */
   static constexpr unsigned short T_INDEX_GRAD = 0;
   static constexpr unsigned short VX_INDEX_GRAD = 1;
-  //static const unsigned short RHO_INDEX_GRAD;
   static const unsigned short RHOS_INDEX_GRAD;
 
 
@@ -135,9 +135,12 @@ public:
    * \param[in] val_density - Density of the mixture
    * \param[in] val_xs - Molar fractions.
    * \param[in] val_grad_xs - Component along the desired dimension of gradient of molar fractions.
+   * \param[in] val_ys - Mass fractions.
    * \param[in] val_diffusioncoeff - Corrected diffusion coefficients for each species ((1-Xs)/Ds).
+   * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.
    */
-  RealVec Solve_SM(const su2double val_density, const RealVec& val_xs, const RealVec& val_grad_xs, const RealVec& val_diffusioncoeff);
+  RealVec Solve_SM(const su2double val_density, const RealVec& val_xs, const RealVec& val_grad_xs, const RealVec& val_ys,
+                   const RealVec& val_diffusioncoeff, const RealMatrix& val_Dij);
 
   /*!
    * \brief Compute projection of the viscous fluxes using Ramshaw self-consisten modification
@@ -147,9 +150,11 @@ public:
    * \param[in] val_viscosity - Laminar viscosity.
    * \param[in] val_thermal_conductivity - Thermal Conductivity.
    * \param[in] val_diffusioncoeff - Effective diffusion coefficients for each species in the mixture.
+   * \param[in] config - Definition of the particular problem
    */
-  virtual void GetViscousProjFlux_Ramshaw(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
-                                          const su2double val_viscosity, const su2double val_therm_conductivity, const RealVec& val_diffusioncoeff);
+  virtual void GetViscousProjFlux(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+                                  const su2double val_viscosity, const su2double val_therm_conductivity,
+                                  const RealVec& val_diffusioncoeff, CConfig* config);
 
   /*!
    * \brief Compute projection of the viscous fluxes solving Stefan-Maxwell equations
@@ -158,10 +163,12 @@ public:
    * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
    * \param[in] val_viscosity - Laminar viscosity.
    * \param[in] val_thermal_conductivity - Thermal Conductivity.
-   * \param[in] val_diffusioncoeff - Effective diffusion coefficients for each species in the mixture.
+   * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.
+   * \param[in] config - Definition of the particular problem
    */
-  virtual void GetViscousProjFlux_SM(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
-                                     const su2double val_viscosity,const su2double val_therm_conductivity, const RealVec& val_diffusioncoeff);
+  virtual void GetViscousProjFlux(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+                                  const su2double val_viscosity, const su2double val_therm_conductivity,
+                                  const RealMatrix& val_Dij, CConfig* config);
 
   /*!
    * \brief Approximation of Viscous NS Jacobians in Thermochemical Non Equilibrium.
@@ -216,6 +223,16 @@ public:
   }
 
   /*!
+   * \brief Set the Gradient of primitives for computing residual
+   * \param[in] Grad_i - Gradient of Primitive variables.
+   * \param[in] Grad_j - Gradient of Primitive variables.
+   */
+  inline void SetBinaryDiffCoeff(const RealMatrix& Diff_i,const RealMatrix& Diff_j) {
+    Dij_i = Diff_i;
+    Dij_j = Diff_j;
+  }
+
+  /*!
    * \brief Set the simulation to explicit
    */
   inline void SetExplicit(void) {
@@ -223,7 +240,6 @@ public:
   }
 
 };
-//const unsigned short CAvgGradReactive_Flow::RHO_INDEX_GRAD = CAvgGradReactive_Flow::VX_INDEX_GRAD + CReactiveNSVariable::GetnDim();
 const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_GRAD = CAvgGradReactive_Flow::VX_INDEX_GRAD + CReactiveNSVariable::GetnDim();
 
 const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_AVGGRAD = CAvgGradReactive_Flow::VX_INDEX_AVGGRAD + CReactiveNSVariable::GetnDim();

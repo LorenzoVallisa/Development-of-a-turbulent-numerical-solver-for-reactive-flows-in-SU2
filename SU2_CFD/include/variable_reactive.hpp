@@ -217,6 +217,16 @@ public:
   su2double** GetGradient_Primitive(void) override;
 
   /*!
+   * \brief Get the value of the primitive variables gradient.
+   * \return Value of the primitive variables gradient.
+   * \param[in] val_var - Index of the variable.
+	 * \param[in] val_dim - Index of the dimension.
+   */
+  su2double GetGradient_Primitive(unsigned short val_var, unsigned short val_dim) override {
+    return Gradient_Primitive.at(val_var,val_dim);
+  }
+
+  /*!
 	 * \brief Add val_value to the gradient of the val_var primitive variable.
 	 * \param[in] val_var - Index of the variable.
 	 * \param[in] val_dim - Index of the dimension.
@@ -254,10 +264,11 @@ public:
 
   /*!
    * \brief Set all the primitive variables form conserved variables.
+   * \param[in] config - Configuration of the particular problem.
    * \param[in] U - Storage of conservative variables.
    * \param[in] V - Storage of primitive variables.
    */
-  bool Cons2PrimVar(su2double* U, su2double* V);
+  bool Cons2PrimVar(CConfig *config, su2double* U, su2double* V);
 
   /*!
    * \brief Set all the conserved variables from primitive variables.
@@ -281,14 +292,14 @@ public:
 	/*!
 	 * \brief Set the value of the speed of the sound.
 	 */
-	bool SetSoundSpeed(void) override;
+	bool SetSoundSpeed(CConfig* config) override;
 
 	/*!
-	 * \brief Set the value of the enthalpy.
+	 * \brief Set the value of the total enthalpy.
 	 */
 	inline void SetEnthalpy(void) override {
     SU2_Assert(Solution != NULL,"The array of solution variables has not been allocated");
-    Primitive.at(H_INDEX_PRIM) = (Solution[RHOE_INDEX_SOL] + Primitive.at(P_INDEX_PRIM)) / Primitive.at(RHO_INDEX_PRIM);
+    Primitive.at(H_INDEX_PRIM) = (Solution[RHOE_INDEX_SOL] + Primitive.at(P_INDEX_PRIM)) / Solution[RHO_INDEX_SOL];
   }
 
   /*!
@@ -361,6 +372,16 @@ public:
   }
 
   /*!
+   * \brief Get the mass fraction \f$\rho_s / \rho \f$ of species s.
+   * \param[in] val_Species - Index of species s.
+   * \return Value of the mass fraction of species s.
+   */
+  inline RealVec GetMassFractions(void) const {
+    return RealVec(Primitive.cbegin() + RHOS_INDEX_PRIM, Primitive.cbegin() + RHOS_INDEX_PRIM + nSpecies);
+  }
+
+
+  /*!
    * \brief Get the energy of the flow.
    * \return Value of the energy of the flow.
    */
@@ -394,7 +415,7 @@ public:
    * \return Value of the velocity for the dimension <i>val_dim</i>.
    */
   inline su2double GetVelocity(unsigned short val_dim) override {
-    return Primitive.at(VX_INDEX_PRIM+val_dim);
+    return Primitive.at(VX_INDEX_PRIM + val_dim);
   }
 
   /*!
@@ -402,18 +423,16 @@ public:
    * \param[in] val_vector - Direction of projection.
    * \return Value of the projected velocity.
    */
-  su2double GetProjVel(su2double* val_vector) override;
+  inline su2double GetProjVel(su2double* val_vector) override {
+    SU2_Assert(val_vector != NULL, "The vector where to project velocity has not been allocated");
+    return std::inner_product(Primitive.cbegin() + VX_INDEX_PRIM, Primitive.cbegin() + VX_INDEX_PRIM + nDim, val_vector, 0.0);
+  }
 
   /*!
    * \brief Set the velocity vector from the old solution.
    * \param[in] val_velocity - Pointer to the velocity.
    */
   void SetVelocity_Old(su2double* val_velocity) override;
-  /*!
-   * \brief Set the temperature.
-   * \param[in] config - Configuration parameters.
-   */
-  bool SetTemperature(CConfig* config) override;
 
 };
 const unsigned short CReactiveEulerVariable::P_INDEX_PRIM = CReactiveEulerVariable::VX_INDEX_PRIM + CReactiveEulerVariable::nDim;
@@ -434,13 +453,12 @@ const unsigned short CReactiveEulerVariable::P_INDEX_GRAD = CReactiveEulerVariab
  */
 class CReactiveNSVariable:public CReactiveEulerVariable {
 protected:
-	RealVec    Diffusion_Coeffs;    /*!< \brief Diffusion coefficients of the mixture. */
+	RealMatrix Diffusion_Coeffs;    /*!< \brief Diffusion coefficients of the mixture. */
   su2double  Laminar_Viscosity;	/*!< \brief Viscosity of the fluid. */
   su2double  Thermal_Conductivity;   /*!< \brief Thermal conductivity of the gas mixture. */
 
 public:
 
-  //static const unsigned short RHO_INDEX_GRAD;
   static const unsigned short RHOS_INDEX_GRAD;
 
   /*!
@@ -463,7 +481,7 @@ public:
 
   /*!
 	 * \overload Class constructor
-	 * \param[in] val_density - Value of the flow density (initialization value).
+	 * \param[in] val_pressure - Value of the flow pressure (initialization value).
 	 * \param[in] val_velocity - Value of the flow velocity (initialization value).
 	 * \param[in] val_temperature - Value of the flow temperature (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
@@ -474,7 +492,7 @@ public:
    * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
    * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveNSVariable(const su2double val_density, const RealVec& val_massfrac, const RealVec& val_velocity,const su2double val_temperature,
+	CReactiveNSVariable(const su2double val_pressure, const RealVec& val_massfrac, const RealVec& val_velocity,const su2double val_temperature,
                       unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies, unsigned short val_nprimvar,
                       unsigned short val_nprimvargrad,unsigned short val_nprimvarlim, CConfig* config);
 
@@ -498,6 +516,12 @@ public:
 	virtual ~CReactiveNSVariable() {};
 
   /*!
+   * \brief Set all primitive variables and transport properties for compressible flows.
+   * \param[in] config - Configuration of the particular problem.
+   */
+  bool SetPrimVar(CConfig* config) override;
+
+  /*!
    * \brief Get the laminar viscosity of the mixture.
    * \return Laminar viscoisty of the mixture
    */
@@ -517,8 +541,8 @@ public:
 	 * \brief Get the species diffusion coefficient.
 	 * \return Value of the species diffusion coefficient.
 	 */
-  inline su2double* GetDiffusionCoeff(void) override {
-    return Diffusion_Coeffs.data();
+  inline RealMatrix GetBinaryDiffusionCoeff(void) {
+    return Diffusion_Coeffs;
   }
 
   /*!
@@ -548,7 +572,6 @@ public:
   }
 
 };
-//const unsigned short CReactiveNSVariable::RHO_INDEX_GRAD = CReactiveNSVariable::P_INDEX_GRAD + 1;
 const unsigned short CReactiveNSVariable::RHOS_INDEX_GRAD = CReactiveNSVariable::P_INDEX_GRAD + 1;
 
 #endif

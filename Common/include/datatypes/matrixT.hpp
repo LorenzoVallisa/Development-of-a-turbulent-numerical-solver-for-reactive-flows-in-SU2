@@ -2,8 +2,8 @@
 #define SU2_MATRIXT_HPP
 
 #include "mat_exprT.hpp"
-#include "vectorT.hpp"
 #include "../Tools/back_forw.hpp"
+#include "../option_structure.hpp"
 
 #include <algorithm>
 #include <iomanip>
@@ -32,7 +32,7 @@ namespace Common {
     /*!
       * \brief Default constructor
     */
-    SU2Mat(): n_rows(),n_cols(),m_data(NULL) {}
+    SU2Mat(): n_rows(), n_cols(), m_data(NULL) {}
 
     /*!
       * \brief Class constructor
@@ -99,7 +99,7 @@ namespace Common {
       * \param[in] e - MatExprT to copy from
      */
     template <class Derived>
-    SU2Mat& operator=(MatExprT<Derived,value_type>& e);
+    SU2Mat& operator=(const MatExprT<Derived,value_type>& e);
 
     /*!
       * \brief Overloaded assignment operator with constants (macro used);
@@ -108,8 +108,8 @@ namespace Common {
     SU2Mat& operator __op__ (value_type value) { \
       static_assert(std::is_arithmetic<value_type>::value,"The type of the matrix is not arithmetic"); \
                                                     \
-      SU2_Assert(strcmp(#__op__ ,"/=") && std::abs(value)>0,"You can't divide by zero"); \
-      for(std::size_t i = 0; i < size(); ++i) \
+      SU2_Assert((strcmp(#__op__ ,"/=") == 0 && std::abs(value) > EPS) || (strcmp(#__op__,"/=") != 0),"You can't divide by zero"); \
+      for(size_type i = 0; i < size(); ++i) \
         m_data[i] __op__ value; \
       return *this; \
     }
@@ -129,8 +129,8 @@ namespace Common {
                                                     \
       SU2_Assert(this->nbRows() == e.nbRows() && this->nbCols() == e.nbCols(), \
                 "The dimension of the matrixes is not compatible and so you can't operate with them"); \
-      for(std::size_t i = 0; i < nbRows(); ++i) { \
-        for(std::size_t j = 0; j < nbCols(); ++j) \
+      for(size_type i = 0; i < nbRows(); ++i) { \
+        for(size_type j = 0; j < nbCols(); ++j) \
           (*this)(i,j) __op__ e(i,j); \
       } \
       return *this; \
@@ -150,9 +150,9 @@ namespace Common {
       std::vector<value_type> tmp(m_data, m_data + size());
       n_cols = e.nbCols();
       this->resize(n_rows,n_cols);
-      for (std::size_t i = 0; i < n_rows; ++i) {
-        for (std::size_t j = 0; j < n_cols; ++j) {
-          for (std::size_t k = 0; k < e.nbRows(); ++k)
+      for(size_type i = 0; i < n_rows; ++i) {
+        for(size_type j = 0; j < n_cols; ++j) {
+          for(size_type k = 0; k < e.nbRows(); ++k)
               (*this)(i,j) += tmp[sub2ind(i,k)] * e(k,j);
         }
       }
@@ -219,6 +219,21 @@ namespace Common {
     inline size_type size(void) const {
       return n_rows*n_cols;
     }
+
+    /*!
+     * \brief Clears the matrix
+    */
+    inline void clear(void) {
+      free_mem();
+      n_rows = 0;
+      n_cols = 0;
+    }
+
+    /*!
+     * \brief Swap the content of two matrixes
+     * \param[in] su2mat - Matrix to swap with the current one
+    */
+    void swap(SU2Mat& su2mat);
 
     /*!
      * \brief Resize the matrix
@@ -302,18 +317,11 @@ namespace Common {
     */
     operator std::vector<std::vector<value_type>>() const {
       auto result = std::vector<value_type>(n_rows,std::vector<value_type>(n_cols));
-      for(std::size_t i = 0; i < n_rows; ++i) {
-        for(std::size_t j = 0; j < n_cols; ++j)
+      for(size_type i = 0; i < n_rows; ++i) {
+        for(size_type j = 0; j < n_cols; ++j)
           result[i][j] = m_data[sub2ind(i,j)];
       }
       return result;
-    }
-
-    /*!
-     * \brief Check if there are zeros in the matrix
-    */
-    inline bool check_notzero(void) {
-      return std::none_of(this->cbegin(), this->cend(), [&](const value_type& x){return x == value_type();});
     }
 
     /*!
@@ -349,6 +357,13 @@ namespace Common {
     */
     friend std::ostream& operator<< TF (std::ostream& out,const MatExprT<SU2Mat,value_type>& A);
 
+    /*!
+     * \brief Check if there are zeros in the matrix
+    */
+    inline bool check_notzero(void) const {
+      return std::none_of(this->cbegin(), this->cend(), [&](const value_type& x){return x == value_type();});
+    }
+
   private:
 
     size_type n_rows;  /*!< \brief Number of rows of the matrix. */
@@ -373,8 +388,10 @@ namespace Common {
 
     /*!
      * \brief sub2ind
+     * \param[in] i - row index
+     * \param[in] j - column index
     */
-    inline std::size_t sub2ind(std::size_t i, std::size_t j) const {
+    inline size_type sub2ind(size_type i, size_type j) const {
       return i*n_cols + j;
     }
 
@@ -383,7 +400,7 @@ namespace Common {
      * \param[in] idx_row - Index of row
      * \param[in] idx_col - Index of column
     */
-    SU2Mat<T> GetCoFactor(std::size_t idx_row,std::size_t idx_col) const;
+    SU2Mat<T> GetCoFactor(size_type idx_row, size_type idx_col) const;
 
     /*!
      * \brief Compute the adjoint of a matrix
@@ -395,9 +412,47 @@ namespace Common {
 
   //
   //
+  /*--- Allocate memory---*/
+  template<typename T>
+  void SU2Mat<T>::allocate(void) {
+    if(size() > 0)
+      m_data = new value_type[size()];
+  }
+
+  //
+  //
+  /*--- Initialize matrix with a value ---*/
+  template<typename T>
+  void SU2Mat<T>::initialize(value_type value) {
+    std::fill(m_data, m_data + size(), value);
+  }
+
+  //
+  //
+  /*--- Free memory ---*/
+  template<typename T>
+  void SU2Mat<T>::free_mem(void) {
+    if(m_data != NULL) {
+      delete [] m_data;
+      m_data = NULL;
+    }
+  }
+
+  //
+  //
+  /* --- Swap the content of two vectors ---*/
+  template<typename T>
+  void SU2Mat<T>::swap(SU2Mat& su2mat) {
+    std::swap(n_rows, su2mat.n_rows);
+    std::swap(n_cols, su2mat.n_cols);
+    std::swap(m_data, su2mat.m_data);
+  }
+
+  //
+  //
   /*--- SU2Mat value constructor---*/
   template<typename T>
-  SU2Mat<T>::SU2Mat(std::size_t _n_rows,std::size_t _n_cols,T init): n_rows(_n_rows),n_cols(_n_cols) {
+  SU2Mat<T>::SU2Mat(size_type _n_rows, size_type _n_cols, T init): n_rows(_n_rows), n_cols(_n_cols) {
     allocate();
     initialize(init);
   }
@@ -406,21 +461,17 @@ namespace Common {
   //
   /*--- SU2Mat copy constructor---*/
   template<typename T>
-  SU2Mat<T>::SU2Mat(const SU2Mat& su2mat): n_rows(su2mat.n_rows),n_cols(su2mat.n_cols) {
+  SU2Mat<T>::SU2Mat(const SU2Mat& su2mat): n_rows(su2mat.n_rows), n_cols(su2mat.n_cols) {
     allocate();
-    for(std::size_t i = 0; i<size(); ++i)
-      m_data[i] = su2mat.m_data[i];
+    std::copy(su2mat.m_data, su2mat.m_data + size() ,m_data);
   }
 
   //
   //
   /*--- SU2Mat move constructor---*/
   template<typename T>
-  SU2Mat<T>::SU2Mat(SU2Mat&& su2mat): n_rows(su2mat.n_rows),n_cols(su2mat.n_cols) {
-    m_data = su2mat.m_data;
-    su2mat.m_data = NULL;
-    su2mat.n_rows = 0;
-    su2mat.n_cols = 0;
+  SU2Mat<T>::SU2Mat(SU2Mat&& su2mat): n_rows(0), n_cols(0), m_data(NULL) {
+    su2mat.swap(*this);
   }
 
   //
@@ -431,11 +482,10 @@ namespace Common {
     if(this!= &su2mat) {
       n_rows = su2mat.n_rows;
       n_cols = su2mat.n_cols;
-      if(m_data!=NULL)
+      if(m_data != NULL)
         delete[] m_data;
-      m_data = new T(size());
-      for(std::size_t i = 0; i<size(); ++i)
-        m_data[i] = su2mat.m_data[i];
+      m_data = new value_type(size());
+      std::copy(su2mat.m_data, su2mat.m_data + size() ,m_data);
     }
     return *this;
   }
@@ -446,14 +496,13 @@ namespace Common {
   template<typename T>
   SU2Mat<T>& SU2Mat<T>::operator=(SU2Mat&& su2mat) {
     if(this!= &su2mat) {
-      n_rows = std::move(su2mat.n_rows);
-      n_cols = std::move(su2mat.n_cols);
-      if(m_data!=NULL)
+      n_rows = 0;
+      n_cols = 0;
+      if(m_data != NULL) {
         delete[] m_data;
-      m_data = su2mat.m_data;
-      su2mat.m_data = NULL;
-      su2mat.n_rows = 0;
-      su2mat.n_cols = 0;
+        m_data = NULL;
+      }
+      su2mat.swap(*this);
     }
     return *this;
   }
@@ -463,11 +512,11 @@ namespace Common {
   /*--- SU2Mat copy constructor from MatExprT ---*/
   template<typename T>
   template<class Derived>
-  SU2Mat<T>::SU2Mat(const MatExprT<Derived,T>& e): n_rows(e.nbRows()),n_cols(e.nbCols()) {
+  SU2Mat<T>::SU2Mat(const MatExprT<Derived,T>& e): n_rows(e.nbRows()), n_cols(e.nbCols()) {
     //const Derived& et(e);
     allocate();
-    for(std::size_t i = 0; i < n_rows; ++i) {
-      for(std::size_t j = 0; j < n_cols; ++j)
+    for(size_type i = 0; i < n_rows; ++i) {
+      for(size_type j = 0; j < n_cols; ++j)
         (*this)(i,j) = e(i,j);
     }
   }
@@ -477,15 +526,15 @@ namespace Common {
   /*--- SU2Mat assignment operator from MatExprT ---*/
   template<typename T>
   template<class Derived>
-  SU2Mat<T>& SU2Mat<T>::operator=(MatExprT<Derived,T>& e) {
+  SU2Mat<T>& SU2Mat<T>::operator=(const MatExprT<Derived,T>& e) {
     //const Derived& et(e);
     n_rows = e.nbRows();
     n_cols = e.nbCols();
-    if(m_data!=NULL)
+    if(m_data != NULL)
       delete[] m_data;
     allocate();
-    for(std::size_t i = 0; i < n_rows; ++i) {
-      for(std::size_t j = 0; j < n_cols; ++j)
+    for(size_type i = 0; i < n_rows; ++i) {
+      for(size_type j = 0; j < n_cols; ++j)
         (*this)(i,j) = e(i,j);
     }
     return *this;
@@ -495,10 +544,10 @@ namespace Common {
   //
   /*--- SU2Mat copy constructor from already allocated memory ---*/
   template<typename T>
-  SU2Mat<T>::SU2Mat(T** data, std::size_t _n_rows, std::size_t _n_cols): n_rows(_n_cols),n_cols(_n_cols) {
+  SU2Mat<T>::SU2Mat(T** data, size_type _n_rows, size_type _n_cols): n_rows(_n_cols), n_cols(_n_cols) {
     allocate();
-    for (std::size_t i = 0; i < _n_rows; ++i)
-      for (std::size_t j = 0; j < _n_cols; ++j)
+    for(size_type i = 0; i < _n_rows; ++i)
+      for(size_type j = 0; j < _n_cols; ++j)
         (*this)(i,j) = data[i][j];
   }
 
@@ -511,40 +560,9 @@ namespace Common {
                "The number of columns is not homogeneous");
     n_cols = mat.front().size();
     allocate();
-    for(std::size_t i = 0; i < n_rows; ++i) {
-      for(std::size_t j = 0; j < n_cols; ++j)
-        m_data[sub2ind(i,j)] = mat[i][j];
-    }
-  }
-
-  //
-  //
-  /*--- Allocate memory---*/
-  template<typename T>
-  void SU2Mat<T>::allocate(void) {
-    if (size() > 0)
-      m_data = new T[size()];
-  }
-
-  //
-  //
-  /*--- Initialize matrix with a value ---*/
-  template<typename T>
-  void SU2Mat<T>::initialize(T value) {
-    for(std::size_t i = 0; i < size(); ++i)
-      m_data[i] = value;
-  }
-
-  //
-  //
-  /*--- free memory ---*/
-  template<typename T>
-  void SU2Mat<T>::free_mem(void) {
-    if (m_data!= NULL) {
-      delete [] m_data;
-      m_data = NULL;
-      n_rows = 0;
-      n_cols = 0;
+    for(size_type i = 0; i < n_rows; ++i) {
+      for(size_type j = 0; j < n_cols; ++j)
+        (*this)(i,j) = mat[i][j];
     }
   }
 
@@ -552,24 +570,24 @@ namespace Common {
   //
   /*--- Resize container ---*/
   template<typename T>
-  void SU2Mat<T>::resize(std::size_t _n_rows,std::size_t _n_cols,T init) {
+  void SU2Mat<T>::resize(size_type _n_rows, size_type _n_cols, value_type init) {
     if(nbRows() == _n_rows && nbCols() == _n_cols)
       return;
 
     size_type new_size = _n_rows * _n_cols;
-    auto new_data = new T[new_size];
+    auto new_data = new value_type[new_size];
 
     if(_n_rows > nbRows() || _n_cols > nbCols())
-      std::fill(new_data, new_data + new_size, init) ;
+      std::fill(new_data, new_data + new_size, init);
 
-    size_type rowsToCopy = _n_rows < nbRows() ? _n_rows : nbRows() ;
-    size_type colsToCopy = _n_cols < nbCols() ? _n_cols : nbCols() ;
+    size_type rowsToCopy = _n_rows < nbRows() ? _n_rows : nbRows();
+    size_type colsToCopy = _n_cols < nbCols() ? _n_cols : nbCols();
 
     for(size_type r=0; r < rowsToCopy; ++r) {
-      auto srcBegin = m_data + (r*nbCols()) ;
-      auto srcEnd = srcBegin + colsToCopy ;
+      auto srcBegin = m_data + (r*nbCols());
+      auto srcEnd = srcBegin + colsToCopy;
       auto dstBegin = new_data + (r*_n_cols);
-      std::copy(srcBegin, srcEnd, dstBegin) ;
+      std::copy(srcBegin, srcEnd, dstBegin);
     }
 
     delete[] m_data;
@@ -583,10 +601,10 @@ namespace Common {
   /*--- Puts the copy of the desired row of the matrix in a supplied vector ---*/
   template<typename T>
   template<class Vec>
-  Vec SU2Mat<T>::GetRow(std::size_t idx_row) const {
+  Vec SU2Mat<T>::GetRow(size_type idx_row) const {
     SU2_Assert(idx_row < n_rows, "The index of the desired row exceeds the number of rows in the matrix");
     Vec vec(n_cols);
-    for(std::size_t i = 0; i < n_cols; ++i)
+    for(size_type i = 0; i < n_cols; ++i)
       vec[i] = m_data[sub2ind(idx_row,i)];
     return vec;
   }
@@ -596,10 +614,10 @@ namespace Common {
   /*--- Puts the copy of the desired column of the matrix in a supplied vector ---*/
   template<typename T>
   template<class Vec>
-  Vec SU2Mat<T>::GetColumn(std::size_t idx_col) const {
+  Vec SU2Mat<T>::GetColumn(size_type idx_col) const {
     SU2_Assert(idx_col < n_cols, "The index of the desired column exceeds the number of columns in the matrix");
     Vec vec(n_rows);
-    for(std::size_t i = 0; i < n_rows; ++i)
+    for(size_type i = 0; i < n_rows; ++i)
       vec[i] = m_data[sub2ind(i,idx_col)];
     return vec;
   }
@@ -609,10 +627,10 @@ namespace Common {
   /*---  Sets the desired row of the matrix from a vector ---*/
   template<typename T>
   template<class Vec>
-  void SU2Mat<T>::SetRow(std::size_t idx_row, const Vec& row)  {
+  void SU2Mat<T>::SetRow(size_type idx_row, const Vec& row)  {
     SU2_Assert(idx_row < n_rows,"The index of row to set exceeds the number of rows in the matrix");
     SU2_Assert(row.size() == n_cols,"The vector of data to set the row is different from the number of columns in the matrix");
-    for(std::size_t i = 0; i < n_cols; ++i) {
+    for(size_type i = 0; i < n_cols; ++i) {
       m_data[sub2ind(idx_row,i)] = row[i];
     }
   }
@@ -622,10 +640,10 @@ namespace Common {
   /*---  Sets the desired column of the matrix from a vector ---*/
   template<typename T>
   template<class Vec>
-  void SU2Mat<T>::SetColumn(std::size_t idx_col, const Vec& col)  {
+  void SU2Mat<T>::SetColumn(size_type idx_col, const Vec& col)  {
     SU2_Assert(idx_col < n_cols,"The index of col to set exceeds the number of columns in the matrix");
     SU2_Assert(col.size() == n_rows,"The vector of data to set the column is different from the number of rows in the matrix");
-    for (std::size_t i = 0; i < n_rows; ++i) {
+    for(size_type i = 0; i < n_rows; ++i) {
       m_data[sub2ind(i,idx_col)] = col[i];
     }
   }
@@ -637,7 +655,7 @@ namespace Common {
   T SU2Mat<T>::determinant(void) const {
     static_assert(std::is_arithmetic<T>::value,"The type of the matrix is not arithmetic. You can't compute determinant");
 
-    std::size_t dim = nbRows();
+    size_type dim = nbRows();
     SU2_Assert(dim == nbCols(),"The matrix is not squared");
     SU2_Assert(dim > 0,"The matrix is empty");
     if(dim == 1)
@@ -646,8 +664,8 @@ namespace Common {
       return (*this)(0,0)*(*this)(1,1) - (*this)(0,1)*(*this)(1,0);
     else {
       auto LU = LU_decomp();
-      T det = LU.second(0,0);
-      for(std::size_t i = 1; i < dim; ++i)
+      value_type det = LU.second(0,0);
+      for(size_type i = 1; i < dim; ++i)
         det *= LU.second(i,i);
       return det;
     }
@@ -660,15 +678,15 @@ namespace Common {
   SU2Mat<T> SU2Mat<T>::inverse(void) const {
     static_assert(std::is_arithmetic<T>::value,"The type of the matrix is not arithmetic. You can't compute inverse");
 
-    std::size_t dim = nbRows();
+    size_type dim = nbRows();
     SU2_Assert(dim == nbCols(),"The matrix is not squared");
     SU2_Assert(dim > 0,"The matrix is empty");
 
     auto LU = LU_decomp();
-    T det = LU.second(0,0);
-    for(std::size_t i = 1; i < dim; ++i)
+    value_type det = LU.second(0,0);
+    for(size_type i = 1; i < dim; ++i)
       det *= LU.second(i,i);
-    if(std::abs(det) < 1e-10)
+    if(std::abs(det) < EPS)
       throw std::runtime_error("Matrix singular. Cannot invert");
 
     if(check_diag())
@@ -676,8 +694,8 @@ namespace Common {
 
     SU2Mat result(dim,dim);
 
-    for(std::size_t i = 0; i < dim; ++i) {
-      SU2Vec<T> b(dim);
+    for(size_type i = 0; i < dim; ++i) {
+      std::vector<value_type> b(dim);
       b[i] = 1.0;
       result.SetColumn(i,MathTools::Backward_Sub(LU.second,MathTools::Forward_Sub(LU.first,b)));
     }
@@ -692,18 +710,18 @@ namespace Common {
   std::pair<SU2Mat<T>,SU2Mat<T>> SU2Mat<T>::LU_decomp(void) const {
     static_assert(std::is_arithmetic<T>::value,"The type of the matrix is not arithmetic. You can't compute LU decomposition");
 
-    std::size_t dim = nbRows();
+    size_type dim = nbRows();
     SU2_Assert(dim == nbCols(),"The matrix is not squared");
     SU2_Assert(dim > 0,"The matrix is empty");
 
-    SU2Mat<T> L(dim,dim),U(dim,dim);
+    SU2Mat L(dim,dim),U(dim,dim);
 
-    for(std::size_t i = 0; i < dim; ++i) {
+    for(size_type i = 0; i < dim; ++i) {
       // Upper Triangular
-      for(std::size_t k = i; k < dim; ++k) {
+      for(size_type k = i; k < dim; ++k) {
         // Summation of L(i, j) * U(j, k)
-        T sum = T();
-        for(std::size_t j = 0; j < i; ++j)
+        value_type sum = value_type();
+        for(size_type j = 0; j < i; ++j)
           sum += (L(i,j)*U(j,k));
           // Evaluating U(i, k)
           U(i,k) = (*this)(i,k) - sum;
@@ -711,10 +729,10 @@ namespace Common {
 
       // Lower Triangular
       L(i,i) = 1.0;
-      for(std::size_t k = i + 1; k < dim; ++k) {
+      for(size_type k = i + 1; k < dim; ++k) {
         // Summation of L(k, j) * U(j, i)
-        T sum = T();
-        for(std::size_t j = 0; j < i; ++j)
+        value_type sum = value_type();
+        for(size_type j = 0; j < i; ++j)
           sum += L(k,j) * U(j,i);
 
         // Evaluating L(k, i)
@@ -732,18 +750,18 @@ namespace Common {
   SU2Mat<T> SU2Mat<T>::adjoint(void) const {
     static_assert(std::is_arithmetic<T>::value,"The type of the matrix is not arithmetic. You can't compute adjoint");
 
-    std::size_t dim = nbRows();
+    size_type dim = nbRows();
     SU2_Assert(dim == nbCols(),"The matrix is not squared");
     SU2_Assert(dim > 0,"The matrix is empty");
 
-    SU2Mat<T> result(dim,dim);
+    SU2Mat result(dim,dim);
     if(dim == 1) {
       result(0,0) = 1;
       return result;
     }
 
-    for (std::size_t i=0; i < dim; ++i) {
-      for (std::size_t j=0; j < dim; ++j) {
+    for(size_type i=0; i < dim; ++i) {
+      for(size_type j=0; j < dim; ++j) {
         // Get cofactor of A(i,j)
         auto tmp = GetCoFactor(i,j);
 
@@ -761,16 +779,16 @@ namespace Common {
   //
   /*--- Cofactor of element (i,j) of the matrix ---*/
   template<typename T>
-  SU2Mat<T> SU2Mat<T>::GetCoFactor(std::size_t idx_row,std::size_t idx_col) const {
+  SU2Mat<T> SU2Mat<T>::GetCoFactor(size_type idx_row,size_type idx_col) const {
     SU2_Assert(idx_row < nbRows(),"The index of desired row for cofactor exceeds the number of rows in the matrix");
     SU2_Assert(idx_col < nbCols(),"The index of desired column for cofactor exceeds the number of columns in the matrix");
 
-    SU2Mat<T> result(nbRows() - 1 ,nbCols() - 1);
-    std::size_t i = 0, j = 0;
+    SU2Mat result(nbRows() - 1 ,nbCols() - 1);
+    size_type i = 0, j = 0;
 
     // Looping for each element of the matrix
-    for(std::size_t curr_row = 0; curr_row < nbRows(); ++curr_row) {
-      for(std::size_t curr_col = 0; curr_col < nbCols(); ++curr_col) {
+    for(size_type curr_row = 0; curr_row < nbRows(); ++curr_row) {
+      for(size_type curr_col = 0; curr_col < nbCols(); ++curr_col) {
         //  Copying into result matrix only those element
         //  which are not in given row and column
         if(curr_row != idx_row && curr_col != idx_col)  {
@@ -778,7 +796,7 @@ namespace Common {
 
           // Row is filled, so increase row index and
           // reset col index
-          if (curr_col == nbCols() - 1) {
+          if(curr_col == nbCols() - 1) {
             j = 0;
             i++;
           }
@@ -795,8 +813,8 @@ namespace Common {
   template<typename T>
   SU2Mat<T> SU2Mat<T>::transpose(void) const {
     SU2Mat result(nbCols(),nbRows());
-    for(std::size_t i = 0; i < n_cols; ++i) {
-      for(std::size_t j = 0; j < n_rows; ++j)
+    for(size_type i = 0; i < n_cols; ++i) {
+      for(size_type j = 0; j < n_rows; ++j)
         result(i,j) = m_data[this->sub2ind(j,i)];
     }
     return result;
@@ -810,9 +828,9 @@ namespace Common {
     if(nbRows() != nbCols())
       return false;
     else {
-      for(std::size_t i = 0; i < n_rows; ++i) {
-        for(std::size_t j = 0; j < n_cols; ++j) {
-          if((*this)(i,j) != T() && i!=j)
+      for(size_type i = 0; i < n_rows; ++i) {
+        for(size_type j = 0; j < n_cols; ++j) {
+          if((*this)(i,j) != value_type() && i!=j)
             return false;
         }
       }
@@ -829,10 +847,10 @@ namespace Common {
 
     SU2_Assert(check_diag(),"You can invert only diagonal matrixes");
     SU2Mat result(n_rows,n_rows);
-    T temp = T();
-    for(std::size_t i = 0; i < n_rows; ++i) {
+    value_type temp = value_type();
+    for(size_type i = 0; i < n_rows; ++i) {
       temp = (*this)(i,i);
-      SU2_Assert(std::abs(temp) > 0.0,std::string("The diagional entry " + std::to_string(i) + " is equal to 0"));
+      SU2_Assert(std::abs(temp) > EPS,std::string("The diagional entry " + std::to_string(i) + " is equal to 0"));
       result(i,i) = 1.0/temp;
     }
     return result;
@@ -847,8 +865,8 @@ namespace Common {
 
     SU2Mat<T> result(r);
     SU2_Assert(result.check_notzero(),"The matrix on rhs contains zero and so you can't compute its reciprocal");
-    for (std::size_t i = 0; i < result.nbRows(); ++i) {
-      for (std::size_t j = 0; j < result.nbCols(); ++j)
+    for(std::size_t i = 0; i < result.nbRows(); ++i) {
+      for(std::size_t j = 0; j < result.nbCols(); ++j)
         result(i,j) = l/result(i,j);
     }
     return result;
@@ -860,8 +878,8 @@ namespace Common {
   template<class Derived, typename T>
   std::ostream& operator<<(std::ostream& out, const MatExprT<Derived,T>& A) {
     out<<std::fixed<<std::setprecision(4);
-    for (std::size_t i = 0; i < A.nbRows(); ++i) {
-      for (std::size_t j = 0; j < A.nbCols(); ++j)
+    for(std::size_t i = 0; i < A.nbRows(); ++i) {
+      for(std::size_t j = 0; j < A.nbCols(); ++j)
         out<<std::right<<std::setw(10)<<A(i,j);
       out<<'\n';
     }

@@ -41,11 +41,9 @@ namespace Common {
     /*!
      * \brief Access to the individual entry (const version)
     */
-    //inline const T& operator()(size_type i, size_type j) const
     inline value_type operator()(size_type i, size_type j) const {
       return this->operator const Derived&().operator()(i,j);
     }
-
 
     /*!
      * \brief Access to the individual entry (non const version)
@@ -57,7 +55,6 @@ namespace Common {
     /*!
      * \brief Access to the individual entry (const version)
     */
-    //inline const T& at(size_type i, size_type j) const
     inline value_type at(size_type i, size_type j) const {
       return this->operator const Derived&().at(i,j);
     }
@@ -135,7 +132,7 @@ namespace Common {
     static_assert(std::is_arithmetic<TYPE(Left)>::value,"The type of the matrix is not arithmetic"); \
                                                  \
     OpName (const MET_TYPE(Left)& l, const double& r): e(l), c(r) { \
-      SU2_Assert(strcmp(#__op__ ,"/") && std::abs(c)>0,"You can't divide by zero"); \
+      SU2_Assert((strcmp(#__op__ ,"/=") == 0 && std::abs(c) > EPS) || (strcmp(#__op__,"/=") != 0),"You can't divide by zero"); \
     }	\
                                         \
     inline TYPE(Left) at(std::size_t i, std::size_t j) const { \

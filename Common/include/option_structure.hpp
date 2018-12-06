@@ -317,13 +317,15 @@ enum ENUM_KIND_NONDIM {
   DIMENSIONAL = 0,			    /*!< \brief Dimensional simulation. */
   FREESTREAM_PRESS_EQ_ONE = 1, /*!< \brief Non-dimensional simulation. */
   FREESTREAM_VEL_EQ_MACH = 2, /*!< \brief Non-dimensional simulation. */
-  FREESTREAM_VEL_EQ_ONE = 3 /*!< \brief Non-dimensional simulation. */
+  FREESTREAM_VEL_EQ_ONE = 3, /*!< \brief Non-dimensional simulation. */
+  REFERENCE = 4 /*!< \brief Non-dimensional simulation with specified values. */
 };
 static const map<string, ENUM_KIND_NONDIM> NonDim_Map = CCreateMap<string, ENUM_KIND_NONDIM>
 ("DIMENSIONAL", DIMENSIONAL)
 ("FREESTREAM_PRESS_EQ_ONE", FREESTREAM_PRESS_EQ_ONE)
 ("FREESTREAM_VEL_EQ_MACH", FREESTREAM_VEL_EQ_MACH)
-("FREESTREAM_VEL_EQ_ONE", FREESTREAM_VEL_EQ_ONE);
+("FREESTREAM_VEL_EQ_ONE", FREESTREAM_VEL_EQ_ONE)
+("REFERENCE", REFERENCE);
 
 /*!
  * \brief different system of measurements
