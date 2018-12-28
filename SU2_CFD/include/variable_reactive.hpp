@@ -1,26 +1,22 @@
 #ifndef SU2_VARIABLE_REACTIVE
 #define SU2_VARIABLE_REACTIVE
 
-#include <memory>
-
 #include "variable_structure.hpp"
+#include <Eigen/Dense>
 #include "../../Common/include/physical_property_library.hpp"
-#include "../../Common/include/datatypes/vectorT.hpp"
-#include "../../Common/include/datatypes/matrixT.hpp"
 #include "../../Common/include/su2_assert.hpp"
+#include <numeric>
 
 /*! \class CReactiveEulerVariable
  *  \brief Main class for defining a variable for chemically reacting inviscid flows.
  *  \author G. Orlando.
  */
-
 class CReactiveEulerVariable:public CVariable {
 public:
 
-  using RealVec = Common::RealVec;
-  using RealMatrix = Common::RealMatrix;
+  using RealVec = std::vector<su2double>;
+  using RealMatrix = Eigen::MatrixXd;
   typedef std::shared_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
-  typedef std::unique_ptr<su2double[]> SmartArr;
 
 protected:
 
@@ -175,7 +171,7 @@ public:
    * \return Set the value of the primitive variable for the index <i>val_var</i>.
    */
   inline void SetPrimitive(su2double* val_prim) override {
-    SU2_Assert(val_prim != NULL, "The arrat of primitive variables has not been allocated");
+    SU2_Assert(val_prim != NULL, "The array of primitive variables has not been allocated");
     std::copy(val_prim,val_prim + nPrimVar,Primitive.begin());
   }
 
@@ -207,14 +203,18 @@ public:
 	 * \brief Set to zero the gradient of the primitive variables.
 	 */
 	inline void SetGradient_PrimitiveZero(unsigned short val_primvar) override {
-    std::fill(Gradient_Primitive.begin(),Gradient_Primitive.end(),0.0);
+    Gradient_Primitive.setZero();
   }
 
   /*!
    * \brief Get the value of the primitive variables gradient.
    * \return Value of the primitive variables gradient.
    */
-  su2double** GetGradient_Primitive(void) override;
+  inline su2double** GetGradient_Primitive(void) override {
+    su2double** res;
+    Eigen::Map<RealMatrix>(&res[0][0], nSpecies, nDim) = Gradient_Primitive;
+    return res;
+  }
 
   /*!
    * \brief Get the value of the primitive variables gradient.
@@ -223,7 +223,7 @@ public:
 	 * \param[in] val_dim - Index of the dimension.
    */
   su2double GetGradient_Primitive(unsigned short val_var, unsigned short val_dim) override {
-    return Gradient_Primitive.at(val_var,val_dim);
+    return Gradient_Primitive(val_var,val_dim);
   }
 
   /*!
@@ -233,7 +233,7 @@ public:
 	 * \param[in] val_value - Value to add to the gradient of the selected primitive variable.
 	 */
 	inline void AddGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    Gradient_Primitive.at(val_var,val_dim) += val_value;
+    Gradient_Primitive(val_var,val_dim) += val_value;
   }
 
   /*!
@@ -243,7 +243,7 @@ public:
 	 * \param[in] val_value - Value to subtract to the gradient of the selected primitive variable.
 	 */
 	inline void SubtractGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    Gradient_Primitive.at(val_var,val_dim) -= val_value;
+    Gradient_Primitive(val_var,val_dim) -= val_value;
   }
 
   /*!
@@ -253,7 +253,7 @@ public:
 	 * \param[in] val_value - Value of the gradient.
 	 */
 	inline void SetGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    Gradient_Primitive.at(val_var,val_dim) = val_value;
+    Gradient_Primitive(val_var,val_dim) = val_value;
   }
 
   /*!
@@ -268,7 +268,7 @@ public:
    * \param[in] U - Storage of conservative variables.
    * \param[in] V - Storage of primitive variables.
    */
-  bool Cons2PrimVar(CConfig *config, su2double* U, su2double* V);
+  bool Cons2PrimVar(CConfig* config, su2double* U, su2double* V);
 
   /*!
    * \brief Set all the conserved variables from primitive variables.
@@ -406,6 +406,7 @@ public:
     Primitive.at(T_INDEX_PRIM) = val_T;
     if(val_T < EPS)
       return true;
+
     return false;
   }
 

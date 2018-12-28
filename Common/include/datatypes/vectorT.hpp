@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <iterator>
 #include <cmath>
+#include <numeric>
 
 namespace Common {
 

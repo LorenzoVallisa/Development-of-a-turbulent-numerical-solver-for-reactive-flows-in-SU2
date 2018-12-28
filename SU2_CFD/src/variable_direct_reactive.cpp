@@ -1,7 +1,5 @@
 #include "../include/variable_reactive.hpp"
 #include "../../Common/include/reacting_model_library.hpp"
-#include "../../Common/include/move_pointer.hpp"
-#include "../../Common/include/default_initialization.hpp"
 
 //
 //
@@ -14,7 +12,11 @@ unsigned short CReactiveEulerVariable::nSpecies = 0;
 CReactiveEulerVariable::LibraryPtr CReactiveEulerVariable::library = NULL;
 
 CReactiveEulerVariable::CReactiveEulerVariable():CVariable() {
-  std::tie(nPrimVar,nPrimVarGrad,nSecondaryVar,nSecondaryVarGrad,nPrimVarLim) = Common::repeat<5,decltype(nPrimVar)>(decltype(nPrimVar)());
+  nPrimVar = 0;
+  nPrimVarGrad = 0;
+  nSecondaryVar = 0;
+  nSecondaryVarGrad = 0;
+  nPrimVarLim = 0;
 }
 
 //
@@ -24,9 +26,10 @@ CReactiveEulerVariable::CReactiveEulerVariable():CVariable() {
  */
 //
 //
-CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned short val_nvar, unsigned short val_nSpecies, unsigned short val_nprimvar,
-                                               unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config):
-                        CVariable(val_nDim,val_nvar,config) {
+CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies,
+                                               unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim,
+                                               CConfig* config):
+                                               CVariable(val_nDim,val_nvar,config) {
   nSpecies = val_nSpecies;
   nPrimVar = val_nprimvar;
   nPrimVarGrad = val_nprimvargrad;
@@ -43,7 +46,6 @@ CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim,unsigned 
   Limiter = new su2double [nVar];
   Solution_Max = new su2double[nPrimVarLim];
   Solution_Min = new su2double[nPrimVarLim];
-
 }
 
 //
@@ -103,7 +105,6 @@ CReactiveEulerVariable::CReactiveEulerVariable(const su2double val_pressure, con
   /*--- Assign primitive variables ---*/
   Primitive[T_INDEX_PRIM] = T;
   Primitive[P_INDEX_PRIM] = P;
-
 }
 
 //
@@ -128,7 +129,6 @@ CReactiveEulerVariable::CReactiveEulerVariable(const RealVec& val_solution, unsi
   /*--- Initialize T and P to the free stream for Secant method ---*/
   Primitive[T_INDEX_PRIM] = config->GetTemperature_FreeStream();
   Primitive[P_INDEX_PRIM] = config->GetPressure_FreeStream();
-
 }
 
 //
@@ -147,7 +147,6 @@ bool CReactiveEulerVariable::SetPrimVar(CConfig* config) {
     SU2_Assert(check_old == true, "Neither the old solution is feasible to set primitive variables: problem unsolvable");
   }
   return nonPhys;
-
 }
 
 //
@@ -214,8 +213,10 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   sqvel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
 
   /*--- Translational-Rotational Temperature ---*/
-  RealVec Yi(U + RHOS_INDEX_SOL,U + (RHOS_INDEX_SOL + nSpecies));
-  std::for_each(Yi.begin(),Yi.end(),[rho](su2double& elem){elem /= rho;});
+  RealVec Yi;
+  Yi.reserve(nSpecies);
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+    Yi.push_back(U[RHOS_INDEX_SOL + iSpecies]/rho);
   const su2double Rgas = library->ComputeRgas(Yi)/config->GetGas_Constant_Ref();
   const su2double C1 = (-rhoE + rho*sqvel)/(rho*Rgas);
   const su2double C2 = 1.0/Rgas;
@@ -322,7 +323,6 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   V[H_INDEX_PRIM] = (U[RHOE_INDEX_SOL] + V[P_INDEX_PRIM])/rho;
 
   return nonPhys;
-
 }
 
 //
@@ -336,41 +336,17 @@ void CReactiveEulerVariable::Prim2ConsVar(CConfig* config, su2double* V, su2doub
   SU2_Assert(U != NULL,"The array of conserved varaibles has not been allocated");
   SU2_Assert(V != NULL,"The array of primitive varaibles has not been allocated");
 
-  unsigned short iDim, iSpecies;
-
   /*--- Set mixture density and species density ---*/
   U[RHO_INDEX_SOL] = V[RHO_INDEX_PRIM];
   std::copy(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM + nSpecies), U + RHOS_INDEX_SOL);
 
   /*--- Set momentum ---*/
-  for(iDim = 0; iDim < nDim; ++iDim)
+  for(unsigned short iDim = 0; iDim < nDim; ++iDim)
     U[RHOVX_INDEX_SOL + iDim] = V[RHO_INDEX_PRIM]*V[VX_INDEX_PRIM + iDim];
 
   /*--- Set energies ---*/
   U[RHOE_INDEX_SOL] = V[RHO_INDEX_PRIM]*V[H_INDEX_PRIM] - V[P_INDEX_PRIM];
-
 }
-
-//
-//
-/*!
- *\brief Get Gradient Primitive Variable
- */
-//
-//
-su2double** CReactiveEulerVariable::GetGradient_Primitive(void) {
-  std::vector<std::vector<double>> tmp_matrix(Gradient_Primitive.nbRows(),std::vector<double>(Gradient_Primitive.nbCols()));
-  for(std::size_t i = 0; i < Gradient_Primitive.nbRows(); ++i)
-    for(std::size_t j = 0; j < Gradient_Primitive.nbCols(); ++j)
-      tmp_matrix[i][j] = Gradient_Primitive(i,j);
-
-  std::vector<su2double*> tmp;
-  for(auto&& elem:tmp_matrix)
-    tmp.push_back(elem.data());
-
-  return tmp.data();
-}
-
 
 //
 //
@@ -379,12 +355,13 @@ su2double** CReactiveEulerVariable::GetGradient_Primitive(void) {
  */
 //
 //
-bool CReactiveEulerVariable::SetDensity(void) {
+inline bool CReactiveEulerVariable::SetDensity(void) {
   SU2_Assert(Solution != NULL,"The array of solution variables has not been allocated");
   Primitive.at(RHO_INDEX_PRIM) = Solution[RHO_INDEX_SOL];
 
   if(Primitive.at(RHO_INDEX_PRIM) < EPS)
     return true;
+
   return false;
 }
 
@@ -404,6 +381,7 @@ bool CReactiveEulerVariable::SetPressure(CConfig* config) {
   Primitive.at(P_INDEX_PRIM) = Pressure;
   if(Pressure < EPS)
     return true;
+
   return false;
 }
 
@@ -424,6 +402,7 @@ bool CReactiveEulerVariable::SetSoundSpeed(CConfig* config) {
   Primitive.at(A_INDEX_PRIM) = Sound_Speed;
   if(Sound_Speed < EPS)
     return true;
+
   return false;
 }
 
@@ -478,6 +457,8 @@ CReactiveNSVariable::CReactiveNSVariable(const su2double val_pressure, const Rea
     dim_temp *= 5.0/9.0;
     dim_press *= 47.8803;
   }
+
+  /*--- Compute transport properties --- */
   //Laminar_Viscosity = library->GetLambda(dim_temp,val_massfrac)/config->GetViscosity_Ref();
   if(US_System)
     Laminar_Viscosity *= 0.02088553108;
@@ -499,8 +480,6 @@ CReactiveNSVariable::CReactiveNSVariable(const RealVec& val_solution, unsigned s
                                          CConfig* config):
                                          CReactiveEulerVariable(val_solution,val_nDim,val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,
                                                                 val_nprimvarlim,config) {
-  //RealVec YS(val_solution.begin() + CReactiveEulerVariable::RHOS_INDEX_PRIM,val_solution.end());
-  //Ys /= val_solution[CReactiveEulerVariable::RHO_INDEX_SOL];
   su2double dim_temp, dim_press;
   bool US_System = config->GetSystemMeasurements() == US;
   dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
@@ -509,6 +488,9 @@ CReactiveNSVariable::CReactiveNSVariable(const RealVec& val_solution, unsigned s
     dim_temp *= 5.0/9.0;
     dim_press *= 47.8803;
   }
+
+  /*--- Compute transport properties --- */
+  const auto Ys = GetMassFractions();
   //Laminar_Viscosity = library->GetLambda(dim_temp,Ys)/config->GetViscosity_Ref();
   if(US_System)
     Laminar_Viscosity *= 0.02088553108;
@@ -529,7 +511,6 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
   /*--- Convert conserved to primitive variables using Euler version since primitives are the same ---*/
   bool nonPhys = CReactiveEulerVariable::SetPrimVar(config);
 
-  /*--- Compute transport properties --- */
   su2double dim_temp, dim_press;
   bool US_System = config->GetSystemMeasurements() == US;
   dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
@@ -538,6 +519,9 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
     dim_temp *= 5.0/9.0;
     dim_press *= 47.8803;
   }
+
+  /*--- Compute transport properties --- */
+  const auto Ys = GetMassFractions();
   //Laminar_Viscosity = library->GetLambda(dim_temp,Ys)/config->GetViscosity_Ref();
   if(US_System)
     Laminar_Viscosity *= 0.02088553108;

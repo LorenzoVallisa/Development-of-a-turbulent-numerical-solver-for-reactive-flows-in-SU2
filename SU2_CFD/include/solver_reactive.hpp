@@ -14,7 +14,6 @@ public:
   using RealVec = CReactiveEulerVariable::RealVec;
   using RealMatrix = CReactiveEulerVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
-  using SmartArr = CReactiveEulerVariable::SmartArr;
 
 protected:
   static LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
@@ -39,10 +38,8 @@ protected:
   RealVec   Velocity_Inf,  /*!< \brief Free stream flow velocity. */
             MassFrac_Inf;  /*!< \brief Free stream species mass fraction. */
 
-  RealVec   Sol_i,  /*!< \brief Auxiliary vector for storing the solution at point i. */
-            Sol_j,      /*!< \brief Auxiliary vector for storing the solution at point j. */
-            Primitive_i,        /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point i. */
-            Primitive_j;        /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point j. */
+  RealVec   Primitive_i,   /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point i. */
+            Primitive_j;   /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point j. */
 
 public:
 
@@ -82,7 +79,7 @@ public:
 	 * \param[in] config - Definition of the particular problem.
    * \param[in] val_filename - Name of the file for the restart
 	 */
-  void Read_Restart(CGeometry* geometry, CConfig* config, std::string val_filename);
+  void Load_Restart(CGeometry* geometry, CConfig* config, std::string val_filename);
 
   /*!
    * \brief Set primitive variables in each point reporting non physical data

@@ -14,17 +14,15 @@ namespace {
   /*!
    * \brief Compute unit normal for the current cell interface
    */
-  void Compute_Outward_UnitNormal(unsigned short nDim,su2double* Normal,su2double* UnitNormal) {
+  void Compute_Outward_UnitNormal(unsigned short nDim, su2double* Normal, su2double* UnitNormal) {
     SU2_Assert(Normal != NULL,"Thw array for Normal has not been allocated");
     SU2_Assert(UnitNormal != NULL,"Thw array for Unit Normal has not been allocated");
 
-    /*--- Face area (norm or the normal vector) ---*/
+    /*--- Face area (norm of the normal vector) ---*/
     su2double Area = std::inner_product(Normal,Normal + nDim, Normal, 0.0);
     Area = std::sqrt(Area);
 
-    /*-- Unit Normal ---*/
-    for(unsigned short iDim = 0; iDim < nDim; ++iDim)
-      UnitNormal[iDim] = Normal[iDim]/Area;
+    std::transform(Normal, Normal + nDim, UnitNormal, [Area](su2double elem){return elem/Area;});
   }
 
 } /*-- End of unnamed namespace ---*/
@@ -35,10 +33,8 @@ namespace {
  * \brief Constructor of the class CUpwReactiveAUSM
  */
 CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
-    CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
-
+                  CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
   implicit = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
-
 }
 
 //
@@ -48,8 +44,7 @@ CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_n
  */
 //
 //
-void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i,
-                                       su2double** val_Jacobian_j, CConfig* config) {
+void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i, su2double** val_Jacobian_j, CConfig* config) {
   //AD::StartPreacc();
   //AD::SetPreaccIn(V_i, nSpecies + nDim+2);
   //AD::SetPreaccIn(V_j, nSpecies + nDim+2);
@@ -138,7 +133,7 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
   const su2double sigma = 1.0;
 
   su2double m12 = mLP + mRM;
-  su2double mP = kP/fa*std::max(1.0-sigma*mF*mF,0.0)*(Pressure_j-Pressure_i)/(Pressure_i+Pressure_j);
+  su2double mP = kP/fa*std::max(1.0-sigma*mF*mF,0.0)*(Pressure_i-Pressure_j)/(Pressure_i+Pressure_j);
   m12 += mP;
   su2double mLF = 0.5*(m12+std::abs(m12));
   su2double mRF = 0.5*(m12-std::abs(m12));
@@ -205,7 +200,6 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
   GradPrimVar_i.resize(nPrimVarAvgGrad, nDim);
   GradPrimVar_j.resize(nPrimVarAvgGrad, nDim);
   Mean_GradPrimVar.resize(nPrimVarAvgGrad, nDim);
-
 }
 
 //
@@ -259,7 +253,6 @@ CAvgGradReactive_Flow::RealVec CAvgGradReactive_Flow::Solve_SM(const su2double v
     throw std::runtime_error("Convergence for StefanMawell equations not achieved");
 
   return Jd;
-
 }
 
 //
@@ -357,7 +350,6 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const RealVec& val_primvar, const
     for(iDim = 0; iDim < nDim; ++iDim)
       Proj_Flux_Tensor[iVar] += Flux_Tensor[iVar][iDim]*val_normal[iDim];
   }
-
 }
 
 //
@@ -459,7 +451,6 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const RealVec& val_primvar, const
       Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] = -Solve_SM(rho, Xs, Grad_Xs.GetColumn<RealVec>(iDim), Ys, Ds, Dij)[iSpecies];
       Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] += Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] * hs[iSpecies];
     }
-
   }
 
   for(iVar = 0; iVar < nVar; ++iVar) {
@@ -488,7 +479,6 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const RealVec& val_primvar, const
     }
   }
   */
-
 }
 
 
@@ -526,7 +516,7 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   SU2_Assert(Mean_GradPrimVar.nbRows() == nPrimVarAvgGrad,"The number of rows in the mean gradient is not correct");
   SU2_Assert(Mean_GradPrimVar.nbCols() == nDim,"The number of columns in the mean gradient is not correct");
 
-  unsigned short iDim,jDim,iSpecies; /*!< \brief Indexes for iterations. */
+  unsigned short iDim, jDim, iSpecies; /*!< \brief Indexes for iterations. */
 
   su2double Mean_Laminar_Viscosity; /*!< \brief Mean value of laminar viscosity. */
   su2double Mean_Thermal_Conductivity;  /*!< \brief Mean value of thermal conductivity. */
@@ -537,12 +527,11 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   Mean_Thermal_Conductivity = 2.0/(1.0/Thermal_Conductivity_i + 1.0/Thermal_Conductivity_j);
   Mean_Dij = 2.0/(1.0/Dij_i + 1.0/Dij_j);
 
-  /*--- Set the primitive variables and compute the mean ---*/
+  /*--- Set the primitive variables ---*/
   std::copy(V_i, V_i + nPrimVar, PrimVar_i.begin());
   std::copy(V_j, V_j + nPrimVar, PrimVar_j.begin());
-  Mean_PrimVar = 0.5*(PrimVar_i + PrimVar_j);
 
-  /*-- Use Molar fraction instead of partial densities ---*/
+  /*-- Use Molar fractions instead of partial densities ---*/
   std::for_each(PrimVar_i.begin() + CReactiveNSVariable::RHOS_INDEX_PRIM, PrimVar_i.begin() + CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies,
                 [=](su2double elem){elem /= V_i[CReactiveNSVariable::RHO_INDEX_PRIM];});
   std::for_each(PrimVar_j.begin() + CReactiveNSVariable::RHOS_INDEX_PRIM, PrimVar_j.begin() + CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies,
@@ -552,8 +541,11 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   //                                         PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies);
   //Xs_j = library->GetMolarFromMass(RealVec(PrimVar_j.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM,
   //                                         PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies);
-  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-    Mean_PrimVar[CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies] = 0.5*(Xs_i[iSpecies] + Xs_j[iSpecies]);
+  std::copy(Xs_i.cbegin(), Xs_i.cend(), PrimVar_i.begin() + CReactiveNSVariable::RHOS_INDEX_PRIM);
+  std::copy(Xs_j.cbegin(), Xs_j.cend(), PrimVar_j.begin() + CReactiveNSVariable::RHOS_INDEX_PRIM);
+
+  /*--- Compute the mean ---*/
+  Mean_PrimVar = 0.5*(PrimVar_i + PrimVar_j);
 
   /*--- Mean gradient approximation ---*/
   for(iDim = 0; iDim < nDim; ++iDim) {
@@ -575,12 +567,11 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
                      Mean_Thermal_Conductivity, Mean_Dij, config);
 
 	/*--- Update viscous residual with the species projected flux ---*/
-  std::copy(Proj_Flux_Tensor,Proj_Flux_Tensor + nVar,val_residual);
+  std::copy(Proj_Flux_Tensor, Proj_Flux_Tensor + nVar, val_residual);
 
 	/*--- Implicit part ---*/
 	if(implicit)
     throw Common::NotImplemented("Implicit method still not implemented. Setting explicit");
-
 }
 
 //
@@ -591,10 +582,8 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
 //
 //
 CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
-  CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
-
+                 CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
   implicit = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
-
 }
 
 //
@@ -626,5 +615,4 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
   /*--- Implicit computation ---*/
   if(implicit)
     throw Common::NotImplemented("Implicit method for source chemistry residual not yet implemented. Setting explicit");
-
 }
