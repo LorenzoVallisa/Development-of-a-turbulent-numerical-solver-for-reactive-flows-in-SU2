@@ -321,14 +321,14 @@ public:
    */
   inline su2double* GetdPdU(void) override {
     return dPdU.data();
-  };
+  }
 
   /*!
    * \brief Set partial derivative of temperature w.r.t. density \f$\frac{\partial T}{\partial \rho_s}\f$
    */
   inline su2double* GetdTdU(void) override {
     return dTdU.data();
-  };
+  }
 
   /*!
    * \brief Get the flow pressure.
@@ -377,9 +377,11 @@ public:
    * \return Value of the mass fraction of species s.
    */
   inline RealVec GetMassFractions(void) const {
-    return RealVec(Primitive.cbegin() + RHOS_INDEX_PRIM, Primitive.cbegin() + RHOS_INDEX_PRIM + nSpecies);
+    RealVec res(Primitive.cbegin() + RHOS_INDEX_PRIM, Primitive.cbegin() + (RHOS_INDEX_PRIM + nSpecies));
+    for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      res[iSpecies] /= Primitive.at(RHO_INDEX_PRIM);
+    return res;
   }
-
 
   /*!
    * \brief Get the energy of the flow.
@@ -396,7 +398,7 @@ public:
    */
   inline su2double GetTemperature(void) override {
     return Primitive.at(T_INDEX_PRIM);
-  };
+  }
 
   /*!
    * \brief Sets the temperature of the flow.
@@ -426,7 +428,7 @@ public:
    */
   inline su2double GetProjVel(su2double* val_vector) override {
     SU2_Assert(val_vector != NULL, "The vector where to project velocity has not been allocated");
-    return std::inner_product(Primitive.cbegin() + VX_INDEX_PRIM, Primitive.cbegin() + VX_INDEX_PRIM + nDim, val_vector, 0.0);
+    return std::inner_product(Primitive.cbegin() + VX_INDEX_PRIM, Primitive.cbegin() + (VX_INDEX_PRIM + nDim), val_vector, 0.0);
   }
 
   /*!
@@ -434,7 +436,6 @@ public:
    * \param[in] val_velocity - Pointer to the velocity.
    */
   void SetVelocity_Old(su2double* val_velocity) override;
-
 };
 const unsigned short CReactiveEulerVariable::P_INDEX_PRIM = CReactiveEulerVariable::VX_INDEX_PRIM + CReactiveEulerVariable::nDim;
 const unsigned short CReactiveEulerVariable::RHO_INDEX_PRIM = CReactiveEulerVariable::P_INDEX_PRIM + 1;
@@ -454,7 +455,7 @@ const unsigned short CReactiveEulerVariable::P_INDEX_GRAD = CReactiveEulerVariab
  */
 class CReactiveNSVariable:public CReactiveEulerVariable {
 protected:
-	RealMatrix Diffusion_Coeffs;    /*!< \brief Diffusion coefficients of the mixture. */
+	RealMatrix Diffusion_Coeffs;    /*!< \brief Binary diffusion coefficients of the mixture. */
   su2double  Laminar_Viscosity;	/*!< \brief Viscosity of the fluid. */
   su2double  Thermal_Conductivity;   /*!< \brief Thermal conductivity of the gas mixture. */
 
@@ -465,7 +466,7 @@ public:
   /*!
 	 * \brief Default constructor of the class.
 	 */
-  CReactiveNSVariable(): CReactiveEulerVariable(),Laminar_Viscosity(),Thermal_Conductivity() {}
+  CReactiveNSVariable():CReactiveEulerVariable(),Laminar_Viscosity(),Thermal_Conductivity() {}
 
   /*!
    * \overloaded Class constructor
@@ -498,7 +499,7 @@ public:
                       unsigned short val_nprimvargrad,unsigned short val_nprimvarlim, CConfig* config);
 
   /*!
-	 * \overload Class constructors
+	 * \overload Class constructor
 	 * \param[in] val_solution - Pointer to the flow value (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of conserved variables.
@@ -565,13 +566,12 @@ public:
   }
 
   /*!
-  	 * \brief Set the temperature at the wall
-     * \param[in] temperature_wall - value of the wall temperature to set
-  	 */
+   * \brief Set the temperature at the wall
+   * \param[in] temperature_wall - value of the wall temperature to set
+   */
 	inline void SetWallTemperature(su2double temperature_wall) override {
     Primitive.at(T_INDEX_PRIM) = temperature_wall;
   }
-
 };
 const unsigned short CReactiveNSVariable::RHOS_INDEX_GRAD = CReactiveNSVariable::P_INDEX_GRAD + 1;
 

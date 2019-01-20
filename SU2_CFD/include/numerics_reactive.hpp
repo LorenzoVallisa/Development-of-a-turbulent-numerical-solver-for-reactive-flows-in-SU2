@@ -4,6 +4,7 @@
 #include "numerics_structure.hpp"
 #include "variable_reactive.hpp"
 
+#include <memory>
 /*!
  * \class CUpwReactiveAUSM
  * \brief Class for computing convective flux using AUSM method.
@@ -24,12 +25,14 @@ protected:
 
   unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
 
+  RealVec Phi_i,Phi_j;  /*!< \brief Vectors to describe the variables of the problem. */
+
 public:
 
   /*!
    * \brief Default constructor of the class.
    */
-  CUpwReactiveAUSM():CNumerics(),implicit(),nSpecies() {}
+  CUpwReactiveAUSM(): CNumerics(),implicit(),nSpecies() {}
 
   /*!
 	 * \brief Constructor of the class.
@@ -59,40 +62,41 @@ public:
   inline void SetExplicit(void) {
     implicit = false;
   }
-
 };
-
 
 /*!
  * \class CAvgGradReactive_Flow
  * \brief Class for computing viscous flux using the average gradients for a chemically reactive flow.
  * \author G. Orlando
  */
-
 class CAvgGradReactive_Flow : public CNumerics {
 public:
 
   using RealVec = CReactiveEulerVariable::RealVec;
   using RealMatrix = CReactiveEulerVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
-  using SmartArr = CReactiveEulerVariable::SmartArr;
+  using Vec = Eigen::VectorXd;
+  typedef std::unique_ptr<su2double[]> SmartArr;
 
 protected:
 
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
-  bool implicit; /*!< \brief Flag for implicit computations. */
-  bool limiter; /*!< \brief Flag for limiter computations. */
+  bool implicit;    /*!< \brief Flag for implicit computations. */
+  bool limiter;     /*!< \brief Flag for limiter computations. */
 
   unsigned short nPrimVar; /*!< \brief Numbers of primitive variables. */
   unsigned short nPrimVarAvgGrad; /*!< \brief Numbers of primitive variables to compute gradient for average computation. */
   unsigned short nSpecies; /*!< \brief Total number of species. */
 
-  RealVec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
-  RealVec PrimVar_i, PrimVar_j;   /*!< \brief Primitives variables at point i and j. */
+  Vec PrimVar_i, PrimVar_j;   /*!< \brief Primitives variables at point i and j. */
+  Vec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
+
   RealMatrix Dij_i, Dij_j;       /*!< \brief Binary diffusion coefficients at point i and j. */
   RealMatrix GradPrimVar_i, GradPrimVar_j; /*!< \brief Gradient of primitives variables at point i and j for average gradient computation. */
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
+
+  RealMatrix Gamma,Gamma_tilde;  /*!< \brief Auxiliary matrices for solving Stefan-Maxwell equations. */
 
 public:
 
@@ -115,7 +119,7 @@ public:
   /*!
    * \brief Default constructor of the class.
    */
-  CAvgGradReactive_Flow():CNumerics(),implicit(),limiter(),nPrimVar(),nPrimVarAvgGrad(),nSpecies() {}
+  CAvgGradReactive_Flow(): CNumerics(),implicit(),limiter(),nPrimVar(),nPrimVarAvgGrad(),nSpecies() {}
 
   /*!
    * \brief Constructor of the class.
@@ -128,7 +132,7 @@ public:
   /*!
    * \brief Destructor of the class.
    */
-  virtual ~CAvgGradReactive_Flow() {};
+  virtual ~CAvgGradReactive_Flow() {}
 
   /*!
    * \brief Compute the diffusive flux along a certain direction
@@ -136,11 +140,9 @@ public:
    * \param[in] val_xs - Molar fractions.
    * \param[in] val_grad_xs - Component along the desired dimension of gradient of molar fractions.
    * \param[in] val_ys - Mass fractions.
-   * \param[in] val_diffusioncoeff - Corrected diffusion coefficients for each species ((1-Xs)/Ds).
    * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.
    */
-  RealVec Solve_SM(const su2double val_density, const RealVec& val_xs, const RealVec& val_grad_xs, const RealVec& val_ys,
-                   const RealVec& val_diffusioncoeff, const RealMatrix& val_Dij);
+  Vec Solve_SM(const su2double val_density, const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys, const RealMatrix& val_Dij);
 
   /*!
    * \brief Compute projection of the viscous fluxes using Ramshaw self-consisten modification
@@ -152,7 +154,7 @@ public:
    * \param[in] val_diffusioncoeff - Effective diffusion coefficients for each species in the mixture.
    * \param[in] config - Definition of the particular problem
    */
-  virtual void GetViscousProjFlux(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+  virtual void GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
                                   const su2double val_viscosity, const su2double val_therm_conductivity,
                                   const RealVec& val_diffusioncoeff, CConfig* config);
 
@@ -166,7 +168,7 @@ public:
    * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.
    * \param[in] config - Definition of the particular problem
    */
-  virtual void GetViscousProjFlux(const RealVec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+  virtual void GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
                                   const su2double val_viscosity, const su2double val_therm_conductivity,
                                   const RealMatrix& val_Dij, CConfig* config);
 
@@ -199,7 +201,6 @@ public:
    */
   void ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i, su2double** val_Jacobian_j, CConfig* config) override;
 
-
   /*!
    * \brief Set the Gradient of primitives for computing residual
    * \param[in] val_nvar - Index of desired variable
@@ -208,8 +209,8 @@ public:
    * \param[in] val_grad_j - Value to assign at point j.
    */
   inline void SetGradient_AvgPrimitive(unsigned short val_nvar, unsigned short val_nDim, su2double val_grad_i, su2double val_grad_j) {
-    GradPrimVar_i.at(val_nvar,val_nDim) = val_grad_i;
-    GradPrimVar_j.at(val_nvar,val_nDim) = val_grad_j;
+    GradPrimVar_i(val_nvar,val_nDim) = val_grad_i;
+    GradPrimVar_j(val_nvar,val_nDim) = val_grad_j;
   }
 
   /*!
@@ -238,7 +239,6 @@ public:
   inline void SetExplicit(void) {
     implicit = false;
   }
-
 };
 const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_GRAD = CAvgGradReactive_Flow::VX_INDEX_GRAD + CReactiveNSVariable::GetnDim();
 
@@ -249,7 +249,6 @@ const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_AVGGRAD = CAvgGradReactiv
  * \brief Class for computing residual due to chemistry source term.
  * \author G. Orlando
  */
-
 class CSourceReactive: public CNumerics {
 public:
 
@@ -261,9 +260,9 @@ protected:
 
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
-  bool implicit; /*!< \brief Flag for implicit scheme. */
+  bool implicit;    /*!< \brief Flag for implicit scheme. */
 
-  unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
+  unsigned short nSpecies;  /*!< \brief Number of species in the mixture. */
 
 public:
 
@@ -301,8 +300,6 @@ public:
   inline void SetExplicit(void) {
     implicit = false;
   }
-
 };
-
 
 #endif

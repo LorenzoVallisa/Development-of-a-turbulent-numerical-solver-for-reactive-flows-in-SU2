@@ -457,8 +457,8 @@ unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver **solver_cont
        ErrorCounter++;
     }
 
-     /*--- Initialize the convective, source and viscous residual vector ---*/
-     if(!Output)
+    /*--- Initialize the convective, source and viscous residual vector ---*/
+    if(!Output)
       LinSysRes.SetBlock_Zero(iPoint);
   }
 

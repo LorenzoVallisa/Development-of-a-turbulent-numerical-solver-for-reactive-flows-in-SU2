@@ -8,7 +8,7 @@
  *  \brief Main class for defining a solver for chemically reacting inviscid flows.
  *  \author G. Orlando.
  */
-class CReactiveEulerSolver:public CSolver {
+class CReactiveEulerSolver: public CSolver {
 public:
 
   using RealVec = CReactiveEulerVariable::RealVec;
@@ -61,13 +61,13 @@ public:
 	virtual ~CReactiveEulerSolver() {}
 
   /*!
-  * \brief Set the simulation to explicit
-  */
+   * \brief Set the simulation to explicit
+   */
   inline void SetExplicit(void) {
     implicit = false;
   }
 
-   /*!
+  /*!
  	 * \brief Looking for non physical points in the initial solution
  	 * \param[in] config - Definition of the particular problem.
  	 */
@@ -322,7 +322,6 @@ public:
     * \param[in] config - Definition of the particular problem.
     */
    void ImplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) override;
-
 };
 
 /*! \class CReactiveNSSolver
@@ -432,7 +431,6 @@ public:
    */
   void BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
                           CNumerics* visc_numerics, CConfig* config,unsigned short val_marker) override;
-
 };
 
 #endif

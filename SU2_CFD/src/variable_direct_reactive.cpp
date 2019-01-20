@@ -1,6 +1,9 @@
 #include "../include/variable_reactive.hpp"
 #include "../../Common/include/reacting_model_library.hpp"
 
+unsigned short CReactiveEulerVariable::nSpecies = 0;
+CReactiveEulerVariable::LibraryPtr CReactiveEulerVariable::library = NULL;
+
 //
 //
 /*!
@@ -8,9 +11,6 @@
  */
 //
 //
-unsigned short CReactiveEulerVariable::nSpecies = 0;
-CReactiveEulerVariable::LibraryPtr CReactiveEulerVariable::library = NULL;
-
 CReactiveEulerVariable::CReactiveEulerVariable():CVariable() {
   nPrimVar = 0;
   nPrimVarGrad = 0;
@@ -28,8 +28,7 @@ CReactiveEulerVariable::CReactiveEulerVariable():CVariable() {
 //
 CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies,
                                                unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim,
-                                               CConfig* config):
-                                               CVariable(val_nDim,val_nvar,config) {
+                                               CConfig* config): CVariable(val_nDim,val_nvar,config) {
   nSpecies = val_nSpecies;
   nPrimVar = val_nprimvar;
   nPrimVarGrad = val_nprimvargrad;
@@ -74,12 +73,12 @@ CReactiveEulerVariable::CReactiveEulerVariable(const su2double val_pressure, con
   rho *= config->GetGas_Constant_Ref();
 
   su2double dim_temp = T*config->GetTemperature_Ref();
-  bool US_System = config->GetSystemMeasurements() ==US;
+  bool US_System = config->GetSystemMeasurements() == US;
   if(US_System)
     dim_temp *= 5.0/9.0;
   //su2double Sound_Speed = library->ComputeFrozenSoundSpeed(dim_temp,Yi,P,rho);
 
-  /*--- Calculate energy (RHOE) from supplied primitive quanitites ---*/
+  /*--- Compute energy (RHOE) from supplied primitive quanitites ---*/
   /*
   su2double sqvel = 0.0;
   for(iDim = 0; iDim < nDim; ++iDim)
@@ -89,7 +88,6 @@ CReactiveEulerVariable::CReactiveEulerVariable(const su2double val_pressure, con
   */
 
   /*--- Initialize Solution and Solution_Old vectors ---*/
-
   /*--- Initialize mixture density and partial density ---*/
   Solution[RHO_INDEX_SOL] = Solution_Old[RHO_INDEX_SOL] = rho;
   for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
@@ -100,7 +98,7 @@ CReactiveEulerVariable::CReactiveEulerVariable(const su2double val_pressure, con
     Solution[RHOVX_INDEX_SOL + iDim] = Solution_Old[RHOVX_INDEX_SOL + iDim] = rho*val_velocity[iDim];
 
   /*--- Initialize energy contribution ---*/
-  Solution[RHOE_INDEX_SOL] = Solution_Old[nSpecies+nDim] = rhoE;
+  Solution[RHOE_INDEX_SOL] = Solution_Old[RHOE_INDEX_SOL] = rhoE;
 
   /*--- Assign primitive variables ---*/
   Primitive[T_INDEX_PRIM] = T;
@@ -165,7 +163,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   su2double rho, rhoE;
   su2double sqvel;
   su2double f, df, NRtol, Btol;
-  su2double T,Told,Tnew,hs,hs_old,Tmin,Tmax;
+  su2double T, Told, Tnew, hs, hs_old, Tmin, Tmax;
 
   /*--- Conserved and primitive vector layout ---*/
   // U:  [rho, rhou, rhov, rhow, rhoE, rho1, ..., rhoNs]^T
@@ -176,12 +174,12 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
 
   /*--- Set temperature clipping values ---*/
   Tmin   = 50.0;
-  Tmax   = 8E4;
+  Tmax   = 6.0e4;
 
   /*--- Set temperature algorithm paramters ---*/
-  NRtol    = 1.0E-6;    // Tolerance for the Secant method
-  Btol     = 1.0E-4;    // Tolerance for the Bisection method
-  maxNIter = 5;        // Maximum Secant method iterations
+  NRtol    = 1.0e-6;    // Tolerance for the Secant method
+  Btol     = 1.0e-4;    // Tolerance for the Bisection method
+  maxNIter = 7;        // Maximum Secant method iterations
   maxBIter = 32;        // Maximum Bisection method iterations
 
   /*--- Rename variables forconvenience ---*/
@@ -198,6 +196,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
     else
       V[RHOS_INDEX_PRIM + iSpecies] = U[RHOS_INDEX_SOL + iSpecies];
   }
+
   if(U[RHO_INDEX_SOL] < EPS) {
     V[RHO_INDEX_PRIM] = U[RHO_INDEX_SOL] = EPS;
     nonPhys = true;
@@ -207,16 +206,19 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
 
   // Rename for convenience
   rho = U[RHO_INDEX_SOL];
+
   /*--- Assign mixture velocity ---*/
   for(iDim = 0; iDim < nDim; ++iDim)
     V[VX_INDEX_PRIM + iDim] = U[RHOVX_INDEX_SOL + iDim]/rho;
   sqvel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
 
-  /*--- Translational-Rotational Temperature ---*/
-  RealVec Yi;
-  Yi.reserve(nSpecies);
+  /*--- Checking sum of mass fraction ---*/
+  RealVec Yi(U + RHOS_INDEX_SOL, U + (RHOS_INDEX_SOL + nSpecies));
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-    Yi.push_back(U[RHOS_INDEX_SOL + iSpecies]/rho);
+    Yi[iSpecies] /= rho;
+  nonPhys = nonPhys || (std::abs(std::accumulate(Yi.cbegin(),Yi.cend(),0.0) - 1.0) > EPS);
+
+  /*--- Translational-Rotational Temperature ---*/
   const su2double Rgas = library->ComputeRgas(Yi)/config->GetGas_Constant_Ref();
   const su2double C1 = (-rhoE + rho*sqvel)/(rho*Rgas);
   const su2double C2 = 1.0/Rgas;
@@ -245,7 +247,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
     df = T - Told + C2*(hs_old-hs);
     Tnew = T - f*(T-Told)/df;
 
-    // Check for convergence
+    /*--- Check for convergence ---*/
     if(std::abs(Tnew - T) < NRtol) {
       NRconvg = true;
       break;
@@ -256,12 +258,11 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
     }
   }
 
-  // If the secant method has converged, assign the value of T.
-  // Otherwise, execute a bisection root-finding method
+  /*--- If the secant method has converged, assign the value of T.
+        Otherwise execute a bisection root-finding method ---*/
   if(NRconvg)
     V[T_INDEX_PRIM] = T;
   else {
-    // Execute the bisection root-finding method
     Bconvg = false;
     su2double Ta = Tmin;
     su2double Tb = Tmax;
@@ -287,7 +288,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
           Tb = T;
       }
 
-    // If absolutely no convergence, then something is going really wrong
+    /*--- If absolutely no convergence, then something is going really wrong ---*/
     if(!Bconvg)
       throw std::runtime_error("Convergence not achieved for bisection method");
     }
@@ -368,8 +369,9 @@ inline bool CReactiveEulerVariable::SetDensity(void) {
 //
 //
 /*!
- *\brief Set pressure (requires SetDensity() call)
- *///
+ *\brief Set pressure (NOTE: it requires SetDensity() call)
+ */
+//
 //
 bool CReactiveEulerVariable::SetPressure(CConfig* config) {
   /*--- Compute this gas mixture property from library ---*/
@@ -389,7 +391,8 @@ bool CReactiveEulerVariable::SetPressure(CConfig* config) {
 //
 /*!
  *\brief Set sound speed (requires SetDensity() call)
- *///
+ */
+//
 //
 bool CReactiveEulerVariable::SetSoundSpeed(CConfig* config) {
   su2double dim_temp = Primitive.at(T_INDEX_PRIM)*config->GetTemperature_Ref();
