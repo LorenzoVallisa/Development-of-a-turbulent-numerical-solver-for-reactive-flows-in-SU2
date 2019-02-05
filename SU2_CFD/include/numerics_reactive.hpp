@@ -4,7 +4,6 @@
 #include "numerics_structure.hpp"
 #include "variable_reactive.hpp"
 
-#include <memory>
 /*!
  * \class CUpwReactiveAUSM
  * \brief Class for computing convective flux using AUSM method.
@@ -25,7 +24,7 @@ protected:
 
   unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
 
-  RealVec Phi_i,Phi_j;  /*!< \brief Vectors to describe the variables of the problem. */
+  RealVec Phi_i,Phi_j;  /*!< \brief Vectors to describe the variables of the problem used in the AUSM scheme. */
 
 public:
 
@@ -45,7 +44,7 @@ public:
   /*!
 	 * \brief Destructor of the class.
 	 */
-	virtual ~CUpwReactiveAUSM() {};
+	virtual ~CUpwReactiveAUSM() {}
 
   /*!
 	 * \brief Compute the residual associated to convective flux between two nodes i and j.
@@ -92,7 +91,10 @@ protected:
   Vec PrimVar_i, PrimVar_j;   /*!< \brief Primitives variables at point i and j. */
   Vec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
 
-  RealMatrix Dij_i, Dij_j;       /*!< \brief Binary diffusion coefficients at point i and j. */
+  RealVec Xs_i, Xs_j;         /*!< \brief Auxiliary vectors for mole fractions at point i and j. */
+
+  RealMatrix Dij_i, Dij_j;      /*!< \brief Binary diffusion coefficients at point i and j. */
+  RealMatrix Mean_Dij;          /*!< \brief Harmonic average of binary diffusion coefficients at point i and j. */
   RealMatrix GradPrimVar_i, GradPrimVar_j; /*!< \brief Gradient of primitives variables at point i and j for average gradient computation. */
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
 
@@ -136,13 +138,15 @@ public:
 
   /*!
    * \brief Compute the diffusive flux along a certain direction
-   * \param[in] val_density - Density of the mixture
+   * \param[in] val_density - Density of the mixture.
+   * \param[in] val_alpha - Parameter for artifical diffusion.
+   * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.
    * \param[in] val_xs - Molar fractions.
    * \param[in] val_grad_xs - Component along the desired dimension of gradient of molar fractions.
    * \param[in] val_ys - Mass fractions.
-   * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.
    */
-  Vec Solve_SM(const su2double val_density, const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys, const RealMatrix& val_Dij);
+  Vec Solve_SM(const su2double val_density, const su2double val_alpha, const RealMatrix& val_Dij,
+               const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys);
 
   /*!
    * \brief Compute projection of the viscous fluxes using Ramshaw self-consisten modification
@@ -218,7 +222,7 @@ public:
    * \param[in] Grad_i - Gradient of Primitive variables.
    * \param[in] Grad_j - Gradient of Primitive variables.
    */
-  inline void SetGradient_AvgPrimitive(const RealMatrix& Grad_i,const RealMatrix& Grad_j) {
+  inline void SetGradient_AvgPrimitive(const RealMatrix& Grad_i, const RealMatrix& Grad_j) {
     GradPrimVar_i = Grad_i;
     GradPrimVar_j = Grad_j;
   }
@@ -228,7 +232,7 @@ public:
    * \param[in] Grad_i - Gradient of Primitive variables.
    * \param[in] Grad_j - Gradient of Primitive variables.
    */
-  inline void SetBinaryDiffCoeff(const RealMatrix& Diff_i,const RealMatrix& Diff_j) {
+  inline void SetBinaryDiffCoeff(const RealMatrix& Diff_i, const RealMatrix& Diff_j) {
     Dij_i = Diff_i;
     Dij_j = Diff_j;
   }
@@ -263,6 +267,8 @@ protected:
   bool implicit;    /*!< \brief Flag for implicit scheme. */
 
   unsigned short nSpecies;  /*!< \brief Number of species in the mixture. */
+
+  RealVec Ys; /*!< \brief Auxiliary vecotr for mass fractions in the mixture. */
 
 public:
 

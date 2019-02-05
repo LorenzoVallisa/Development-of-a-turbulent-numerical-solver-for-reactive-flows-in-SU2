@@ -65,25 +65,24 @@ CReactiveEulerVariable::CReactiveEulerVariable(const su2double val_pressure, con
   su2double T = val_temperature;   // Translational-rotational temperature [K]
   su2double P = val_pressure;
 
-  RealVec Yi = val_massfrac;
   su2double rho,rhoE;
 
   /*--- Compute mixture density ---*/
-  //rho = library->ComputeDensity(T,P,Yi);
+  //rho = library->ComputeDensity(T,P,val_massfrac);
   rho *= config->GetGas_Constant_Ref();
 
   su2double dim_temp = T*config->GetTemperature_Ref();
   bool US_System = config->GetSystemMeasurements() == US;
   if(US_System)
     dim_temp *= 5.0/9.0;
-  //su2double Sound_Speed = library->ComputeFrozenSoundSpeed(dim_temp,Yi,P,rho);
+  //su2double Sound_Speed = library->ComputeFrozenSoundSpeed(dim_temp,val_massfrac,P,rho);
 
   /*--- Compute energy (RHOE) from supplied primitive quanitites ---*/
   /*
   su2double sqvel = 0.0;
   for(iDim = 0; iDim < nDim; ++iDim)
     sqvel += val_mach[iDim]*Sound_Speed * val_mach[iDim]*Sound_speed;
-  su2double e_tot = library->ComputeEnergy(dim_temp,Yi)/config->GetEnergy_Ref();
+  su2double e_tot = library->ComputeEnergy(dim_temp,val_massfrac)/config->GetEnergy_Ref();
   rhoE = rho*(0.5*sqvel + e_tot);
   */
 
@@ -185,16 +184,14 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   /*--- Rename variables forconvenience ---*/
   rhoE  = U[RHOE_INDEX_SOL];          // Density * total energy [J/m3]
 
-  /*--- Assign species and mixture density ---*/
+  /*--- Assign species mass fraction and mixture density ---*/
   // Note: If any species densities are < 0, these values are re-assigned
-  //       in the primitive AND conserved vectors to ensure positive density
+  //       in the conserved vector to ensure positive density
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
     if(U[RHOS_INDEX_SOL + iSpecies] < EPS) {
-      V[RHOS_INDEX_PRIM + iSpecies] = U[RHOS_INDEX_SOL + iSpecies] = EPS;
+      U[RHOS_INDEX_SOL + iSpecies] = EPS;
       nonPhys = true;
     }
-    else
-      V[RHOS_INDEX_PRIM + iSpecies] = U[RHOS_INDEX_SOL + iSpecies];
   }
 
   if(U[RHO_INDEX_SOL] < EPS) {
@@ -204,19 +201,20 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   else
     V[RHO_INDEX_PRIM] = U[RHO_INDEX_SOL];
 
-  // Rename for convenience
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+    V[RHOS_INDEX_PRIM + iSpecies] = U[RHOS_INDEX_SOL]/U[RHO_INDEX_SOL];
+
+  /*--- Checking sum of mass fraction ---*/
+  RealVec Yi(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM + nSpecies));
+  nonPhys = nonPhys || (std::abs(std::accumulate(Yi.cbegin(),Yi.cend(),0.0) - 1.0) > EPS);
+
+  /*--- Rename for convenience ---*/
   rho = U[RHO_INDEX_SOL];
 
   /*--- Assign mixture velocity ---*/
   for(iDim = 0; iDim < nDim; ++iDim)
     V[VX_INDEX_PRIM + iDim] = U[RHOVX_INDEX_SOL + iDim]/rho;
   sqvel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
-
-  /*--- Checking sum of mass fraction ---*/
-  RealVec Yi(U + RHOS_INDEX_SOL, U + (RHOS_INDEX_SOL + nSpecies));
-  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-    Yi[iSpecies] /= rho;
-  nonPhys = nonPhys || (std::abs(std::accumulate(Yi.cbegin(),Yi.cend(),0.0) - 1.0) > EPS);
 
   /*--- Translational-Rotational Temperature ---*/
   const su2double Rgas = library->ComputeRgas(Yi)/config->GetGas_Constant_Ref();
@@ -339,7 +337,8 @@ void CReactiveEulerVariable::Prim2ConsVar(CConfig* config, su2double* V, su2doub
 
   /*--- Set mixture density and species density ---*/
   U[RHO_INDEX_SOL] = V[RHO_INDEX_PRIM];
-  std::copy(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM + nSpecies), U + RHOS_INDEX_SOL);
+  for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+    U[RHOS_INDEX_SOL + iSpecies] = V[RHO_INDEX_PRIM]*V[RHOS_INDEX_PRIM];
 
   /*--- Set momentum ---*/
   for(unsigned short iDim = 0; iDim < nDim; ++iDim)

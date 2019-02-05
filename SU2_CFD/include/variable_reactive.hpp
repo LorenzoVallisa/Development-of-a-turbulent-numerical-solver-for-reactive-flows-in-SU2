@@ -2,9 +2,10 @@
 #define SU2_VARIABLE_REACTIVE
 
 #include "variable_structure.hpp"
-#include <Eigen/Dense>
 #include "../../Common/include/physical_property_library.hpp"
 #include "../../Common/include/su2_assert.hpp"
+
+#include <Eigen/Dense>
 #include <numeric>
 
 /*! \class CReactiveEulerVariable
@@ -26,7 +27,7 @@ protected:
   unsigned short nPrimVarLim; /*!< \brief Number of primitive variables to limit in the problem. */
 
   /*--- Primitive variable definition ---*/
-  RealVec    Primitive; /*!< \brief Primitive variables (T,vx,vy,vz,P,rho,h,a,rho1,...rhoNs) in compressible flows. */
+  RealVec    Primitive; /*!< \brief Primitive variables (T,vx,vy,vz,P,rho,h,a,Y1,...YNs) in compressible flows. */
   RealMatrix Gradient_Primitive; /*!< \brief Gradient of the primitive variables (T, vx, vy, vz, P, rho). */
   RealVec    Limiter_Primitive;    /*!< \brief Limiter of the primitive variables (T, vx, vy, vz, P, rho). */
   RealVec    dPdU;                 /*!< \brief Partial derivative of pressure w.r.t. conserved variables. */
@@ -295,7 +296,7 @@ public:
 	bool SetSoundSpeed(CConfig* config) override;
 
 	/*!
-	 * \brief Set the value of the total enthalpy.
+	 * \brief Set the value of the total enthalpy (need a call of SetPressure()).
 	 */
 	inline void SetEnthalpy(void) override {
     SU2_Assert(Solution != NULL,"The array of solution variables has not been allocated");
@@ -368,7 +369,7 @@ public:
    * \return Value of the mass fraction of species s.
    */
   inline su2double GetMassFraction(unsigned short val_Species) override {
-    return Primitive.at(RHOS_INDEX_PRIM + val_Species)/Primitive.at(RHO_INDEX_PRIM);
+    return Primitive.at(RHOS_INDEX_PRIM + val_Species);
   }
 
   /*!
@@ -377,10 +378,7 @@ public:
    * \return Value of the mass fraction of species s.
    */
   inline RealVec GetMassFractions(void) const {
-    RealVec res(Primitive.cbegin() + RHOS_INDEX_PRIM, Primitive.cbegin() + (RHOS_INDEX_PRIM + nSpecies));
-    for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-      res[iSpecies] /= Primitive.at(RHO_INDEX_PRIM);
-    return res;
+    return RealVec(Primitive.cbegin() + RHOS_INDEX_PRIM, Primitive.cbegin() + (RHOS_INDEX_PRIM + nSpecies));
   }
 
   /*!
@@ -401,7 +399,7 @@ public:
   }
 
   /*!
-   * \brief Sets the temperature of the flow.
+   * \brief Set the temperature of the flow.
    * \return Value of the temperature of the flow.
    */
   inline bool SetTemperature(su2double val_T) override {
