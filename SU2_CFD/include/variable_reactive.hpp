@@ -61,6 +61,13 @@ public:
   static constexpr unsigned short VX_INDEX_GRAD = 1;
   static const unsigned short P_INDEX_GRAD;
 
+  /**
+   * Mapping between the primitivelimited variable name and its position in the physical data
+   */
+  static constexpr unsigned short T_INDEX_LIM = 0;
+  static constexpr unsigned short VX_INDEX_LIM = 1;
+  static const unsigned short P_INDEX_LIM;
+
   /*!
 	 * \brief Default constructor of the class.
 	 */
@@ -446,6 +453,7 @@ const unsigned short CReactiveEulerVariable::RHOS_INDEX_SOL = CReactiveEulerVari
 
 const unsigned short CReactiveEulerVariable::P_INDEX_GRAD = CReactiveEulerVariable::VX_INDEX_GRAD + CReactiveEulerVariable::nDim;
 
+const unsigned short CReactiveEulerVariable::P_INDEX_LIM = CReactiveEulerVariable::VX_INDEX_LIM + CReactiveEulerVariable::nDim;
 
 /*! \class CReactiveNSVariable
  *  \brief Main class for defining a variable for chemically reacting viscous flows.

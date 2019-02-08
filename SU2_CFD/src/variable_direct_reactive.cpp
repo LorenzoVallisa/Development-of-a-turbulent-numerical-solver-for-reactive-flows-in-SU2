@@ -72,7 +72,7 @@ CReactiveEulerVariable::CReactiveEulerVariable(const su2double val_pressure, con
   rho *= config->GetGas_Constant_Ref();
 
   su2double dim_temp = T*config->GetTemperature_Ref();
-  bool US_System = config->GetSystemMeasurements() == US;
+  bool US_System = (config->GetSystemMeasurements() == US);
   if(US_System)
     dim_temp *= 5.0/9.0;
   //su2double Sound_Speed = library->ComputeFrozenSoundSpeed(dim_temp,val_massfrac,P,rho);
@@ -224,7 +224,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   T = V[T_INDEX_PRIM];
   Told = T + 1.0;
   NRconvg = false;
-  bool US_System = config->GetSystemMeasurements() == US;
+  bool US_System = (config->GetSystemMeasurements() == US);
   for(iIter = 0; iIter < maxNIter; ++iIter) {
     /*--- Execute a secant root-finding method to find T ---*/
     su2double dim_temp, dim_temp_old;
@@ -452,7 +452,7 @@ CReactiveNSVariable::CReactiveNSVariable(const su2double val_pressure, const Rea
                                          CReactiveEulerVariable(val_pressure,val_massfrac,val_velocity,val_temperature,val_nDim,
                                                                 val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,val_nprimvarlim,config) {
   su2double dim_temp, dim_press;
-  bool US_System = config->GetSystemMeasurements() == US;
+  bool US_System = (config->GetSystemMeasurements() == US);
   dim_temp = val_temperature*config->GetTemperature_Ref();
   dim_press = val_pressure*config->GetPressure_Ref()/101325.0;
   if(US_System) {
@@ -483,7 +483,7 @@ CReactiveNSVariable::CReactiveNSVariable(const RealVec& val_solution, unsigned s
                                          CReactiveEulerVariable(val_solution,val_nDim,val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,
                                                                 val_nprimvarlim,config) {
   su2double dim_temp, dim_press;
-  bool US_System = config->GetSystemMeasurements() == US;
+  bool US_System = (config->GetSystemMeasurements() == US);
   dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
   dim_press = Primitive[P_INDEX_PRIM]*config->GetPressure_Ref()/101325.0;
   if(US_System) {
@@ -514,7 +514,7 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
   bool nonPhys = CReactiveEulerVariable::SetPrimVar(config);
 
   su2double dim_temp, dim_press;
-  bool US_System = config->GetSystemMeasurements() == US;
+  bool US_System = (config->GetSystemMeasurements() == US);
   dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
   dim_press = Primitive[P_INDEX_PRIM]*config->GetPressure_Ref()/101325.0;
   if(US_System) {

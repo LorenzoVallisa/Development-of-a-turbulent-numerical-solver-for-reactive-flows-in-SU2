@@ -41,6 +41,19 @@ protected:
   RealVec   Primitive_i,   /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point i. */
             Primitive_j;   /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point j. */
 
+  RealVec   PrimVar_i,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at point i. */
+            PrimVar_j,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at point j. */
+            PrimVar_Vertex,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at boundary node. */
+            PrimVar_Average,  /*!< \brief Auxiliary nPrimVarGrad vector for storing average of primitive.. */
+            Partial_Res;  /*!< \brief Auxiliary nPrimVarGrad vector. */
+
+  RealVec   Prim_i, /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point i. */
+            Prim_j, /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point j. */
+            Primitive; /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at boundary node. */
+
+  RealMatrix C_Mat,S_Mat; /*!< \brief Auxiliary matrices for least squares computation. */
+  RealMatrix rotMatrix; /*!< \brief Auxiliary matrix for MPI parallel simulations. */
+
 public:
 
   /*!

@@ -2096,7 +2096,6 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
 
   /*--- Solver definition for the Potential, Euler, Navier-Stokes problems ---*/
   if(reactive_euler || reactive_ns) {
-
     /*--- Definition of the convective scheme for each equation and mesh level ---*/
     if (compressible) {
       /*--- Compressible flow ---*/
@@ -2112,7 +2111,6 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
         delete numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_SECOND_TERM];
       }
     }
-
   }
 
   /*--- Solver definition for the turbulent model problem ---*/

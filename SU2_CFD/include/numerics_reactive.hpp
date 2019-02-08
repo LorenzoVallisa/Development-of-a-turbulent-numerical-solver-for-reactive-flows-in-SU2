@@ -13,7 +13,6 @@ class CUpwReactiveAUSM: public CNumerics {
 public:
 
   using RealVec = CReactiveEulerVariable::RealVec;
-  using RealMatrix = CReactiveEulerVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
@@ -257,7 +256,6 @@ class CSourceReactive: public CNumerics {
 public:
 
   using RealVec = CReactiveEulerVariable::RealVec;
-  using RealMatrix = CReactiveEulerVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:

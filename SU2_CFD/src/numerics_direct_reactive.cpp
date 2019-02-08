@@ -34,7 +34,7 @@ namespace {
  */
 CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
                   CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
-  implicit = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
+  implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
   Phi_i.resize(nVar);
   Phi_j.resize(nVar);
@@ -192,7 +192,8 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
   nPrimVar = nSpecies + nDim + 5;
   nPrimVarAvgGrad = nSpecies + nDim + 1;
 
-  implicit = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
+  implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
+  limiter = config->GetViscous_Limiter_Flow();
 
   //Mean_PrimVar.resize(nPrimVar);
   PrimVar_i.resize(nPrimVar);
@@ -290,7 +291,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   rho = val_primvar[CReactiveNSVariable::RHO_INDEX_PRIM];
   T   = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
   RealVec hs(nSpecies);
-  bool US_System = config->GetSystemMeasurements() == SI;
+  bool US_System = (config->GetSystemMeasurements() == SI);
   su2double dim_temp = T*config->GetTemperature_Ref();
   if(US_System)
     dim_temp *= 5.0/9.0;
@@ -384,7 +385,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   ktr = val_thermal_conductivity;
   T = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
   RealVec hs(nSpecies);
-  bool US_System = config->GetSystemMeasurements() == SI;
+  bool US_System = (config->GetSystemMeasurements() == SI);
   su2double dim_temp = T*config->GetTemperature_Ref();
   if(US_System)
     dim_temp *= 5.0/9.0;
@@ -476,6 +477,8 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const RealVec& val_Mean_PrimVar, 
 void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i, su2double** val_Jacobian_j, CConfig* config) {
   SU2_Assert(V_i != NULL, "The array for the primitive variables at node i has not been allocated");
   SU2_Assert(V_j != NULL, "The array for the primitive variables at node j has not been allocated");
+  SU2_Assert(PrimVar_Lim_i != NULL, "The array for the primitive variables at node i has not been allocated");
+  SU2_Assert(PrimVar_Lim_j != NULL, "The array for the primitive variables at node j has not been allocated");
 
   SU2_Assert(GradPrimVar_i.rows() == nPrimVarAvgGrad, "The number of rows in the gradient of varaible i is not correct");
   SU2_Assert(GradPrimVar_i.cols() == nDim, "The number of columns in the gradient of varaible i is not correct");
@@ -545,7 +548,7 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
 //
 CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
                  CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
-  implicit = config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT;
+  implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
   Ys.resize(nSpecies);
 }

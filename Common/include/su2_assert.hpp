@@ -1,8 +1,16 @@
-#include <string>
+#ifndef __cplusplus
+#error You must use C++
+#endif
 #include <iostream>
+#include <string>
+
 
 #ifdef SU2_Assert
 #undef SU2_Assert
+#endif
+
+#ifndef ERRORSTATUS
+#define ERRORSTATUS 2
 #endif
 
 #ifndef NDEBUG
