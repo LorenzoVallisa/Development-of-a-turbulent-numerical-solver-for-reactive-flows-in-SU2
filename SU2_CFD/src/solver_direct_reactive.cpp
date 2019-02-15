@@ -2280,24 +2280,7 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
 
   				/*--- Primitive variables, and gradient ---*/
   				visc_numerics->SetPrimitive(V_domain, V_inlet.data());
-          auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics);
-          SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
-          for(iDim = 0; iDim < nDim; ++iDim) {
-            /*--- Temperature gradient ---*/
-            avggrad_numerics->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::T_INDEX_GRAD,iDim,
-                                                       node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::T_INDEX_GRAD,iDim),
-                                                       node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::T_INDEX_GRAD,iDim));
-            /*--- Velocity gradient ---*/
-            for(jDim = 0; jDim < nDim; ++jDim)
-              avggrad_numerics->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::VX_INDEX_GRAD + jDim,iDim,
-                                                         node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + jDim,iDim),
-                                                         node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + jDim,iDim));
-            /*--- Molar fractions gradient ---*/
-            for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-              avggrad_numerics->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::RHOS_INDEX_GRAD + iSpecies,iDim,
-                                                         node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies,iDim),
-                                                         node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies,iDim));
-          }
+          visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
 
           /*--- Laminar viscosity ---*/
           visc_numerics->SetLaminarViscosity(node[iPoint]->GetLaminarViscosity(), node[iPoint]->GetLaminarViscosity());
@@ -2306,6 +2289,8 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
           visc_numerics->SetThermalConductivity(node[iPoint]->GetThermalConductivity(), node[iPoint]->GetThermalConductivity());
 
           /*--- Species binary coefficients ---*/
+          auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics);
+          SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
           auto ns_variable = dynamic_cast<CReactiveNSVariable*>(node[iPoint]);
           SU2_Assert(ns_variable != NULL, "The cast compute the binary diffusion coefficients has not been successfull");
           avggrad_numerics->SetBinaryDiffCoeff(ns_variable->GetBinaryDiffusionCoeff(), ns_variable->GetBinaryDiffusionCoeff());
@@ -2544,24 +2529,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
 
         /*--- Primitive variables and gradient ---*/
         visc_numerics->SetPrimitive(V_domain, V_outlet.data());
-        auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics);
-        SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
-        for(iDim = 0; iDim < nDim; ++iDim) {
-          /*--- Temperature gradient ---*/
-          avggrad_numerics->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::T_INDEX_GRAD,iDim,
-                                                     node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::T_INDEX_GRAD,iDim),
-                                                     node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::T_INDEX_GRAD,iDim));
-          /*--- Velocity gradient ---*/
-          for(jDim = 0; jDim < nDim; ++jDim)
-            avggrad_numerics->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::VX_INDEX_GRAD + jDim,iDim,
-                                                       node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + jDim,iDim),
-                                                       node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + jDim,iDim));
-          /*--- Molar fractions gradient ---*/
-          for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-            avggrad_numerics->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::RHOS_INDEX_GRAD + iSpecies,iDim,
-                                                       node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies,iDim),
-                                                       node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies,iDim));
-        }
+        visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
 
         /*--- Laminar viscosity ---*/
         visc_numerics->SetLaminarViscosity(node[iPoint]->GetLaminarViscosity(), node[iPoint]->GetLaminarViscosity());
@@ -2570,6 +2538,8 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         visc_numerics->SetThermalConductivity(node[iPoint]->GetThermalConductivity(), node[iPoint]->GetThermalConductivity());
 
         /*--- Species binary coefficients ---*/
+        auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics);
+        SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
         auto ns_variable = dynamic_cast<CReactiveNSVariable*>(node[iPoint]);
         SU2_Assert(ns_variable != NULL, "The cast compute the binary diffusion coefficients has not been successfull");
         avggrad_numerics->SetBinaryDiffCoeff(ns_variable->GetBinaryDiffusionCoeff(), ns_variable->GetBinaryDiffusionCoeff());
@@ -3142,24 +3112,7 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
 
     /*--- Set Primitive variables and gradient ---*/
     numerics->SetPrimitive(node[iPoint]->GetPrimitive(), node[jPoint]->GetPrimitive());
-    auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(numerics);
-    SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
-      for(iDim = 0; iDim < nDim; ++iDim) {
-      /*--- Temperature gradient ---*/
-      avggrad_numerics->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::T_INDEX_GRAD,iDim,
-                                                 node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::T_INDEX_GRAD,iDim),
-                                                 node[jPoint]->GetGradient_Primitive(CReactiveNSVariable::T_INDEX_GRAD,iDim));
-      /*--- Velocity gradient ---*/
-      for(jDim = 0; jDim < nDim; ++jDim)
-        avggrad_numerics->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::VX_INDEX_GRAD + jDim,iDim,
-                                                   node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + jDim,iDim),
-                                                   node[jPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + jDim,iDim));
-      /*--- Molar fractions gradient ---*/
-      for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-        avggrad_numerics->SetGradient_AvgPrimitive(CAvgGradReactive_Flow::RHOS_INDEX_GRAD + iSpecies,iDim,
-                                                   node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies,iDim),
-                                                   node[jPoint]->GetGradient_Primitive(CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies,iDim));
-    }
+    numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[jPoint]->GetGradient_Primitive());
 
     /*--- Set primitve variables limited ---*/
     numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[jPoint]->GetLimiter_Primitive());
@@ -3171,6 +3124,8 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
     numerics->SetThermalConductivity(node[iPoint]->GetThermalConductivity(), node[jPoint]->GetThermalConductivity());
 
     /*--- Species binary coefficients ---*/
+    auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(numerics);
+    SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
     avggrad_numerics->SetBinaryDiffCoeff(dynamic_cast<CReactiveNSVariable*>(node[iPoint])->GetBinaryDiffusionCoeff(),
                                          dynamic_cast<CReactiveNSVariable*>(node[jPoint])->GetBinaryDiffusionCoeff());
 

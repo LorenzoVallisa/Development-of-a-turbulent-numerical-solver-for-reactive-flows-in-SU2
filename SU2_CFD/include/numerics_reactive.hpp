@@ -71,7 +71,7 @@ class CAvgGradReactive_Flow : public CNumerics {
 public:
 
   using RealVec = CReactiveEulerVariable::RealVec;
-  using RealMatrix = CReactiveEulerVariable::RealMatrix;
+  using RealMatrix = CReactiveNSVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
   using Vec = Eigen::VectorXd;
   typedef std::unique_ptr<su2double[]> SmartArr;
@@ -87,27 +87,22 @@ protected:
   unsigned short nPrimVarAvgGrad; /*!< \brief Numbers of primitive variables to compute gradient for average computation. */
   unsigned short nSpecies; /*!< \brief Total number of species. */
 
+  Vec Edge_Vector;  /*!< \brief Vector connecting point i to j. */
+
   Vec PrimVar_i, PrimVar_j;   /*!< \brief Primitives variables at point i and j. */
   Vec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
+
+  RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
+  Vec Proj_Mean_GradPrimVar_Edge; /*!< \brief Projected mean value of the gradient. */
 
   RealVec Xs_i, Xs_j;         /*!< \brief Auxiliary vectors for mole fractions at point i and j. */
 
   RealMatrix Dij_i, Dij_j;      /*!< \brief Binary diffusion coefficients at point i and j. */
   RealMatrix Mean_Dij;          /*!< \brief Harmonic average of binary diffusion coefficients at point i and j. */
-  RealMatrix GradPrimVar_i, GradPrimVar_j; /*!< \brief Gradient of primitives variables at point i and j for average gradient computation. */
-  RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
 
   RealMatrix Gamma,Gamma_tilde;  /*!< \brief Auxiliary matrices for solving Stefan-Maxwell equations. */
 
 public:
-
-  /**
-   * \brief Mapping between the primitive variable gradient name and its position in the physical data
-   */
-  static constexpr unsigned short T_INDEX_GRAD = 0;
-  static constexpr unsigned short VX_INDEX_GRAD = 1;
-  static const unsigned short RHOS_INDEX_GRAD;
-
 
   /**
    * Mapping between the primitive variable gradient name
@@ -211,19 +206,11 @@ public:
    * \param[in] val_grad_i - Value to assign at point i.
    * \param[in] val_grad_j - Value to assign at point j.
    */
-  inline void SetGradient_AvgPrimitive(unsigned short val_nvar, unsigned short val_nDim, su2double val_grad_i, su2double val_grad_j) {
-    GradPrimVar_i(val_nvar,val_nDim) = val_grad_i;
-    GradPrimVar_j(val_nvar,val_nDim) = val_grad_j;
-  }
-
-  /*!
-   * \brief Set the Gradient of primitives for computing residual
-   * \param[in] Grad_i - Gradient of Primitive variables.
-   * \param[in] Grad_j - Gradient of Primitive variables.
-   */
-  inline void SetGradient_AvgPrimitive(const RealMatrix& Grad_i, const RealMatrix& Grad_j) {
-    GradPrimVar_i = Grad_i;
-    GradPrimVar_j = Grad_j;
+  inline void SetPrimVarGradient(unsigned short val_nvar, unsigned short val_nDim, su2double val_grad_i, su2double val_grad_j) {
+    SU2_Assert(PrimVar_Grad_i[val_nvar] != NULL, std::string("The row " + std::to_string(val_nvar) + " of gradient primitive has not been allocated"));
+    SU2_Assert(PrimVar_Grad_j[val_nvar] != NULL, std::string("The row " + std::to_string(val_nvar) + " of gradient primitive has not been allocated"));
+    PrimVar_Grad_i[val_nvar][val_nDim] = val_grad_i;
+    PrimVar_Grad_j[val_nvar][val_nDim] = val_grad_j;
   }
 
   /*!
@@ -243,8 +230,6 @@ public:
     implicit = false;
   }
 };
-const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_GRAD = CAvgGradReactive_Flow::VX_INDEX_GRAD + CReactiveNSVariable::GetnDim();
-
 const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_AVGGRAD = CAvgGradReactive_Flow::VX_INDEX_AVGGRAD + CReactiveNSVariable::GetnDim();
 
 /*!
@@ -281,7 +266,7 @@ public:
   /*!
    * \brief Destructor of the class.
    */
-  virtual ~CSourceReactive() {};
+  virtual ~CSourceReactive() {}
 
   /*!
    * \brief Calculation of the residual of chemistry source term

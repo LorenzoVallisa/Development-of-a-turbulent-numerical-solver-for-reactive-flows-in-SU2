@@ -195,6 +195,8 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
   limiter = config->GetViscous_Limiter_Flow();
 
+  Edge_Vector.resize(nDim);
+
   //Mean_PrimVar.resize(nPrimVar);
   PrimVar_i.resize(nPrimVar);
   PrimVar_j.resize(nPrimVar);
@@ -206,8 +208,6 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
   //Dij_j.resize(nSpecies, nSpecies);
   //Mean_Dij.resize(nSpecies, nSpecies);
 
-  //GradPrimVar_i.resize(nPrimVarAvgGrad, nDim);
-  //GradPrimVar_j.resize(nPrimVarAvgGrad, nDim);
   Mean_GradPrimVar.resize(nPrimVarAvgGrad, nDim);
 
   Gamma.resize(nSpecies,nSpecies);
@@ -480,10 +480,6 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   SU2_Assert(PrimVar_Lim_i != NULL, "The array for the primitive variables at node i has not been allocated");
   SU2_Assert(PrimVar_Lim_j != NULL, "The array for the primitive variables at node j has not been allocated");
 
-  SU2_Assert(GradPrimVar_i.rows() == nPrimVarAvgGrad, "The number of rows in the gradient of varaible i is not correct");
-  SU2_Assert(GradPrimVar_i.cols() == nDim, "The number of columns in the gradient of varaible i is not correct");
-  SU2_Assert(GradPrimVar_j.rows() == nPrimVarAvgGrad, "The number of rows in the gradient of varaible j is not correct");
-  SU2_Assert(GradPrimVar_j.cols() == nDim, "The number of columns in the gradient of varaible j is not correct");
   SU2_Assert(Mean_GradPrimVar.rows() == nPrimVarAvgGrad, "The number of rows in the mean gradient is not correct");
   SU2_Assert(Mean_GradPrimVar.cols() == nDim, "The number of columns in the mean gradient is not correct");
 
@@ -513,18 +509,52 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   Mean_PrimVar = 0.5*(PrimVar_i + PrimVar_j);
 
   /*--- Mean gradient approximation ---*/
-  for(iDim = 0; iDim < nDim; ++iDim) {
-    // Temperature
-    Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) = 0.5*(GradPrimVar_i(T_INDEX_GRAD,iDim) + GradPrimVar_j(T_INDEX_GRAD,iDim));
+  for(iDim = 0; iDim < nDim; ++iDim)
+    Edge_Vector[iDim] = Coord_j[iDim] - Coord_i[iDim];
 
-    // Velocities
-    for(jDim = 0; jDim < nDim; ++jDim)
-      Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) = 0.5*(GradPrimVar_i(VX_INDEX_GRAD + jDim,iDim) + GradPrimVar_j(VX_INDEX_GRAD + jDim,iDim));
+  if(!limiter) {
+    for(iDim = 0; iDim < nDim; ++iDim) {
+      /*--- Temperature ---*/
+      Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::T_INDEX_GRAD][iDim] +
+                                                    PrimVar_Grad_j[CReactiveNSVariable::T_INDEX_GRAD][iDim]);
 
-    // Molar Fractions
-    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-      Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(GradPrimVar_i(RHOS_INDEX_GRAD + iSpecies,iDim) +
-                                                                  GradPrimVar_j(RHOS_INDEX_GRAD + iSpecies,iDim));
+      /*--- Velocities ---*/
+      for(jDim = 0; jDim < nDim; ++jDim)
+        Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::VX_INDEX_GRAD + jDim][iDim] +
+                                                              PrimVar_Grad_i[CReactiveNSVariable::VX_INDEX_GRAD + jDim][iDim]);
+
+      /*--- Molar Fractions ---*/
+      for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies][iDim] +
+                                                                    PrimVar_Grad_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies][iDim]);
+    }
+  }
+  else {
+    for(iDim = 0; iDim < nDim; ++iDim) {
+      /*--- Temperature ---*/
+      Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::T_INDEX_GRAD][iDim]*
+                                                    PrimVar_Lim_i[CReactiveNSVariable::T_INDEX_LIM] +
+                                                    PrimVar_Grad_j[CReactiveNSVariable::T_INDEX_GRAD][iDim]*
+                                                    PrimVar_Lim_j[CReactiveNSVariable::T_INDEX_LIM]);
+      /*--- Velocities ---*/
+      for(jDim = 0; jDim < nDim; ++jDim)
+        Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::VX_INDEX_GRAD + jDim][iDim]*
+                                                              PrimVar_Lim_i[CReactiveNSVariable::VX_INDEX_LIM + jDim] +
+                                                              PrimVar_Grad_i[CReactiveNSVariable::VX_INDEX_GRAD + jDim][iDim]*
+                                                              PrimVar_Lim_j[CReactiveNSVariable::VX_INDEX_LIM + jDim]);
+      /*--- Molar Fractions ---*/
+      for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies][iDim] +
+                                                                    PrimVar_Grad_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies][iDim]);
+    }
+  }
+
+  Proj_Mean_GradPrimVar_Edge = Mean_GradPrimVar*Edge_Vector;
+  su2double dist_ij_2 = Edge_Vector.dot(Edge_Vector);
+  if (dist_ij_2 > EPS) {
+    for(unsigned short iVar = 0; iVar < nPrimVarAvgGrad; ++iVar)
+      for (iDim = 0; iDim < nDim; ++iDim)
+        Mean_GradPrimVar(iVar,iDim) -= (Proj_Mean_GradPrimVar_Edge[iVar] - (PrimVar_j[iVar] - PrimVar_i[iVar]))*Edge_Vector[iDim] / dist_ij_2;
   }
 
   /*--- Get projected flux tensor ---*/

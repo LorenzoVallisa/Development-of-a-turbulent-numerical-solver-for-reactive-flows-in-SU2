@@ -14,13 +14,11 @@
  */
 class CReactiveEulerVariable:public CVariable {
 public:
-
-  using RealVec = std::vector<su2double>;
-  using RealMatrix = Eigen::MatrixXd;
+  typedef std::vector<su2double> RealVec;
+  typedef su2double** SU2Matrix;
   typedef std::shared_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
 
 protected:
-
   static LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
   static unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
@@ -28,7 +26,7 @@ protected:
 
   /*--- Primitive variable definition ---*/
   RealVec    Primitive; /*!< \brief Primitive variables (T,vx,vy,vz,P,rho,h,a,Y1,...YNs) in compressible flows. */
-  RealMatrix Gradient_Primitive; /*!< \brief Gradient of the primitive variables (T, vx, vy, vz, P, rho). */
+  SU2Matrix  Gradient_Primitive; /*!< \brief Gradient of the primitive variables (T, vx, vy, vz, P, rho). */
   RealVec    Limiter_Primitive;    /*!< \brief Limiter of the primitive variables (T, vx, vy, vz, P, rho). */
   RealVec    dPdU;                 /*!< \brief Partial derivative of pressure w.r.t. conserved variables. */
   RealVec    dTdU;                /*!< \brief Partial derivative of temperature w.r.t. conserved variables. */
@@ -120,7 +118,7 @@ public:
   /*!
 	 * \brief Destructor of the class.
 	 */
-	virtual ~CReactiveEulerVariable() {}
+	virtual ~CReactiveEulerVariable();
 
   /*!
    * \brief Get the number of dimensions of the problem.
@@ -211,7 +209,11 @@ public:
 	 * \brief Set to zero the gradient of the primitive variables.
 	 */
 	inline void SetGradient_PrimitiveZero(unsigned short val_primvar) override {
-    Gradient_Primitive.setZero();
+    SU2_Assert(Gradient_Primitive != NULL, "The matrix for gradient primitive has not been allocated");
+    for(unsigned short iVar = 0; iVar < val_primvar; ++iVar) {
+      SU2_Assert(Gradient_Primitive[iVar] != NULL, std::string("The row " + std::to_string(iVar) + " of gradient primitive has not been allocated"));
+      std::fill(Gradient_Primitive[iVar], Gradient_Primitive[iVar] + nDim, 0.0);
+    }
   }
 
   /*!
@@ -219,9 +221,7 @@ public:
    * \return Value of the primitive variables gradient.
    */
   inline su2double** GetGradient_Primitive(void) override {
-    su2double** res;
-    Eigen::Map<RealMatrix>(&res[0][0], nSpecies, nDim) = Gradient_Primitive;
-    return res;
+    return Gradient_Primitive;
   }
 
   /*!
@@ -231,7 +231,8 @@ public:
 	 * \param[in] val_dim - Index of the dimension.
    */
   su2double GetGradient_Primitive(unsigned short val_var, unsigned short val_dim) override {
-    return Gradient_Primitive(val_var,val_dim);
+    SU2_Assert(Gradient_Primitive[val_var] != NULL,std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
+    return Gradient_Primitive[val_var][val_dim];
   }
 
   /*!
@@ -241,7 +242,8 @@ public:
 	 * \param[in] val_value - Value to add to the gradient of the selected primitive variable.
 	 */
 	inline void AddGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    Gradient_Primitive(val_var,val_dim) += val_value;
+    SU2_Assert(Gradient_Primitive[val_var] != NULL,std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
+    Gradient_Primitive[val_var][val_dim] += val_value;
   }
 
   /*!
@@ -251,7 +253,8 @@ public:
 	 * \param[in] val_value - Value to subtract to the gradient of the selected primitive variable.
 	 */
 	inline void SubtractGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    Gradient_Primitive(val_var,val_dim) -= val_value;
+    SU2_Assert(Gradient_Primitive[val_var] != NULL,std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
+    Gradient_Primitive[val_var][val_dim] -= val_value;
   }
 
   /*!
@@ -261,7 +264,8 @@ public:
 	 * \param[in] val_value - Value of the gradient.
 	 */
 	inline void SetGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    Gradient_Primitive(val_var,val_dim) = val_value;
+    SU2_Assert(Gradient_Primitive[val_var] != NULL,std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
+    Gradient_Primitive[val_var][val_dim] = val_value;
   }
 
   /*!
@@ -460,13 +464,15 @@ const unsigned short CReactiveEulerVariable::P_INDEX_LIM = CReactiveEulerVariabl
  *  \author G. Orlando.
  */
 class CReactiveNSVariable:public CReactiveEulerVariable {
+public:
+  typedef Eigen::Matrix<su2double,Eigen::Dynamic,Eigen::Dynamic,Eigen::RowMajor> RealMatrix;
+
 protected:
 	RealMatrix Diffusion_Coeffs;    /*!< \brief Binary diffusion coefficients of the mixture. */
   su2double  Laminar_Viscosity;	/*!< \brief Viscosity of the fluid. */
   su2double  Thermal_Conductivity;   /*!< \brief Thermal conductivity of the gas mixture. */
 
 public:
-
   static const unsigned short RHOS_INDEX_GRAD;
 
   /*!

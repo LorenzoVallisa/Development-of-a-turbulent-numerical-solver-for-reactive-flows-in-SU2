@@ -39,7 +39,9 @@ CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim, unsigned
   library = LibraryPtr(new Framework::ReactingModelLibrary(config->GetConfigLibFile()));
 
   Primitive.resize(nPrimVar);
-  Gradient_Primitive.resize(nPrimVarGrad,nDim);
+  Gradient_Primitive = new su2double* [nPrimVarGrad];
+  for(unsigned short iVar = 0; iVar < nPrimVarGrad; ++iVar)
+    Gradient_Primitive[iVar] = new su2double[nDim];
   Limiter_Primitive.resize(nPrimVarLim);
 
   Limiter = new su2double [nVar];
@@ -126,6 +128,21 @@ CReactiveEulerVariable::CReactiveEulerVariable(const RealVec& val_solution, unsi
   /*--- Initialize T and P to the free stream for Secant method ---*/
   Primitive[T_INDEX_PRIM] = config->GetTemperature_FreeStream();
   Primitive[P_INDEX_PRIM] = config->GetPressure_FreeStream();
+}
+
+//
+//
+/*!
+ *\brief Class destructor
+ */
+//
+//
+CReactiveEulerVariable::~CReactiveEulerVariable() {
+  if(Gradient_Primitive != NULL) {
+    for(unsigned short iVar = 0; iVar < nVar; ++iVar)
+      delete[] Gradient_Primitive[iVar];
+    delete[] Gradient_Primitive;
+  }
 }
 
 //

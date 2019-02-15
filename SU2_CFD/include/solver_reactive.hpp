@@ -10,9 +10,8 @@
  */
 class CReactiveEulerSolver: public CSolver {
 public:
-
   using RealVec = CReactiveEulerVariable::RealVec;
-  using RealMatrix = CReactiveEulerVariable::RealMatrix;
+  using RealMatrix = CReactiveNSVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
