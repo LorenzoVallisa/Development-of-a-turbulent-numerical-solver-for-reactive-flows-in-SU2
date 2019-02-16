@@ -89,8 +89,8 @@ protected:
 
   Vec Edge_Vector;  /*!< \brief Vector connecting point i to j. */
 
-  Vec PrimVar_i, PrimVar_j;   /*!< \brief Primitives variables at point i and j. */
   Vec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
+  Vec Diff_PrimVar;         /*!< \brief Difference of primitive varaibles involved in average computations. */
 
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
   Vec Proj_Mean_GradPrimVar_Edge; /*!< \brief Projected mean value of the gradient. */
