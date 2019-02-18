@@ -11,12 +11,10 @@
  */
 class CUpwReactiveAUSM: public CNumerics {
 public:
-
   using RealVec = CReactiveEulerVariable::RealVec;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
-
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
   bool implicit; /*!< \brief Flag for implicit scheme. */
@@ -69,7 +67,6 @@ public:
  */
 class CAvgGradReactive_Flow : public CNumerics {
 public:
-
   using RealVec = CReactiveEulerVariable::RealVec;
   using RealMatrix = CReactiveNSVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
@@ -77,7 +74,6 @@ public:
   typedef std::unique_ptr<su2double[]> SmartArr;
 
 protected:
-
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
   bool implicit;    /*!< \brief Flag for implicit computations. */
@@ -89,6 +85,7 @@ protected:
 
   Vec Edge_Vector;  /*!< \brief Vector connecting point i to j. */
 
+  Vec PrimVar_i, PrimVar_j;    /*!< \brief Primitive variables at node i and j. */
   Vec Mean_PrimVar;           /*!< \brief Mean primitive variables. */
   Vec Diff_PrimVar;         /*!< \brief Difference of primitive varaibles involved in average computations. */
 
@@ -96,11 +93,16 @@ protected:
   Vec Proj_Mean_GradPrimVar_Edge; /*!< \brief Projected mean value of the gradient. */
 
   RealVec Xs_i, Xs_j;         /*!< \brief Auxiliary vectors for mole fractions at point i and j. */
+  RealVec Xs,Ys;              /*!< \brief Auxiliary vectors for mean mole and mass fractions. */
+  RealMatrix Grad_Xs;         /*!< \brief Auxiliary matrix for mean gradient of mole fractions. */
 
+private:
   RealMatrix Dij_i, Dij_j;      /*!< \brief Binary diffusion coefficients at point i and j. */
   RealMatrix Mean_Dij;          /*!< \brief Harmonic average of binary diffusion coefficients at point i and j. */
 
   RealMatrix Gamma,Gamma_tilde;  /*!< \brief Auxiliary matrices for solving Stefan-Maxwell equations. */
+
+  RealVec hs;                   /*!< \brief Auxiliary vector to store partial enthalpy for species diffusion flux contribution. */
 
 public:
 
@@ -185,7 +187,7 @@ public:
    * \param[out] val_Proj_Jac_Tensor_j - Pointer to the projected viscous Jacobian at point j.
    * \param[in] config - Definition of the particular problem
   */
-  virtual void GetViscousProjJacs(const RealVec& val_Mean_PrimVar, const RealMatrix& val_Mean_GradPrimVar,
+  virtual void GetViscousProjJacs(const Vec& val_Mean_PrimVar, const RealMatrix& val_Mean_GradPrimVar,
                                   const RealVec& val_diffusion_coeff, const su2double val_laminar_viscosity, const su2double val_thermal_conductivity,
                                   const su2double val_dist_ij, SmartArr val_normal, const su2double val_dS, su2double* val_Proj_Visc_Flux,
                                   su2double** val_Proj_Jac_Tensor_i, su2double** val_Proj_Jac_Tensor_j, CConfig* config);
@@ -239,19 +241,20 @@ const unsigned short CAvgGradReactive_Flow::RHOS_INDEX_AVGGRAD = CAvgGradReactiv
  */
 class CSourceReactive: public CNumerics {
 public:
-
   using RealVec = CReactiveEulerVariable::RealVec;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
 
 protected:
-
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
   bool implicit;    /*!< \brief Flag for implicit scheme. */
 
   unsigned short nSpecies;  /*!< \brief Number of species in the mixture. */
 
-  RealVec Ys; /*!< \brief Auxiliary vecotr for mass fractions in the mixture. */
+  RealVec Ys; /*!< \brief Auxiliary vector for mass fractions in the mixture. */
+
+private:
+  RealVec omega; /*!< \brief Auxiliary vector for mass production term. */
 
 public:
 

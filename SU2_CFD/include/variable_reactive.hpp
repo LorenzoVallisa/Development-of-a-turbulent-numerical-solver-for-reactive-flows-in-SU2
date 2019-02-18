@@ -31,6 +31,8 @@ protected:
   RealVec    dPdU;                 /*!< \brief Partial derivative of pressure w.r.t. conserved variables. */
   RealVec    dTdU;                /*!< \brief Partial derivative of temperature w.r.t. conserved variables. */
 
+  RealVec Ys;               /*!< \brief Auxiliary vector to store mass fractions separately. */
+
 public:
 
   /**

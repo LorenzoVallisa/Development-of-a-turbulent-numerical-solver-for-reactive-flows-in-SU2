@@ -197,15 +197,11 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
 
   Edge_Vector.resize(nDim);
 
-  Mean_PrimVar.resize(nPrimVar);
+  PrimVar_i.resize(nPrimVar);
+  PrimVar_j.resize(nPrimVar);
   Diff_PrimVar.resize(nPrimVarAvgGrad);
 
-  //Xs_i.resize(nSpecies);
-  //Xs_j.resize(nSpecies);
-
-  //Dij_i.resize(nSpecies, nSpecies);
-  //Dij_j.resize(nSpecies, nSpecies);
-  //Mean_Dij.resize(nSpecies, nSpecies);
+  Xs.resize(nSpecies);
 
   Mean_GradPrimVar.resize(nPrimVarAvgGrad, nDim);
 
@@ -223,34 +219,17 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
 CAvgGradReactive_Flow::Vec CAvgGradReactive_Flow::Solve_SM(const su2double val_density, const su2double val_alpha, const RealMatrix& val_Dij,
                                                            const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys) {
   su2double toll = 1e-11;
-  unsigned short iSpecies,jSpecies;
 
   /*--- Rename for convenience ---*/
   su2double rho = val_density;
   su2double alpha = val_alpha;
 
-  /*--- Compute vectors that do not change during iteration ---*/
-  RealVec mMasses;
-  su2double sigma = std::accumulate(val_ys.cbegin(), val_ys.cend(), 0.0);
-  //mMasses = library->GetMolarMasses();
-  su2double massTot = val_xs[0]*mMasses[0]/(val_ys[0]*sigma);
+  /*--- Compute original matrix of Stefan-Maxwell equations ---*/
+  //Gamma = library->GetGamma(rho,val_xs,val_ys,val_Dij)
 
-  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-    for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
-      if(iSpecies != jSpecies)
-        Gamma(iSpecies,jSpecies) = -sigma*massTot*val_xs[iSpecies]/(rho*mMasses[jSpecies]*val_Dij(iSpecies,jSpecies));
-      else {
-        double tmp = 0.0;
-        for(unsigned short kSpecies = 0; kSpecies < nSpecies; ++kSpecies)
-          if(kSpecies != iSpecies)
-            tmp += val_xs[kSpecies]/val_Dij(iSpecies,kSpecies);
-        Gamma(iSpecies,iSpecies) = sigma*massTot*tmp/(rho*mMasses[iSpecies]);
-      }
-    }
-  }
-
-  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-    for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
+  /*--- Add artificial diffusion part ---*/
+  for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+    for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
       Gamma_tilde(iSpecies,jSpecies) = Gamma(iSpecies,jSpecies) + alpha*val_ys[iSpecies];
 
   Eigen::BiCGSTAB<RealMatrix> bicg(Gamma_tilde);
@@ -289,7 +268,8 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   ktr = val_therm_conductivity;
   rho = val_primvar[CReactiveNSVariable::RHO_INDEX_PRIM];
   T   = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
-  RealVec hs(nSpecies);
+
+  /*--- Compute partial enthalpies ---*/
   bool US_System = (config->GetSystemMeasurements() == SI);
   su2double dim_temp = T*config->GetTemperature_Ref();
   if(US_System)
@@ -337,7 +317,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
     /*--- Species diffusion velocity ---*/
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
       Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] = rho*(val_diffusion_coeff[iSpecies]*
-                                                                               val_grad_primvar(RHOS_INDEX_AVGGRAD+iSpecies,iDim) -
+                                                                               val_grad_primvar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) -
                                                                                val_primvar[CReactiveNSVariable::RHOS_INDEX_PRIM+iSpecies]*
                                                                                Normalization_Vec[iDim]);
       /*--- Heat flux due to species diffusion term ---*/
@@ -383,7 +363,8 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   mu  = val_viscosity;
   ktr = val_thermal_conductivity;
   T = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
-  RealVec hs(nSpecies);
+
+  /*--- Compute partial enthalpies ---*/
   bool US_System = (config->GetSystemMeasurements() == SI);
   su2double dim_temp = T*config->GetTemperature_Ref();
   if(US_System)
@@ -394,9 +375,9 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   //  std::transform(hs.begin(),hs.end(),hs.begin(),[config](su2double elem){return elem*3.28084*3.28084;});
 
   /*--- Extract molar fractions, their gradient and mass fractions ---*/
-  RealVec Xs(val_primvar.data() + CReactiveNSVariable::RHOS_INDEX_PRIM, val_primvar.data() + (CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies));
-  RealMatrix Grad_Xs = val_grad_primvar.block(RHOS_INDEX_AVGGRAD,0,nSpecies,nDim);
-  RealVec Ys;
+  std::copy(val_primvar.data() + CReactiveNSVariable::RHOS_INDEX_PRIM, val_primvar.data() + (CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies),
+            Xs.begin());
+  Grad_Xs = val_grad_primvar.block(RHOS_INDEX_AVGGRAD,0,nSpecies,nDim);
   //Ys = library->GetMassFromMolar(Xs);
 
   /*--- Compute the velocity divergence ---*/
@@ -457,7 +438,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
  */
 //
 //
-void CAvgGradReactive_Flow::GetViscousProjJacs(const RealVec& val_Mean_PrimVar, const RealMatrix& val_Mean_GradPrimVar,
+void CAvgGradReactive_Flow::GetViscousProjJacs(const Vec& val_Mean_PrimVar, const RealMatrix& val_Mean_GradPrimVar,
                                                const RealVec& val_diffusion_coeff, const su2double val_laminar_viscosity,
                                                const su2double val_thermal_conductivity, const su2double val_dist_ij, SmartArr val_normal,
                                                const su2double val_dS, su2double* val_Proj_Visc_Flux, su2double** val_Proj_Jac_Tensor_i,
@@ -492,22 +473,26 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   Mean_Thermal_Conductivity = 2.0/(1.0/Thermal_Conductivity_i + 1.0/Thermal_Conductivity_j);
   Mean_Dij = 2.0/(Dij_i.cwiseInverse() + Dij_j.cwiseInverse()).array();
 
+  /*--- Copy primitive varaibles ---*/
+  std::copy(V_i, V_i + nPrimVar, PrimVar_i.data());
+  std::copy(V_j, V_j + nPrimVar, PrimVar_j.data());
+
   /*-- Use Molar fractions instead of mass fractions ---*/
-  //Xs_i = library->GetMolarFromMass(RealVec(PrimVar_i.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM,
-  //                                         PrimVar_i.cbegin() + (CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies));
-  //Xs_j = library->GetMolarFromMass(RealVec(PrimVar_j.cbegin() + CReactiveNSVariable::RHOS_INDEX_PRIM,
-  //                                         PrimVar_i.cbegin() + (CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies));
-  std::copy(Xs_i.cbegin(), Xs_i.cend(), V_i + CReactiveNSVariable::RHOS_INDEX_PRIM);
-  std::copy(Xs_j.cbegin(), Xs_j.cend(), V_j + CReactiveNSVariable::RHOS_INDEX_PRIM);
+  //Xs_i = library->GetMolarFromMass(RealVec(PrimVar_i.data() + CReactiveNSVariable::RHOS_INDEX_PRIM,
+  //                                         PrimVar_i.data() + (CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies));
+  //Xs_j = library->GetMolarFromMass(RealVec(PrimVar_j.data() + CReactiveNSVariable::RHOS_INDEX_PRIM,
+  //                                         PrimVar_i.data() + (CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies));
+  std::copy(Xs_i.cbegin(), Xs_i.cend(), PrimVar_i.data() + CReactiveNSVariable::RHOS_INDEX_PRIM);
+  std::copy(Xs_j.cbegin(), Xs_j.cend(), PrimVar_j.data() + CReactiveNSVariable::RHOS_INDEX_PRIM);
 
   /*--- Compute the mean ---*/
-  for(iVar = 0; iVar < nPrimVar; ++iVar)
-    Mean_PrimVar[iVar] = 0.5*(V_i[iVar] + V_j[iVar]);
+  Mean_PrimVar = 0.5*(PrimVar_i + PrimVar_j);
 
-  /*--- Mean gradient approximation ---*/
+  /*--- Compute the vector from i to j ---*/
   for(iDim = 0; iDim < nDim; ++iDim)
     Edge_Vector[iDim] = Coord_j[iDim] - Coord_i[iDim];
 
+  /*--- Mean gradient approximation ---*/
   if(!limiter) {
     for(iDim = 0; iDim < nDim; ++iDim) {
       /*--- Temperature ---*/
@@ -546,7 +531,7 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   }
 
   Proj_Mean_GradPrimVar_Edge = Mean_GradPrimVar*Edge_Vector;
-  su2double dist_ij_2 = Edge_Vector.dot(Edge_Vector);
+  su2double dist_ij_2 = std::inner_product(Edge_Vector.data(), Edge_Vector.data() + Edge_Vector.size(), Edge_Vector.data(), 0.0);
   if(dist_ij_2 > EPS) {
     Diff_PrimVar[T_INDEX_AVGGRAD] = V_j[CReactiveNSVariable::T_INDEX_PRIM] - V_i[CReactiveNSVariable::T_INDEX_PRIM];
     for(iDim = 0; iDim < nDim; ++iDim)
@@ -557,23 +542,6 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
 
     Mean_GradPrimVar -= (Proj_Mean_GradPrimVar_Edge - Diff_PrimVar)*Edge_Vector.transpose()/dist_ij_2;
   }
-  /*
-  su2double iDim_comp;
-  if(dist_ij_2 > EPS) {
-    for(iDim = 0; iDim < nDim; ++iDim) {
-        iDim_comp = Edge_Vector[iDim]/dist_ij_2;
-        Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) -= (Proj_Mean_GradPrimVar_Edge[T_INDEX_AVGGRAD] -
-                                                   (V_j[CReactiveNSVariable::T_INDEX_PRIM] - V_i[CReactiveNSVariable::T_INDEX_PRIM]))*iDim_comp;
-        for(jDim = 0; jDim < nDim; ++jDim)
-          Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) -= (Proj_Mean_GradPrimVar_Edge[VX_INDEX_AVGGRAD + jDim] -
-                                                             (V_j[CReactiveNSVariable::VX_INDEX_PRIM + jDim] -
-                                                              V_i[CReactiveNSVariable::VX_INDEX_PRIM + jDim]))*iDim_comp;
-        for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-          Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) -= (Proj_Mean_GradPrimVar_Edge[RHOS_INDEX_AVGGRAD + iSpecies] -
-                                                                   (V_j[CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies] -
-                                                                    V_i[CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies]))*iDim_comp;
-  }
-  */
 
   /*--- Get projected flux tensor ---*/
   GetViscousProjFlux(Mean_PrimVar, Mean_GradPrimVar, Common::wrap_in_unique(Normal), Mean_Laminar_Viscosity,
@@ -624,10 +592,10 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
   dim_temp = temp*config->GetTemperature_Ref();
   dim_rho = rho*config->GetDensity_Ref();
 
-  //auto res = library->GetMassProductionTerm(dim_temp,dim_rho,Ys);
+  //omega = library->GetMassProductionTerm(dim_temp,dim_rho,Ys);
 
   /*--- Assign to the residual. NOTE: We need to invert the sign since it is a residual that will be ADDED to the total one ---*/
-  //std::copy(res.cbegin(),res.cend(),val_residual);
+  std::copy(omega.cbegin(),omega.cend(),val_residual);
   for(unsigned short iVar = 0; iVar < nVar; ++iVar)
     val_residual[iVar] *= -Volume/(config->GetDensity_Ref()*config->GetTime_Ref());
 

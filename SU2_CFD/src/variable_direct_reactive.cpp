@@ -47,6 +47,8 @@ CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim, unsigned
   Limiter = new su2double [nVar];
   Solution_Max = new su2double[nPrimVarLim];
   Solution_Min = new su2double[nPrimVarLim];
+
+  Ys.resize(nSpecies);
 }
 
 //
@@ -202,7 +204,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   rhoE  = U[RHOE_INDEX_SOL];          // Density * total energy [J/m3]
 
   /*--- Assign species mass fraction and mixture density ---*/
-  // Note: If any species densities are < 0, these values are re-assigned
+  // NOTE: If any species densities are < 0, these values are re-assigned
   //       in the conserved vector to ensure positive density
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
     if(U[RHOS_INDEX_SOL + iSpecies] < EPS) {
@@ -222,8 +224,8 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
     V[RHOS_INDEX_PRIM + iSpecies] = U[RHOS_INDEX_SOL]/U[RHO_INDEX_SOL];
 
   /*--- Checking sum of mass fraction ---*/
-  RealVec Yi(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM + nSpecies));
-  nonPhys = nonPhys || (std::abs(std::accumulate(Yi.cbegin(),Yi.cend(),0.0) - 1.0) > EPS);
+  std::copy(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM + nSpecies), Ys.begin());
+  nonPhys = nonPhys || (std::abs(std::accumulate(Ys.cbegin(),Ys.cend(),0.0) - 1.0) > EPS);
 
   /*--- Rename for convenience ---*/
   rho = U[RHO_INDEX_SOL];
@@ -234,7 +236,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   sqvel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
 
   /*--- Translational-Rotational Temperature ---*/
-  const su2double Rgas = library->ComputeRgas(Yi)/config->GetGas_Constant_Ref();
+  const su2double Rgas = library->ComputeRgas(Ys)/config->GetGas_Constant_Ref();
   const su2double C1 = (-rhoE + rho*sqvel)/(rho*Rgas);
   const su2double C2 = 1.0/Rgas;
 
@@ -251,8 +253,8 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
       dim_temp *= 5.0/9.0;
       dim_temp_old *= 5.0/9.0;
     }
-    //hs_old = library->ComputeEnthalpy(dim_temp_old,Yi)/config->GetEnergy_Ref();
-    //hs = library->ComputeEnthalpy(dim_temp,Yi)/config->GetEnergy_Ref();
+    //hs_old = library->ComputeEnthalpy(dim_temp_old,Ys)/config->GetEnergy_Ref();
+    //hs = library->ComputeEnthalpy(dim_temp,Ys)/config->GetEnergy_Ref();
     if(US_System) {
       hs_old *= 3.28084*3.28084;
       hs *= 3.28084*3.28084;
@@ -286,7 +288,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
       su2double dim_temp = T*config->GetTemperature_Ref();;
       if(US_System)
         dim_temp *= 5.0/9.0;
-      //hs = library->ComputeEnthalpy(dim_temp,Yi)/config->GetEnergy_Ref();
+      //hs = library->ComputeEnthalpy(dim_temp,Ys)/config->GetEnergy_Ref();
       if(US_System)
         hs *= 3.28084*3.28084;
       f = T - C1 - C2*hs;
@@ -319,7 +321,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   }
 
   /*--- Pressure ---*/
-  //V[P_INDEX_PRIM] = library->ComputePressure(V[RHO_INDEX_PRIM],V[T_INDEX_PRIM],Yi)/config->GetGas_Constant_Ref();
+  //V[P_INDEX_PRIM] = library->ComputePressure(V[RHO_INDEX_PRIM],V[T_INDEX_PRIM],Ys)/config->GetGas_Constant_Ref();
   if(V[P_INDEX_PRIM] < EPS) {
     V[P_INDEX_PRIM] = EPS;
     nonPhys = true;
@@ -329,7 +331,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   su2double dim_temp = V[T_INDEX_PRIM]*config->GetTemperature_Ref();
   if(US_System)
     dim_temp *= 5.0/9.0;
-  //V[A_INDEX_PRIM] = library->ComputeFrozenSoundSpeed(dim_temp,Yi,V[P_INDEX_PRIM],V[RHO_INDEX_PRIM]);
+  //V[A_INDEX_PRIM] = library->ComputeFrozenSoundSpeed(dim_temp,Ys,V[P_INDEX_PRIM],V[RHO_INDEX_PRIM]);
   if(V[A_INDEX_PRIM] < EPS) {
     V[A_INDEX_PRIM] = EPS;
     nonPhys = true;
@@ -509,7 +511,7 @@ CReactiveNSVariable::CReactiveNSVariable(const RealVec& val_solution, unsigned s
   }
 
   /*--- Compute transport properties --- */
-  const auto Ys = GetMassFractions();
+  Ys = GetMassFractions();
   //Laminar_Viscosity = library->GetLambda(dim_temp,Ys)/config->GetViscosity_Ref();
   if(US_System)
     Laminar_Viscosity *= 0.02088553108;
@@ -540,7 +542,7 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
   }
 
   /*--- Compute transport properties --- */
-  const auto Ys = GetMassFractions();
+  Ys = GetMassFractions();
   //Laminar_Viscosity = library->GetLambda(dim_temp,Ys)/config->GetViscosity_Ref();
   if(US_System)
     Laminar_Viscosity *= 0.02088553108;
