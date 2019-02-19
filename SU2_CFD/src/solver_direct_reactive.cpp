@@ -87,7 +87,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   nVar = nSpecies + nDim + 2; /*--- Conserved variables (rho,rho*vx,rho*vy,rho*vz,rho*E,rho1,...rhoNs)^T ---*/
   nPrimVar = nSpecies + nDim + 5; /*--- Primitive variables (T,vx,vy,vz,P,rho,h,a,rho1,...rhoNs)^T ---*/
   nPrimVarGrad = nDim + 2; /*--- Gradient Primitive variables (T,vx,vy,vz,P)^T ---*/
-  nPrimVarLim = nDim + 2 ; /*--- Primitive variables to limit (T,vx,vy,vz,P)^T ---*/
+  nPrimVarLim = nPrimVarGrad; /*--- Primitive variables to limit (T,vx,vy,vz,P)^T ---*/
 
   /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
   SetNondimensionalization(geometry, config, iMesh);
@@ -112,9 +112,6 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   Solution_j = new su2double[nVar];
 
 	/*--- Allocate vectors related to the primitive ---*/
-  Primitive_i.resize(nPrimVar);
-  Primitive_j.resize(nPrimVar);
-
   PrimVar_i.resize(nPrimVarGrad);
   PrimVar_j.resize(nPrimVarGrad);
   PrimVar_Vertex.resize(nPrimVarGrad);
@@ -125,12 +122,18 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   Prim_j.resize(nPrimVarLim);
   Primitive.resize(nPrimVarLim);
 
-  /*--- Allocate arrays for conserved variable limits ---*/
-  Lower_Limit.resize(nPrimVar);
-  Upper_Limit.resize(nPrimVar, 1.0e16);
+  /*--- Allocate vectors for conserved variable limits ---*/
+  Lower_Limit.resize(nPrimVar, 0.0);
+  Upper_Limit.resize(nPrimVar, 1.0e16); /*--- 1.0/EPS ---*/
 
   std::fill(Lower_Limit.begin() + CReactiveEulerVariable::RHOVX_INDEX_SOL,
-            Lower_Limit.begin() + CReactiveEulerVariable::RHOVX_INDEX_SOL + nDim, -1.0e16);
+            Lower_Limit.begin() + CReactiveEulerVariable::RHOVX_INDEX_SOL + nDim, -1.0e16); /*--- -1.0/EPS ---*/
+  Lower_Limit[CReactiveEulerVariable::RHOE_INDEX_SOL] = -1.0e16;
+
+  /*--- Allocate auxiliary vectors ---*/
+  Ys_i.resize(nSpecies);
+  Ys_j.resize(nSpecies);
+  Ys.resize(nSpecies);
 
   /*--- Initialize the solution & residual CVectors ---*/
  	LinSysSol.Initialize(nPoint, nPointDomain, nVar, 0.0);
@@ -197,7 +200,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   }
 
   /*--- Initialize the solution to the far-field state everywhere. ---*/
-  for(iPoint = 0; iPoint < nPoint; iPoint++)
+  for(iPoint = 0; iPoint < nPoint; ++iPoint)
     node[iPoint] = new CReactiveEulerVariable(Pressure_Inf, MassFrac_Inf, Velocity_Inf, Temperature_Inf,
                                               nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, config);
 
@@ -205,7 +208,6 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   Check_FreeStream_Solution(config);
 
   /*--- MPI solution ---*/
-  rotMatrix.resize(3,3);
 	Set_MPI_Solution(geometry, config);
 }
 
@@ -289,7 +291,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    su2double Pressure_FreeStreamND = 0.0, Density_FreeStreamND = 0.0,ModVel_FreeStreamND = 0.0,
              Temperature_FreeStreamND = 0.0, Energy_FreeStreamND = 0.0, Total_UnstTimeND = 0.0, Delta_UnstTimeND = 0.0;
 
-   RealVec   Velocity_FreeStreamND(nDim);
+   su2double Velocity_FreeStreamND[nDim];
 
    unsigned short iDim;
 
@@ -368,7 +370,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    Energy_FreeStreamND = Energy_FreeStream/Energy_Ref;
    config->SetEnergy_FreeStreamND(Energy_FreeStreamND);
 
-   ModVel_FreeStreamND = std::inner_product(Velocity_FreeStreamND.cbegin(),Velocity_FreeStreamND.cend(),Velocity_FreeStreamND.cbegin(),0.0);
+   ModVel_FreeStreamND = std::inner_product(Velocity_FreeStreamND,Velocity_FreeStreamND + nDim,Velocity_FreeStreamND,0.0);
    ModVel_FreeStreamND = std::sqrt(ModVel_FreeStreamND);
    config->SetModVel_FreeStreamND(ModVel_FreeStreamND);
 
@@ -463,7 +465,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    */
  //
  //
-unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver **solver_container, CConfig *config, bool Output) {
+unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver** solver_container, CConfig* config, bool Output) {
   unsigned long iPoint, ErrorCounter = 0;
   bool RightSol = true;
 
@@ -1012,6 +1014,7 @@ void CReactiveEulerSolver::Set_MPI_Solution(CGeometry* geometry, CConfig* config
   unsigned short iVar, iMarker, iPeriodic_Index, MarkerS, MarkerR;
 	unsigned long iVertex, iPoint, nVertexS, nVertexR, nBufferS_Vector, nBufferR_Vector;
 	su2double theta, cosTheta, sinTheta, phi, cosPhi, sinPhi, psi, cosPsi, sinPsi;
+  su2double rotMatrix[3][3] = {};
 	RealVec Buffer_Receive_U,Buffer_Send_U;
 
   #ifdef HAVE_MPI
@@ -1070,17 +1073,17 @@ void CReactiveEulerSolver::Set_MPI_Solution(CGeometry* geometry, CConfig* config
 
         /*--- Compute the rotation matrix. Note that the implicit
         ordering is rotation about the x-axis, y-axis,then z-axis. ---*/
-        rotMatrix(0,0) = cosPhi*cosPsi;
-        rotMatrix(1,0) = sinTheta*sinPhi*cosPsi - cosTheta*sinPsi;
-        rotMatrix(2,0) = cosTheta*sinPhi*cosPsi + sinTheta*sinPsi;
+        rotMatrix[0][0] = cosPhi*cosPsi;
+        rotMatrix[1][0] = sinTheta*sinPhi*cosPsi - cosTheta*sinPsi;
+        rotMatrix[2][0] = cosTheta*sinPhi*cosPsi + sinTheta*sinPsi;
 
-        rotMatrix(0,1) = cosPhi*sinPsi;
-        rotMatrix(1,1) = sinTheta*sinPhi*sinPsi + cosTheta*cosPsi;
-        rotMatrix(2,1) = cosTheta*sinPhi*sinPsi - sinTheta*cosPsi;
+        rotMatrix[0][1] = cosPhi*sinPsi;
+        rotMatrix[1][1] = sinTheta*sinPhi*sinPsi + cosTheta*cosPsi;
+        rotMatrix[2][1] = cosTheta*sinPhi*sinPsi - sinTheta*cosPsi;
 
-        rotMatrix(0,2) = -sinPhi;
-        rotMatrix(1,2) = sinTheta*cosPhi;
-        rotMatrix(2,2) = cosTheta*cosPhi;
+        rotMatrix[0][2] = -sinPhi;
+        rotMatrix[1][2] = sinTheta*cosPhi;
+        rotMatrix[2][2] = cosTheta*cosPhi;
 
         /*--- Copy conserved variables before performing transformation. ---*/
         for(iVar = 0; iVar < nVar; ++iVar)
@@ -1088,36 +1091,37 @@ void CReactiveEulerSolver::Set_MPI_Solution(CGeometry* geometry, CConfig* config
 
         /*--- Rotate the momentum components. ---*/
         if(nDim == 2) {
-          Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL] = rotMatrix(0,0)*
+          Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL] = rotMatrix[0][0]*
                                                               Buffer_Receive_U[CReactiveEulerVariable::RHOVX_INDEX_SOL*nVertexR + iVertex] +
-                                                              rotMatrix(0,1)*
+                                                              rotMatrix[0][1]*
                                                               Buffer_Receive_U[(CReactiveEulerVariable::RHOVX_INDEX_SOL+1)*nVertexR + iVertex];
 
-          Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL + 1] = rotMatrix(1,0)*
+          Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL + 1] = rotMatrix[1][0]*
                                                                   Buffer_Receive_U[CReactiveEulerVariable::RHOVX_INDEX_SOL*nVertexR + iVertex] +
-                                                                  rotMatrix(1,1)*
+                                                                  rotMatrix[1][1]*
                                                                   Buffer_Receive_U[(CReactiveEulerVariable::RHOVX_INDEX_SOL+1)*nVertexR + iVertex];
         }
 
         else {
-          Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL] = rotMatrix(0,0)*
+          Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL] = rotMatrix[0][0]*
                                                               Buffer_Receive_U[CReactiveEulerVariable::RHOVX_INDEX_SOL*nVertexR + iVertex] +
-                                                              rotMatrix(0,1)*
+                                                              rotMatrix[0][1]*
                                                               Buffer_Receive_U[(CReactiveEulerVariable::RHOVX_INDEX_SOL+1)*nVertexR + iVertex] +
-                                                              rotMatrix(0,2)*
+                                                              rotMatrix[0][2]*
                                                               Buffer_Receive_U[(CReactiveEulerVariable::RHOVX_INDEX_SOL+2)*nVertexR + iVertex];
 
-         Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL+1] = rotMatrix(1,0)*
+         Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL+1] = rotMatrix[1][0]*
                                                                Buffer_Receive_U[CReactiveEulerVariable::RHOVX_INDEX_SOL*nVertexR + iVertex] +
-                                                               rotMatrix(1,1)*
+                                                               rotMatrix[1][1]*
                                                                Buffer_Receive_U[(CReactiveEulerVariable::RHOVX_INDEX_SOL+1)*nVertexR + iVertex] +
-                                                               rotMatrix(1,2)*
+                                                               rotMatrix[1][2]*
                                                                Buffer_Receive_U[(CReactiveEulerVariable::RHOVX_INDEX_SOL+2)*nVertexR + iVertex];
-         Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL+2] = rotMatrix(2,0)*
+
+         Solution[CReactiveEulerVariable::RHOVX_INDEX_SOL+2] = rotMatrix[2][0]*
                                                                Buffer_Receive_U[CReactiveEulerVariable::RHOVX_INDEX_SOL*nVertexR + iVertex] +
-                                                               rotMatrix(2,1)*
+                                                               rotMatrix[2][1]*
                                                                Buffer_Receive_U[(CReactiveEulerVariable::RHOVX_INDEX_SOL+1)*nVertexR + iVertex] +
-                                                               rotMatrix(2,2)*
+                                                               rotMatrix[2][2]*
                                                                Buffer_Receive_U[(CReactiveEulerVariable::RHOVX_INDEX_SOL+2)*nVertexR + iVertex];
         }
 
@@ -1141,6 +1145,7 @@ void CReactiveEulerSolver::Set_MPI_Primitive_Limiter(CGeometry* geometry, CConfi
   unsigned long iVertex, iPoint;
   unsigned long nVertexS, nVertexR, nBufferS_Vector, nBufferR_Vector;
   su2double theta, cosTheta, sinTheta, phi, cosPhi, sinPhi, psi, cosPsi, sinPsi;
+  su2double rotMatrix[3][3] = {};
   RealVec Buffer_Receive_Limit, Buffer_Send_Limit;
 
   /*--- Initialize vector to store the limiter ---*/
@@ -1204,17 +1209,17 @@ void CReactiveEulerSolver::Set_MPI_Primitive_Limiter(CGeometry* geometry, CConfi
 
           /*--- Compute the rotation matrix. Note that the implicit
           ordering is rotation about the x-axis, y-axis, then z-axis. ---*/
-          rotMatrix(0,0) = cosPhi*cosPsi;
-          rotMatrix(1,0) = sinTheta*sinPhi*cosPsi - cosTheta*sinPsi;
-          rotMatrix(2,0) = cosTheta*sinPhi*cosPsi + sinTheta*sinPsi;
+          rotMatrix[0][0] = cosPhi*cosPsi;
+          rotMatrix[1][0] = sinTheta*sinPhi*cosPsi - cosTheta*sinPsi;
+          rotMatrix[2][0] = cosTheta*sinPhi*cosPsi + sinTheta*sinPsi;
 
-          rotMatrix(0,1) = cosPhi*sinPsi;
-          rotMatrix(1,1) = sinTheta*sinPhi*sinPsi + cosTheta*cosPsi;
-          rotMatrix(2,2) = cosTheta*sinPhi*sinPsi - sinTheta*cosPsi;
+          rotMatrix[0][1] = cosPhi*sinPsi;
+          rotMatrix[1][1] = sinTheta*sinPhi*sinPsi + cosTheta*cosPsi;
+          rotMatrix[2][1] = cosTheta*sinPhi*sinPsi - sinTheta*cosPsi;
 
-          rotMatrix(0,2) = -sinPhi;
-          rotMatrix(1,2) = sinTheta*cosPhi;
-          rotMatrix(2,2) = cosTheta*cosPhi;
+          rotMatrix[0][2] = -sinPhi;
+          rotMatrix[1][2] = sinTheta*cosPhi;
+          rotMatrix[2][2] = cosTheta*cosPhi;
 
           /*--- Copy conserved variables before performing transformation. ---*/
           for(iVar = 0; iVar < nPrimVarLim; ++iVar)
@@ -1222,37 +1227,37 @@ void CReactiveEulerSolver::Set_MPI_Primitive_Limiter(CGeometry* geometry, CConfi
 
           /*--- Rotate the momentum components. ---*/
           if(nDim == 2) {
-            Limiter[CReactiveEulerVariable::VX_INDEX_LIM] =  rotMatrix(0,0)*
+            Limiter[CReactiveEulerVariable::VX_INDEX_LIM] =  rotMatrix[0][0]*
                                                              Buffer_Receive_Limit[CReactiveEulerVariable::VX_INDEX_GRAD*nVertexR+iVertex] +
-                                                             rotMatrix(0,1)*
+                                                             rotMatrix[0][1]*
                                                              Buffer_Receive_Limit[(CReactiveEulerVariable::VX_INDEX_GRAD + 1)*nVertexR+iVertex];
 
-            Limiter[CReactiveEulerVariable::VX_INDEX_LIM + 1] =  rotMatrix(1,0)*
+            Limiter[CReactiveEulerVariable::VX_INDEX_LIM + 1] =  rotMatrix[1][0]*
                                                                  Buffer_Receive_Limit[CReactiveEulerVariable::VX_INDEX_GRAD*nVertexR+iVertex] +
-                                                                 rotMatrix(1,1)*
+                                                                 rotMatrix[1][1]*
                                                                  Buffer_Receive_Limit[(CReactiveEulerVariable::VX_INDEX_GRAD + 1)*nVertexR+iVertex];
           }
 
           else {
-            Limiter[CReactiveEulerVariable::VX_INDEX_LIM]  =  rotMatrix(0,0)*
+            Limiter[CReactiveEulerVariable::VX_INDEX_LIM]  =  rotMatrix[0][0]*
                                                               Buffer_Receive_Limit[CReactiveEulerVariable::VX_INDEX_GRAD*nVertexR+iVertex] +
-                                                              rotMatrix(0,1)*
+                                                              rotMatrix[0][1]*
                                                               Buffer_Receive_Limit[(CReactiveEulerVariable::VX_INDEX_GRAD + 1)*nVertexR+iVertex] +
-                                                              rotMatrix(0,2)*
+                                                              rotMatrix[0][2]*
                                                               Buffer_Receive_Limit[(CReactiveEulerVariable::VX_INDEX_GRAD + 2)*nVertexR+iVertex];
 
-            Limiter[CReactiveEulerVariable::VX_INDEX_LIM + 1] =  rotMatrix(1,0)*
+            Limiter[CReactiveEulerVariable::VX_INDEX_LIM + 1] =  rotMatrix[1][0]*
                                                                  Buffer_Receive_Limit[CReactiveEulerVariable::VX_INDEX_GRAD*nVertexR+iVertex] +
-                                                                 rotMatrix(1,1)*
+                                                                 rotMatrix[1][1]*
                                                                  Buffer_Receive_Limit[(CReactiveEulerVariable::VX_INDEX_GRAD + 1)*nVertexR+iVertex] +
-                                                                 rotMatrix(1,2)*
+                                                                 rotMatrix[1][2]*
                                                                  Buffer_Receive_Limit[(CReactiveEulerVariable::VX_INDEX_GRAD + 2)*nVertexR+iVertex];
 
-            Limiter[CReactiveEulerVariable::VX_INDEX_LIM + 2] =  rotMatrix(2,0)*
+            Limiter[CReactiveEulerVariable::VX_INDEX_LIM + 2] =  rotMatrix[2][0]*
                                                                  Buffer_Receive_Limit[CReactiveEulerVariable::VX_INDEX_GRAD*nVertexR+iVertex] +
-                                                                 rotMatrix(2,1)*
+                                                                 rotMatrix[2][1]*
                                                                  Buffer_Receive_Limit[(CReactiveEulerVariable::VX_INDEX_GRAD + 1)*nVertexR+iVertex] +
-                                                                 rotMatrix(2,2)*
+                                                                 rotMatrix[2][2]*
                                                                  Buffer_Receive_Limit[(CReactiveEulerVariable::VX_INDEX_GRAD + 2)*nVertexR+iVertex];
         }
 
@@ -1276,6 +1281,7 @@ void CReactiveEulerSolver::Set_MPI_Primitive_Gradient(CGeometry* geometry, CConf
   unsigned short iVar, iDim, iMarker, iPeriodic_Index, MarkerS, MarkerR;
 	unsigned long iVertex, iPoint, nVertexS, nVertexR, nBufferS_Vector, nBufferR_Vector;
 	su2double theta, cosTheta, sinTheta, phi, cosPhi, sinPhi, psi, cosPsi, sinPsi;
+  su2double rotMatrix[3][3] = {};
   RealMatrix Gradient(nPrimVarGrad,nDim);
   RealVec Buffer_Receive_Gradient,Buffer_Send_Gradient;
 
@@ -1339,17 +1345,17 @@ void CReactiveEulerSolver::Set_MPI_Primitive_Gradient(CGeometry* geometry, CConf
 
           /*--- Compute the rotation matrix. Note that the implicit
           ordering is rotation about the x-axis, y-axis, then z-axis. ---*/
-          rotMatrix(0,0) = cosPhi*cosPsi;
-          rotMatrix(1,0) = sinTheta*sinPhi*cosPsi - cosTheta*sinPsi;
-          rotMatrix(2,0) = cosTheta*sinPhi*cosPsi + sinTheta*sinPsi;
+          rotMatrix[0][0] = cosPhi*cosPsi;
+          rotMatrix[1][0] = sinTheta*sinPhi*cosPsi - cosTheta*sinPsi;
+          rotMatrix[2][0] = cosTheta*sinPhi*cosPsi + sinTheta*sinPsi;
 
-          rotMatrix(0,1) = cosPhi*sinPsi;
-          rotMatrix(1,1) = sinTheta*sinPhi*sinPsi + cosTheta*cosPsi;
-          rotMatrix(2,2) = cosTheta*sinPhi*sinPsi - sinTheta*cosPsi;
+          rotMatrix[0][1] = cosPhi*sinPsi;
+          rotMatrix[1][1] = sinTheta*sinPhi*sinPsi + cosTheta*cosPsi;
+          rotMatrix[2][1] = cosTheta*sinPhi*sinPsi - sinTheta*cosPsi;
 
-          rotMatrix(0,2) = -sinPhi;
-          rotMatrix(1,2) = sinTheta*cosPhi;
-          rotMatrix(2,2) = cosTheta*cosPhi;
+          rotMatrix[0][2] = -sinPhi;
+          rotMatrix[1][2] = sinTheta*cosPhi;
+          rotMatrix[2][2] = cosTheta*cosPhi;
 
           /*--- Copy conserved variables before performing transformation. ---*/
           for(iVar = 0; iVar < nPrimVarGrad; ++iVar)
@@ -1359,21 +1365,24 @@ void CReactiveEulerSolver::Set_MPI_Primitive_Gradient(CGeometry* geometry, CConf
           /*--- Need to rotate the gradients for all conserved variables. ---*/
           for(iVar = 0; iVar < nPrimVarGrad; ++iVar) {
             if(nDim == 2) {
-              Gradient(iVar,0) = rotMatrix(0,0)*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
-                                 rotMatrix(0,1)*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
-              Gradient(iVar,1) = rotMatrix(1,0)*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
-                                 rotMatrix(1,1)*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
+              Gradient(iVar,0) = rotMatrix[0][0]*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
+                                 rotMatrix[0][1]*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
+
+              Gradient(iVar,1) = rotMatrix[1][0]*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
+                                 rotMatrix[1][1]*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
             }
             else {
-              Gradient(iVar,0) = rotMatrix(0,0)*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
-                                 rotMatrix(0,1)*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
-                                 rotMatrix(0,2)*Buffer_Receive_Gradient[2*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
-              Gradient(iVar,1) = rotMatrix(1,0)*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
-                                 rotMatrix(1,1)*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
-                                 rotMatrix(1,2)*Buffer_Receive_Gradient[2*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
-              Gradient(iVar,2) = rotMatrix(2,0)*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
-                                 rotMatrix(2,1)*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
-                                 rotMatrix(2,2)*Buffer_Receive_Gradient[2*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
+              Gradient(iVar,0) = rotMatrix[0][0]*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
+                                 rotMatrix[0][1]*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
+                                 rotMatrix[0][2]*Buffer_Receive_Gradient[2*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
+
+              Gradient(iVar,1) = rotMatrix[1][0]*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
+                                 rotMatrix[1][1]*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
+                                 rotMatrix[1][2]*Buffer_Receive_Gradient[2*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
+
+              Gradient(iVar,2) = rotMatrix[2][0]*Buffer_Receive_Gradient[0*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
+                                 rotMatrix[2][1]*Buffer_Receive_Gradient[1*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex] +
+                                 rotMatrix[2][2]*Buffer_Receive_Gradient[2*nPrimVarGrad*nVertexR + iVar*nVertexR + iVertex];
             }
          }
 
@@ -1396,7 +1405,6 @@ void CReactiveEulerSolver::Set_MPI_Primitive_Gradient(CGeometry* geometry, CConf
 //
 void CReactiveEulerSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config,
                                         unsigned short iMesh, unsigned long Iteration) {
-
   su2double Area, Volume, Mean_SoundSpeed = 0.0, Mean_ProjVel = 0.0, Lambda;
   su2double Local_Delta_Time, Global_Delta_Time = 1E6;
   unsigned long iEdge, iVertex, iPoint, jPoint;
@@ -1431,7 +1439,7 @@ void CReactiveEulerSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_co
       auto GridVel_j = geometry->node[jPoint]->GetGridVel();
       su2double ProjVel_i = std::inner_product(GridVel_i,GridVel_i + nDim, Normal, 0.0);
       su2double ProjVel_j = std::inner_product(GridVel_j,GridVel_j + nDim, Normal, 0.0);
-      Mean_ProjVel -= 0.5 * (ProjVel_i + ProjVel_j);
+      Mean_ProjVel -= 0.5*(ProjVel_i + ProjVel_j);
     }
 
     /*--- Inviscid contribution ---*/
@@ -1715,8 +1723,11 @@ void CReactiveEulerSolver::SetResidual_DualTime(CGeometry* geometry, CSolver** s
 //
 //
 void CReactiveEulerSolver::ImplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) {
+  /*--- Local variables ---*/
   unsigned short iVar;
 	unsigned long iPoint, total_index, IterLinSol = 0;
+
+  su2double Volume, Delta;
 
   /*--- Set maximum residual to zero ---*/
   for(iVar = 0; iVar < nVar; ++iVar) {
@@ -1729,10 +1740,10 @@ void CReactiveEulerSolver::ImplicitEuler_Iteration(CGeometry* geometry, CSolver*
     /*--- Read the residual ---*/
     auto Local_Res_TruncError = node[iPoint]->GetResTruncError();
     /*--- Read the volume ---*/
-    su2double Volume = geometry->node[iPoint]->GetVolume();
+    Volume = geometry->node[iPoint]->GetVolume();
 
     if(node[iPoint]->GetDelta_Time() > EPS) {
-      su2double Delta = Volume / node[iPoint]->GetDelta_Time();
+      Delta = Volume / node[iPoint]->GetDelta_Time();
       Jacobian.AddVal2Diag(iPoint, Delta);
     }
     else {
@@ -1773,7 +1784,7 @@ void CReactiveEulerSolver::ImplicitEuler_Iteration(CGeometry* geometry, CSolver*
   /*--- Update solution (system written in terms of increments) ---*/
 	for(iPoint = 0; iPoint < nPointDomain; ++iPoint) {
 		for(iVar = 0; iVar < nVar; ++iVar)
-			node[iPoint]->AddSolution(iVar, LinSysSol[iPoint*nVar+iVar]);
+			node[iPoint]->AddClippedSolution(iVar, LinSysSol[iPoint*nVar+iVar], Lower_Limit[iVar], Upper_Limit[iVar]);
   }
 
   /*--- Compute the root mean square residual ---*/
@@ -1788,10 +1799,13 @@ void CReactiveEulerSolver::ImplicitEuler_Iteration(CGeometry* geometry, CSolver*
 //
 //
 void CReactiveEulerSolver::ExplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) {
-  su2double Res;
+  /*--- Local variables ---*/
   unsigned short iVar;
   unsigned long iPoint;
 
+  su2double Res, Volume, Delta = 0.0;
+
+  /*--- Set residual to zero ---*/
   for(iVar = 0; iVar < nVar; ++iVar) {
     SetRes_RMS(iVar, 0.0);
     SetRes_Max(iVar, 0.0, 0);
@@ -1799,15 +1813,16 @@ void CReactiveEulerSolver::ExplicitEuler_Iteration(CGeometry* geometry, CSolver*
 
   /*--- Update the solution ---*/
   for(iPoint = 0; iPoint < nPointDomain; ++iPoint) {
-    su2double Volume = geometry->node[iPoint]->GetVolume();
-    su2double Delta = node[iPoint]->GetDelta_Time() / Volume;
+    Volume = geometry->node[iPoint]->GetVolume();
+    if(Volume > EPS)
+      Delta = node[iPoint]->GetDelta_Time() / Volume;
 
     auto Res_TruncError = node[iPoint]->GetResTruncError();
     auto Residual = LinSysRes.GetBlock(iPoint);
 
     for(iVar = 0; iVar < nVar; ++iVar) {
       Res = Residual[iVar] + Res_TruncError[iVar];
-      node[iPoint]->AddSolution(iVar, -Res*Delta);
+      node[iPoint]->AddClippedSolution(iVar, -Res*Delta, Lower_Limit[iVar], Upper_Limit[iVar]);
       AddRes_RMS(iVar, Res*Res);
       AddRes_Max(iVar, std::abs(Res), geometry->node[iPoint]->GetGlobalIndex(), geometry->node[iPoint]->GetCoord());
     }
@@ -1825,12 +1840,15 @@ void CReactiveEulerSolver::ExplicitEuler_Iteration(CGeometry* geometry, CSolver*
 //
 //
 void CReactiveEulerSolver::ExplicitRK_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iRKStep) {
-  su2double Res;
+  /*--- Local variables ---*/
   unsigned short iVar;
   unsigned long iPoint;
 
+  su2double Res, Volume, Delta = 0.0;
+
   auto RK_AlphaCoeff = config->Get_Alpha_RKStep(iRKStep);
 
+  /*--- Set residual to zero ---*/
   for(iVar = 0; iVar < nVar; ++iVar) {
     SetRes_RMS(iVar, 0.0);
     SetRes_Max(iVar, 0.0, 0);
@@ -1838,15 +1856,16 @@ void CReactiveEulerSolver::ExplicitRK_Iteration(CGeometry* geometry, CSolver** s
 
   /*--- Update the solution ---*/
   for(iPoint = 0; iPoint < nPointDomain; ++iPoint) {
-    su2double Volume = geometry->node[iPoint]->GetVolume();
-    su2double Delta = node[iPoint]->GetDelta_Time() / Volume;
+    Volume = geometry->node[iPoint]->GetVolume();
+    if(Volume > EPS)
+      Delta = node[iPoint]->GetDelta_Time() / Volume;
 
     auto Res_TruncError = node[iPoint]->GetResTruncError();
     auto Residual = LinSysRes.GetBlock(iPoint);
 
     for(iVar = 0; iVar < nVar; ++iVar) {
       Res = Residual[iVar] + Res_TruncError[iVar];
-      node[iPoint]->AddSolution(iVar, -Res*Delta*RK_AlphaCoeff);
+      node[iPoint]->AddClippedSolution(iVar, -Res*Delta*RK_AlphaCoeff, Lower_Limit[iVar], Upper_Limit[iVar]);
       AddRes_RMS(iVar, Res*Res);
       AddRes_Max(iVar, std::abs(Res), geometry->node[iPoint]->GetGlobalIndex(), geometry->node[iPoint]->GetCoord());
     }
@@ -1878,15 +1897,14 @@ void CReactiveEulerSolver::Centered_Residual(CGeometry *geometry, CSolver **solv
 //
 void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
                                            CConfig* config, unsigned short iMesh) {
-  unsigned long iEdge, iPoint, jPoint, counter_local=0, counter_global=0;
+  unsigned long iEdge, iPoint, jPoint, counter_local = 0, counter_global = 0;
   unsigned short iDim, iVar;
 
   su2double Project_Grad_i, Project_Grad_j;
-  RealVec Ys_i,Ys_j;
 
   /*--- Initialize the upwind convective residual to zero ---*/
   SU2_Assert(Res_Conv != NULL,"The array for source residual has not been allocated");
-  std::fill(Res_Conv, Res_Conv + nVar,0.0);
+  std::fill(Res_Conv, Res_Conv + nVar, 0.0);
 
   /*--- Loop over all the edges ---*/
   for(iEdge = 0; iEdge < geometry->GetnEdge(); ++iEdge) {
@@ -1896,8 +1914,8 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
     numerics->SetNormal(geometry->edge[iEdge]->GetNormal());
 
     /*--- Get primitive variables ---*/
-    Primitive_i = RealVec(node[iPoint]->GetPrimitive(),node[iPoint]->GetPrimitive() + nPrimVar);
-    Primitive_j = RealVec(node[jPoint]->GetPrimitive(),node[jPoint]->GetPrimitive() + nPrimVar);
+    auto Primitive_i = node[iPoint]->GetPrimitive();
+    auto Primitive_j = node[jPoint]->GetPrimitive();
 
     if(second_order) {
       SU2_Assert(Vector_i != NULL, "The array to compute the vector from i to j has not been allocated");
@@ -1910,17 +1928,17 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
       auto Gradient_j = node[iPoint]->GetGradient_Primitive();
 
       /*--- Auxiliary vector to store reconstruction ---*/
-      RealVec Prim_Recon_i(nPrimVarLim);
-      RealVec Prim_Recon_j(nPrimVarLim);
+      su2double Prim_Recon_i[nPrimVarLim];
+      su2double Prim_Recon_j[nPrimVarLim];
 
       Prim_Recon_i[CReactiveEulerVariable::T_INDEX_LIM] = Primitive_i[CReactiveEulerVariable::T_INDEX_PRIM];
       Prim_Recon_j[CReactiveEulerVariable::T_INDEX_LIM] = Primitive_j[CReactiveEulerVariable::T_INDEX_PRIM];
       Prim_Recon_i[CReactiveEulerVariable::P_INDEX_LIM] = Primitive_i[CReactiveEulerVariable::P_INDEX_PRIM];
       Prim_Recon_j[CReactiveEulerVariable::P_INDEX_LIM] = Primitive_j[CReactiveEulerVariable::P_INDEX_PRIM];
-      std::copy(Primitive_i.cbegin() + CReactiveEulerVariable::VX_INDEX_PRIM, Primitive_i.cbegin() + (CReactiveEulerVariable::VX_INDEX_PRIM + nDim),
-                Prim_Recon_i.begin() + CReactiveEulerVariable::VX_INDEX_LIM);
-      std::copy(Primitive_j.cbegin() + CReactiveEulerVariable::VX_INDEX_PRIM, Primitive_j.cbegin() + (CReactiveEulerVariable::VX_INDEX_PRIM + nDim),
-                Prim_Recon_j.begin() + CReactiveEulerVariable::VX_INDEX_LIM);
+      std::copy(Primitive_i + CReactiveEulerVariable::VX_INDEX_PRIM, Primitive_i + (CReactiveEulerVariable::VX_INDEX_PRIM + nDim),
+                Prim_Recon_i + CReactiveEulerVariable::VX_INDEX_LIM);
+      std::copy(Primitive_j + CReactiveEulerVariable::VX_INDEX_PRIM, Primitive_j + (CReactiveEulerVariable::VX_INDEX_PRIM + nDim),
+                Prim_Recon_j + CReactiveEulerVariable::VX_INDEX_LIM);
 
       for(iVar = 0; iVar < nPrimVarLim; ++iVar) {
         Project_Grad_i = Project_Grad_j = 0.0;
@@ -1969,8 +1987,8 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
       /*--- Compute other primitive variables accordingly to the reconstruction ---*/
       if(!non_phys_i) {
         su2double rho_recon_i;
-        Ys_i = RealVec(Primitive_i.cbegin() + CReactiveEulerVariable::RHOS_INDEX_PRIM,
-                       Primitive_i.cbegin() + CReactiveEulerVariable::RHOS_INDEX_PRIM + nSpecies);
+        std::copy(Primitive_i + CReactiveEulerVariable::RHOS_INDEX_PRIM,
+                  Primitive_i + (CReactiveEulerVariable::RHOS_INDEX_PRIM + nSpecies), Ys_i.begin());
         //rho_recon_i = library->ComputeDensity(Primitive_i[CReactiveEulerVariable::T_INDEX_PRIM],
         //                                      Primitive_i[CReactiveEulerVariable::P_INDEX_PRIM],Ys_i);
         rho_recon_i *= config->GetGas_Constant_Ref();
@@ -1984,9 +2002,9 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
         Primitive_i[CReactiveEulerVariable::H_INDEX_PRIM] /= config->GetEnergy_Ref();
         if(US_System)
           Primitive_i[CReactiveEulerVariable::H_INDEX_PRIM] *= 3.28084*3.28084;
-        su2double sq_vel_i = std::inner_product(Primitive_i.cbegin() + CReactiveEulerVariable::VX_INDEX_PRIM,
-                                                Primitive_i.cbegin() + CReactiveEulerVariable::VX_INDEX_PRIM + nDim,
-                                                Primitive_i.cbegin() + CReactiveEulerVariable::VX_INDEX_PRIM, 0.0);
+        su2double sq_vel_i = std::inner_product(Primitive_i + CReactiveEulerVariable::VX_INDEX_PRIM,
+                                                Primitive_i + (CReactiveEulerVariable::VX_INDEX_PRIM + nDim),
+                                                Primitive_i + CReactiveEulerVariable::VX_INDEX_PRIM, 0.0);
         Primitive_i[CReactiveEulerVariable::H_INDEX_PRIM] += 0.5*sq_vel_i;
         //Gamma_i = library->ComputeFrozenGamma(dim_temp_i,Ys_i);
         //Primitive_i[CReactiveEulerVariable::A_INDEX_PRIM] = std::sqrt(Gamma_i*Primitive_i[CReactiveEulerVariable::P_INDEX_PRIM]/rho_recon_i);
@@ -1994,8 +2012,8 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
 
       if(!non_phys_j) {
         su2double rho_recon_j;
-        Ys_i = RealVec(Primitive_j.cbegin() + CReactiveEulerVariable::RHOS_INDEX_PRIM,
-                       Primitive_j.cbegin() + CReactiveEulerVariable::RHOS_INDEX_PRIM + nSpecies);;
+        std::copy(Primitive_j + CReactiveEulerVariable::RHOS_INDEX_PRIM,
+                  Primitive_j + (CReactiveEulerVariable::RHOS_INDEX_PRIM + nSpecies), Ys_j.begin());
         //rho_recon_j = library->ComputeDensity(Primitive_j[CReactiveEulerVariable::T_INDEX_PRIM],
         //                                      Primitive_j[CReactiveEulerVariable::P_INDEX_PRIM],Ys_j);
         rho_recon_j *= config->GetGas_Constant_Ref();
@@ -2009,19 +2027,20 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
         Primitive_j[CReactiveEulerVariable::H_INDEX_PRIM] /= config->GetEnergy_Ref();
         if(US_System)
           Primitive_j[CReactiveEulerVariable::H_INDEX_PRIM] *= 3.28084*3.28084;
-        su2double sq_vel_j = std::inner_product(Primitive_j.cbegin() + CReactiveEulerVariable::VX_INDEX_PRIM,
-                                                Primitive_j.cbegin() + CReactiveEulerVariable::VX_INDEX_PRIM + nDim,
-                                                Primitive_j.cbegin() + CReactiveEulerVariable::VX_INDEX_PRIM, 0.0);
+        su2double sq_vel_j = std::inner_product(Primitive_j + CReactiveEulerVariable::VX_INDEX_PRIM,
+                                                Primitive_j + CReactiveEulerVariable::VX_INDEX_PRIM + nDim,
+                                                Primitive_j + CReactiveEulerVariable::VX_INDEX_PRIM, 0.0);
         Primitive_j[CReactiveEulerVariable::H_INDEX_PRIM] += 0.5*sq_vel_j;
         //Gamma_j = library->ComputeFrozenGamma(dim_temp_j,Ys_j);
         //Primitive_j[CReactiveEulerVariable::A_INDEX_PRIM] = std::sqrt(Gamma_j*Primitive_j[CReactiveEulerVariable::P_INDEX_PRIM]/rho_recon_j);
       }
 
-      numerics->SetPrimitive(Primitive_i.data(), Primitive_j.data());
+      numerics->SetPrimitive(Primitive_i, Primitive_j);
     } /*--- End second order reconstruction ---*/
+
     else {
       /*--- Set primitive variables without reconstruction ---*/
-      numerics->SetPrimitive(Primitive_i.data(), Primitive_j.data());
+      numerics->SetPrimitive(Primitive_i, Primitive_j);
     }
 
     /*--- Compute the residual ---*/
@@ -2046,14 +2065,12 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
       LinSysRes.SubtractBlock(jPoint, Res_Conv);
 
       /*--- Set implicit Jacobians ---*/
-      if(implicit) {
+      if(implicit)
         throw Common::NotImplemented("Implicit computation for upwind residual not implemented");
-
-      }
     }
     else
       throw std::runtime_error("NaN found in the upwind residual");
-  }
+  } /*--- End loop over edges ---*/
 
   /*--- Warning message about non-physical reconstructions ---*/
   if(config->GetConsole_Output_Verb() == VERB_HIGH) {
@@ -2077,11 +2094,12 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
 void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver_container,
                                            CNumerics* numerics, CNumerics* second_numerics,
                                            CConfig* config, unsigned short iMesh) {
-  unsigned long iPoint,counter_local=0, counter_global=0;
+  /*--- Local variables ---*/
+  unsigned long iPoint, counter_local = 0, counter_global=0;
 
   /*--- Initialize the source residual to zero ---*/
   SU2_Assert(Res_Sour != NULL,"The array for source residual has not been allocated");
-  std::fill(Res_Sour,Res_Sour + nVar,0.0);
+  std::fill(Res_Sour, Res_Sour + nVar, 0.0);
 
   /*--- Loop over all points ---*/
   for(iPoint = 0; iPoint < nPointDomain; ++iPoint) {
@@ -2132,6 +2150,33 @@ void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver
 //
 //
 /*!
+  *\brief Set freestream solution all over the domain
+  */
+//
+//
+void CReactiveEulerSolver::SetFreeStream_Solution(CConfig* config) {
+  /*--- Local variables ---*/
+  unsigned long iPoint;
+  unsigned short iDim, iSpecies;
+
+  for(iPoint = 0; iPoint < nPoint; ++iPoint) {
+    /*--- Set density ---*/
+    node[iPoint]->SetSolution(CReactiveEulerVariable::RHO_INDEX_SOL, Density_Inf);
+    /*--- Set momentum ---*/
+    for(iDim = 0; iDim < nDim; ++iDim)
+      node[iPoint]->SetSolution(CReactiveEulerVariable::RHOVX_INDEX_SOL + iDim, Density_Inf*Velocity_Inf[iDim]);
+    /*--- Set energy ---*/
+    node[iPoint]->SetSolution(CReactiveEulerVariable::RHOE_INDEX_SOL, Density_Inf*config->GetEnergy_FreeStreamND());
+    /*--- Set partial densities ---*/
+    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      node[iPoint]->SetSolution(CReactiveEulerVariable::RHOS_INDEX_SOL, Density_Inf*MassFrac_Inf[iSpecies]);
+  }
+}
+
+
+//
+//
+/*!
   *\brief Solid wall boundary conditions for Euler
   */
 //
@@ -2143,6 +2188,7 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
   unsigned long iVertex,iPoint;
   unsigned short iDim;
   su2double Area,Pressure;
+  su2double UnitNormal[nDim];
 
   /*--- Loop over all the vertices on this boundary (val_marker) ---*/
 	for(iVertex = 0; iVertex < geometry->nVertex[val_marker]; ++iVertex) {
@@ -2151,30 +2197,35 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
 
 		/*--- Check if the node belongs to the domain (i.e, not a halo node) ---*/
 		if(geometry->node[iPoint]->GetDomain()) {
-
 			/*--- Normal vector for this vertex (negative for outward convention) ---*/
 			auto Normal = geometry->vertex[val_marker][iVertex]->GetNormal();
 
 			/*--- Compute parameters from the geometry ---*/
       Area = ::ComputeArea(Normal,nDim);
-      RealVec UnitNormal;
-      std::transform(Normal,Normal + nDim,std::back_inserter(UnitNormal),[Area](su2double coord){return -coord/Area;});
+      for(iDim = 0; iDim < nDim; ++iDim)
+        UnitNormal[iDim] = -Normal[iDim]/Area;
 
 			/*--- Retrieve the pressure on the vertex ---*/
       Pressure = node[iPoint]->GetPressure();
 
 			/*--- Compute the residual ---*/
 			for(iDim = 0; iDim < nDim; ++iDim)
-				Residual[CReactiveEulerVariable::RHOVX_INDEX_SOL+iDim] = Pressure * UnitNormal[iDim] * Area;
+				Residual[CReactiveEulerVariable::RHOVX_INDEX_SOL + iDim] = Pressure*UnitNormal[iDim]*Area;
+
+      /*--- Correction to energy due to mowing wall: extra term due to pressure contribution ---*/
+      if(grid_movement) {
+        auto GridVel = geometry->node[iPoint]->GetGridVel();
+        su2double ProjGridVel = std::inner_product(GridVel, GridVel + nDim, UnitNormal, 0.0);
+        Residual[CReactiveEulerVariable::RHOE_INDEX_SOL] += Pressure*ProjGridVel*Area;
+      }
 
       /*--- Add value to the residual ---*/
   		LinSysRes.AddBlock(iPoint, Residual);
 
       if(implicit)
         throw Common::NotImplemented("Implicit computation for solid wall boundary conditions for Euler not implemented");
-
-      }
-    } /*--- End of iVertex for loop ---*/
+    }
+  } /*--- End of iVertex for loop ---*/
 }
 
 //
@@ -2189,20 +2240,20 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
 	unsigned long iVertex, iPoint, Point_Normal;
   unsigned short iDim, jDim, iSpecies;
   su2double Area;
+  su2double V_inlet[nPrimVar];
 
   std::string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
   bool viscous = config->GetViscous();
 
   su2double Density, Pressure, Temperature, Enthalpy, SoundSpeed;
-	RealVec Velocity, MassFrac;
 
   /*--- Supersonic inlet flow: there are no outgoing characteristics,
         so all flow variables can be imposed at the inlet.
         First, retrieve the specified values for the primitive variables. ---*/
 	Temperature = config->GetInlet_Temperature(Marker_Tag);
 	Pressure    = config->GetInlet_Pressure(Marker_Tag);
-	Velocity    = RealVec(config->GetInlet_Velocity(Marker_Tag),config->GetInlet_Velocity(Marker_Tag) + nDim);
-  MassFrac    = RealVec(config->GetInlet_MassFrac(Marker_Tag));
+	auto Velocity = config->GetInlet_Velocity(Marker_Tag);
+  Ys = config->GetInlet_MassFrac(Marker_Tag);
 
 	/*--- Density at the inlet from the gas law ---*/
 	//Density = library->ComputeDensity(Temperature,Pressure);
@@ -2228,15 +2279,14 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
   //SoundSpeed /= config->GetVelocity_Ref();
 
   /*--- Primitive variables using the derived quantities ---*/
-  RealVec V_inlet(nPrimVar);
   V_inlet[CReactiveEulerVariable::T_INDEX_PRIM] = Temperature;
-  std::copy(Velocity.cbegin(), Velocity.cend(), V_inlet.begin() + CReactiveEulerVariable::VX_INDEX_PRIM);
+  std::copy(Velocity, Velocity + nDim, V_inlet + CReactiveEulerVariable::VX_INDEX_PRIM);
   V_inlet[CReactiveEulerVariable::P_INDEX_PRIM] = Pressure;
   V_inlet[CReactiveEulerVariable::RHO_INDEX_PRIM] = Density;
-  su2double Velocity2 = std::inner_product(Velocity.cbegin(), Velocity.cend() ,Velocity.cbegin(), 0.0);
+  su2double Velocity2 = std::inner_product(Velocity, Velocity + nDim, Velocity, 0.0);
   V_inlet[CReactiveEulerVariable::H_INDEX_PRIM] = Enthalpy + 0.5*Velocity2;
   V_inlet[CReactiveEulerVariable::A_INDEX_PRIM] = SoundSpeed;
-  std::copy(MassFrac.cbegin(), MassFrac.cend(), V_inlet.begin() + CReactiveEulerVariable::RHOS_INDEX_PRIM);
+  std::copy(Ys.cbegin(), Ys.cend(), V_inlet + CReactiveEulerVariable::RHOS_INDEX_PRIM);
 
   /*--- Loop over all the vertices on this boundary (val_marker) ---*/
 	for(iVertex = 0; iVertex < geometry->nVertex[val_marker]; ++iVertex) {
@@ -2253,7 +2303,10 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
       /*--- Pull primitve variable from actual point ---*/
       auto V_domain = node[iPoint]->GetPrimitive();
 
-      conv_numerics->SetPrimitive(V_domain, V_inlet.data());
+      /*--- Pull primitve variable from actual point ---*/
+      conv_numerics->SetPrimitive(V_domain, V_inlet);
+      if(grid_movement)
+        conv_numerics->SetGridVel(geometry->node[iPoint]->GetGridVel(), geometry->node[iPoint]->GetGridVel());
 
       /*--- Compute the residual using an upwind scheme ---*/
       try {
@@ -2278,8 +2331,8 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
   				visc_numerics->SetNormal(Normal);
   				visc_numerics->SetCoord(geometry->node[iPoint]->GetCoord(), geometry->node[Point_Normal]->GetCoord());
 
-  				/*--- Primitive variables, and gradient ---*/
-  				visc_numerics->SetPrimitive(V_domain, V_inlet.data());
+  				/*--- Set primitive variables and gradient ---*/
+  				visc_numerics->SetPrimitive(V_domain, V_inlet);
           visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
 
           /*--- Laminar viscosity ---*/
@@ -2325,8 +2378,8 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
   unsigned long iVertex, iPoint, Point_Normal;
   su2double Pressure, P_Exit, Velocity2, Entropy, Density, Energy, dim_temp,
             Riemann, Vn, SoundSpeed, Gamma, Gamma_Minus_One, Mach_Exit, Vn_Exit, Area;
-  RealVec V_outlet(nPrimVar);
-  RealVec Ys(nSpecies),Velocity(nDim),UnitNormal(nDim);
+  su2double V_outlet[nPrimVar];
+  su2double Velocity[nDim], UnitNormal[nDim];
 
   std::string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
   bool viscous = config->GetViscous();
@@ -2341,10 +2394,11 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
       /*--- Normal vector for this vertex (negate for outward convention) ---*/
       auto Normal = geometry->vertex[val_marker][iVertex]->GetNormal();
       Area = ::ComputeArea(Normal,nDim);
-      std::transform(Normal,Normal + nDim,Normal,std::negate<su2double>());
-      conv_numerics->SetNormal(Normal);
-      for(iDim = 0; iDim < nDim; iDim++)
+      for(iDim = 0; iDim < nDim; ++iDim) {
+        Normal[iDim] = -Normal[iDim];
         UnitNormal[iDim] = Normal[iDim]/Area;
+      }
+      conv_numerics->SetNormal(Normal);
 
       /*--- Current solution at this boundary node ---*/
       auto V_domain = node[iPoint]->GetPrimitive();
@@ -2362,9 +2416,9 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
             of boundary update depends on this. ---*/
       Density = V_domain[CReactiveEulerVariable::RHO_INDEX_PRIM];
       std::copy(V_domain + CReactiveEulerVariable::VX_INDEX_PRIM,
-                V_domain + CReactiveEulerVariable::VX_INDEX_PRIM + nDim, Velocity.begin());
-      Velocity2 = std::inner_product(Velocity.cbegin(), Velocity.cend(), Velocity.cbegin(), 0.0);
-      Vn = std::inner_product(UnitNormal.cbegin(), UnitNormal.cend(), Velocity.cbegin(), 0.0);
+                V_domain + CReactiveEulerVariable::VX_INDEX_PRIM + nDim, Velocity);
+      Velocity2 = std::inner_product(Velocity, Velocity + nDim, Velocity, 0.0);
+      Vn = std::inner_product(UnitNormal, UnitNormal + nDim, Velocity, 0.0);
       Pressure = V_domain[CReactiveEulerVariable::P_INDEX_PRIM];
       std::copy(V_domain + CReactiveEulerVariable::RHOS_INDEX_PRIM,
                 V_domain + CReactiveEulerVariable::RHOS_INDEX_PRIM + nSpecies, Ys.begin());
@@ -2381,7 +2435,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         /*--- Supersonic exit flow: there are no incoming characteristics,
               so no boundary condition is necessary. Set outlet state to current
               state so that upwinding handles the direction of propagation. ---*/
-        std::copy(V_domain, V_domain + nPrimVar, V_outlet.begin());
+        std::copy(V_domain, V_domain + nPrimVar, V_outlet);
       }
       else {
         /*--- Subsonic exit flow: there is one incoming characteristic,
@@ -2411,9 +2465,10 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         su2double Tnew;
         NRconvg = false;
         su2double gamma;
+        su2double dim_temp_old, gamma_old;
+
+        /*--- Execute a secant root-finding method to find the outlet temperature ---*/
         for(iIter = 0; iIter < maxNIter; ++iIter) {
-          /*--- Execute a secant root-finding method to find the outlet temperature ---*/
-          su2double dim_temp_old, gamma_old;
           dim_temp = T*config->GetTemperature_Ref();
           dim_temp_old = Told*config->GetTemperature_Ref();
           if(US_System) {
@@ -2427,7 +2482,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
           su2double df = tmp - std::pow(a/Told,gamma_old);
           Tnew = T - f*(T-Told)/df;
 
-          // Check for convergence
+          /*--- Check for convergence ---*/
           if(std::abs(Tnew - T) < NRtol) {
             NRconvg = true;
             break;
@@ -2441,7 +2496,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         if(NRconvg)
           V_outlet[CReactiveEulerVariable::T_INDEX_PRIM] = T;
         else {
-          // Execute the bisection root-finding method
+          /*--- Execute the bisection root-finding method ---*/
           Bconvg = false;
           su2double Ta = 50;
           su2double Tb = 8.0e4;
@@ -2466,7 +2521,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
                 Tb = T;
             }
 
-          // If absolutely no convergence, then something is going really wrong
+          /*--- If absolutely no convergence, then something is going really wrong ---*/
           if(!Bconvg)
             throw std::runtime_error("Convergence not achieved for bisection method");
           }
@@ -2484,10 +2539,10 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         su2double diff_v = Vn_Exit - Vn;
         for(iDim = 0; iDim < nDim; ++iDim)
           Velocity[iDim] += diff_v*UnitNormal[iDim];
-        Velocity2 = std::inner_product(Velocity.cbegin(), Velocity.cend(), Velocity.cbegin(),0.0);
+        Velocity2 = std::inner_product(Velocity, Velocity + nDim, Velocity, 0.0);
 
         /*--- Conservative variables, using the derived quantities ---*/
-        std::copy(Velocity.cbegin(), Velocity.cend(), V_outlet.begin() + CReactiveEulerVariable::VX_INDEX_PRIM);
+        std::copy(Velocity, Velocity + nDim, V_outlet + CReactiveEulerVariable::VX_INDEX_PRIM);
         V_outlet[CReactiveEulerVariable::P_INDEX_PRIM] = Pressure;
         V_outlet[CReactiveEulerVariable::RHO_INDEX_PRIM] = Density;
         //V_outlet[CReactiveEulerVariable::H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp,Ys)/config->GetEnergy_Ref();
@@ -2495,11 +2550,13 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
           V_outlet[CReactiveEulerVariable::H_INDEX_PRIM] *= 3.28084*3.28084;
         V_outlet[CReactiveEulerVariable::H_INDEX_PRIM] += 0.5*Velocity2;
         V_outlet[CReactiveEulerVariable::A_INDEX_PRIM] = SoundSpeed;
-        std::copy(Ys.cbegin(), Ys.cend(), V_outlet.begin() + CReactiveEulerVariable::RHOS_INDEX_PRIM);
+        std::copy(Ys.cbegin(), Ys.cend(), V_outlet + CReactiveEulerVariable::RHOS_INDEX_PRIM);
       }
 
-      /*--- Set various quantities in the solver class ---*/
-      conv_numerics->SetPrimitive(V_domain, V_outlet.data());
+      /*--- Set primitives and grid movement in the convective numerics class ---*/
+      conv_numerics->SetPrimitive(V_domain, V_outlet);
+      if(grid_movement)
+        conv_numerics->SetGridVel(geometry->node[iPoint]->GetGridVel(), geometry->node[iPoint]->GetGridVel());
 
       /*--- Compute the residual using an upwind scheme ---*/
       try {
@@ -2528,7 +2585,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         visc_numerics->SetCoord(geometry->node[iPoint]->GetCoord(), geometry->node[Point_Normal]->GetCoord());
 
         /*--- Primitive variables and gradient ---*/
-        visc_numerics->SetPrimitive(V_domain, V_outlet.data());
+        visc_numerics->SetPrimitive(V_domain, V_outlet);
         visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
 
         /*--- Laminar viscosity ---*/
@@ -2608,7 +2665,7 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config,unsign
   nVar = nSpecies + nDim + 2; /*--- Conserved variables (rho,rho*vx,rho*vy,rho*vz,rho*E,rho1,...rhoNs)^T ---*/
   nPrimVar = nSpecies + nDim + 5; /*--- Primitive variables (T,vx,vy,vz,P,rho,h,a,rho1,...rhoNs)^T ---*/
   nPrimVarLim = nDim + 2;  /*--- Primitive variables to limit (T,vx,vy,vz,P)^T ---*/
-  nPrimVarGrad = nSpecies + nDim + 2; /*--- Gradient Primitive variables (T,vx,vy,vz,P,X1....XNs)^T ---*/
+  nPrimVarGrad = nPrimVarLim + nSpecies; /*--- Gradient Primitive variables (T,vx,vy,vz,P,X1....XNs)^T ---*/
   //nPrimVarGrad = nSpecies + nDim + 3; /*--- Gradient Primitive variables (T,vx,vy,vz,P,rho,Y1....YNs)^T ---*/
 
   /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
@@ -2634,10 +2691,7 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config,unsign
   Solution_i = new su2double[nVar];
   Solution_j = new su2double[nVar];
 
-  /*--- Allocate vectors related to the solution ---*/
-  Primitive_i.resize(nPrimVar);
-  Primitive_j.resize(nPrimVar);
-
+  /*--- Allocate vectors related to the primitive ---*/
   PrimVar_i.resize(nPrimVarGrad);
   PrimVar_j.resize(nPrimVarGrad);
   PrimVar_Vertex.resize(nPrimVarGrad);
@@ -2648,12 +2702,18 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config,unsign
   Prim_j.resize(nPrimVarLim);
   Primitive.resize(nPrimVarLim);
 
-  /*--- Allocate arrays for conserved variable limits ---*/
-  Lower_Limit.resize(nPrimVar);
-  Upper_Limit.resize(nPrimVar, 1.0e16);
+  /*--- Allocate vectors for conserved variable limits ---*/
+  Lower_Limit.resize(nPrimVar, 0.0);
+  Upper_Limit.resize(nPrimVar, 1.0e16); /*--- 1.0/EPS ---*/
 
-  std::fill(Lower_Limit.begin() + CReactiveEulerVariable::RHOVX_INDEX_SOL,
-            Lower_Limit.begin() + CReactiveEulerVariable::RHOVX_INDEX_SOL + nDim, -1.0e16);
+  std::fill(Lower_Limit.begin() + CReactiveNSVariable::RHOVX_INDEX_SOL,
+            Lower_Limit.begin() + CReactiveNSVariable::RHOVX_INDEX_SOL + nDim, -1.0e16); /*--- -1.0/EPS ---*/
+  Lower_Limit[CReactiveNSVariable::RHOE_INDEX_SOL] = -1.0e16;
+
+  /*--- Allocate auxiliary vectors ---*/
+  Ys_i.resize(nSpecies);
+  Ys_j.resize(nSpecies);
+  Ys.resize(nSpecies);
 
   /*--- Initialize the solution & residual CVectors ---*/
  	LinSysSol.Initialize(nPoint, nPointDomain, nVar, 0.0);
@@ -2722,7 +2782,7 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config,unsign
   }
 
   /*--- Initialize the solution to the far-field state everywhere. ---*/
-  for(iPoint = 0; iPoint < nPoint; iPoint++)
+  for(iPoint = 0; iPoint < nPoint; ++iPoint)
     node[iPoint] = new CReactiveNSVariable(Pressure_Inf, MassFrac_Inf, Velocity_Inf, Temperature_Inf,
                                            nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, config);
 
@@ -2730,7 +2790,6 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config,unsign
   Check_FreeStream_Solution(config);
 
   /*--- MPI solution ---*/
-  rotMatrix.resize(3,3);
 	Set_MPI_Solution(geometry, config);
 }
 
@@ -2793,12 +2852,11 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
   su2double Local_Delta_Time_Visc;
   su2double Mean_SoundSpeed, Mean_ProjVel;
   su2double Mean_LaminarVisc, Mean_ThermalCond, Mean_Density, Mean_CV;
-  RealVec Ys_i(nSpecies),Ys_j(nSpecies);
   su2double Lambda, Lambda_1, Lambda_2;
   const su2double K_v = 0.5;
   const su2double FOUR_OVER_THREE = 4.0/3.0;
   unsigned long iEdge, iVertex, iPoint, jPoint;
-  unsigned short iMarker;
+  unsigned short iMarker, iSpecies;
 
   bool time_steping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
   bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
@@ -2831,13 +2889,13 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
       auto GridVel_j = geometry->node[jPoint]->GetGridVel();
       su2double ProjVel_i = std::inner_product(GridVel_i,GridVel_i + nDim, Normal, 0.0);
       su2double ProjVel_j = std::inner_product(GridVel_j,GridVel_j + nDim, Normal, 0.0);
-      Mean_ProjVel -= 0.5 * (ProjVel_i + ProjVel_j);
+      Mean_ProjVel -= 0.5*(ProjVel_i + ProjVel_j);
     }
 
-    Mean_Density = 0.5 * (node[iPoint]->GetDensity() + node[jPoint]->GetDensity());
-    Mean_ThermalCond = 0.5 * (node[iPoint]->GetThermalConductivity() + node[jPoint]->GetThermalConductivity());
+    Mean_Density = 0.5*(node[iPoint]->GetDensity() + node[jPoint]->GetDensity());
+    Mean_ThermalCond = 0.5*(node[iPoint]->GetThermalConductivity() + node[jPoint]->GetThermalConductivity());
     Mean_LaminarVisc = 0.5*(node[iPoint]->GetLaminarViscosity() + node[jPoint]->GetLaminarViscosity());
-    for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
       Ys_i[iSpecies] = node[iPoint]->GetMassFraction(iSpecies);
       Ys_j[iSpecies] = node[jPoint]->GetMassFraction(iSpecies);
     }
@@ -2856,21 +2914,21 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
     */
 
     /*--- Inviscid contribution ---*/
-    Lambda = std::abs(Mean_ProjVel) + Mean_SoundSpeed*Area;
+    Lambda = (std::abs(Mean_ProjVel) + Mean_SoundSpeed)*Area;
     if(geometry->node[iPoint]->GetDomain())
-      node[iPoint]->AddMax_Lambda_Visc(Lambda);
+      node[iPoint]->AddMax_Lambda_Inv(Lambda);
     if(geometry->node[jPoint]->GetDomain())
-      node[jPoint]->AddMax_Lambda_Visc(Lambda);
+      node[jPoint]->AddMax_Lambda_Inv(Lambda);
 
     /*--- Determine the viscous spectral radius and apply it to the control volume ---*/
-  	Lambda_1 = FOUR_OVER_THREE*(Mean_LaminarVisc);
+  	Lambda_1 = FOUR_OVER_THREE*Mean_LaminarVisc;
   	Lambda_2 = Mean_ThermalCond/Mean_CV;
   	Lambda = (Lambda_1 + Lambda_2)*Area*Area/Mean_Density;
   	if(geometry->node[iPoint]->GetDomain())
       node[iPoint]->AddMax_Lambda_Visc(Lambda);
   	if(geometry->node[jPoint]->GetDomain())
       node[jPoint]->AddMax_Lambda_Visc(Lambda);
-  }
+  } /*--- End loop interior edges ---*/
 
   /*--- Loop boundary edges ---*/
   for(iMarker = 0; iMarker < geometry->GetnMarker(); ++iMarker) {
@@ -2894,9 +2952,9 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
         }
 
         Mean_Density = node[iPoint]->GetDensity();
-        Mean_ThermalCond =node[iPoint]->GetThermalConductivity();
+        Mean_ThermalCond = node[iPoint]->GetThermalConductivity();
         Mean_LaminarVisc = node[iPoint]->GetLaminarViscosity();
-        for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+        for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
           Ys_i[iSpecies] = node[iPoint]->GetMassFraction(iSpecies);
         /*
         su2double dim_temp = node[iPoint]->GetTemperature()*config->GetTemperature_Ref();
@@ -2910,12 +2968,12 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
         */
 
         /*--- Inviscid contribution ---*/
-        Lambda = std::abs(Mean_ProjVel) + Mean_SoundSpeed;
+        Lambda = (std::abs(Mean_ProjVel) + Mean_SoundSpeed)*Area;
         if(geometry->node[iPoint]->GetDomain())
-          node[iPoint]->AddMax_Lambda_Visc(Lambda);
+          node[iPoint]->AddMax_Lambda_Inv(Lambda);
 
         /*--- Viscous contribution ---*/
-      	Lambda_1 = FOUR_OVER_THREE*(Mean_LaminarVisc);
+      	Lambda_1 = FOUR_OVER_THREE*Mean_LaminarVisc;
       	Lambda_2 = Mean_ThermalCond/Mean_CV;
       	Lambda = (Lambda_1 + Lambda_2)*Area*Area/Mean_Density;
       	if(geometry->node[iPoint]->GetDomain())
@@ -2924,7 +2982,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
           node[jPoint]->AddMax_Lambda_Visc(Lambda);
       }
     }
-  }
+  } /*--- End loop boundary edges ---*/
 
   /*--- Each element uses their own speed for a steady state simulation ---*/
   for(iPoint = 0; iPoint < nPointDomain; ++iPoint) {
@@ -3097,11 +3155,11 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
 void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution_container, CNumerics* numerics,
                                          CConfig *config, unsigned short iMesh, unsigned short iRKStep) {
 	unsigned long iPoint, jPoint, iEdge;
-  unsigned short iDim,jDim,iSpecies;
+  unsigned short iDim, jDim, iSpecies;
 
   /*--- Initialize the viscous residual to zero ---*/
   SU2_Assert(Res_Visc != NULL,"The array for viscous residual has not been allocated");
-  std::fill(Res_Visc,Res_Visc + nVar,0.0);
+  std::fill(Res_Visc, Res_Visc + nVar, 0.0);
 
   for(iEdge = 0; iEdge < geometry->GetnEdge(); ++iEdge) {
     /*--- Points, coordinates and normal vector in edge ---*/
@@ -3430,7 +3488,7 @@ void CReactiveNSSolver::SetPrimitive_Gradient_LS(CGeometry* geometry, CConfig* c
     auto result = C_Mat*S_Mat;
     for(iVar = 0; iVar < nPrimVarGrad; ++iVar) {
 		  for(iDim = 0; iDim < nDim; ++iDim)
-        node[iPoint]->SetGradient_Primitive(iVar,iDim,result(0,iDim));
+        node[iPoint]->SetGradient_Primitive(iVar,iDim,result(iVar,iDim));
     }
 
     //	AD::SetPreaccOut(node[iPoint]->GetGradient_Primitive(), nPrimVarGrad, nDim);
@@ -3457,7 +3515,8 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
   unsigned long iVertex, iPoint, jPoint;
   su2double ktr;
   su2double Ti, Tj, dTdn, Twall;
-  su2double dij, Area, C = 1E30;
+  su2double dij, Area, C = 5.0;
+  su2double UnitNormal[nDim];
 
 	/*--- Identify the boundary ---*/
 	auto Marker_Tag = config->GetMarker_All_TagBound(val_marker);
@@ -3473,8 +3532,8 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
 			/*--- Compute dual-grid area and boundary normal ---*/
 			auto Normal = geometry->vertex[val_marker][iVertex]->GetNormal();
 			Area = ::ComputeArea(Normal,nDim);
-      RealVec UnitNormal;
-      std::transform(Normal,Normal + nDim,std::back_inserter(UnitNormal),[Area](su2double coord){return -coord/Area;});
+      for(iDim = 0; iDim < nDim; ++iDim)
+        UnitNormal[iDim] = -Normal[iDim]/Area;
 
 			/*--- Compute closest normal neighbor ---*/
       jPoint = geometry->vertex[val_marker][iVertex]->GetNormal_Neighbor();
@@ -3487,17 +3546,17 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         dij += (Coord_j[iDim] - Coord_i[iDim])*(Coord_j[iDim] - Coord_i[iDim]);
       dij = std::sqrt(dij);
 
-      /*--- Store the corrected velocity at the wall which will be zero (v = 0)
-            unless there is grid motion (v = u_wall) ---*/
+      /*--- Store the corrected velocity at the wall which will be zero (u = 0)
+            unless there is grid motion (u = u_wall) ---*/
       if(grid_movement) {
         auto GridVel = geometry->node[iPoint]->GetGridVel();
         std::copy(GridVel, GridVel + nDim, Vector);
       }
       else
-        std::fill(Vector,Vector + nDim,0.0);
+        std::fill(Vector, Vector + nDim, 0.0);
 
       /*--- Initialize residual to zero ---*/
-      std::fill(Res_Visc,Res_Visc + nVar,0.0);
+      std::fill(Res_Visc, Res_Visc + nVar, 0.0);
 
       /*--- Set the residual, truncation error and velocity value on the boundary ---*/
 			node[iPoint]->SetVelocity_Old(Vector);
@@ -3506,16 +3565,24 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         node[iPoint]->SetVal_ResTruncError_Zero(CReactiveNSVariable::RHOVX_INDEX_SOL + iDim);
       }
 
-      /*--- Calculate the gradient of temperature ---*/
+      /*--- Extract the interior temperature and the thermal conductivity for the boundary node ---*/
       Tj   = node[jPoint]->GetTemperature();
-
-      /*--- Rename variables for convenience ---*/
       ktr  = node[iPoint]->GetThermalConductivity();
-      dTdn = -ktr*(Tj-Twall)/dij;
+
+      /*--- Compute normal gradient ---*/
+      dTdn = (Twall - Tj)/dij;
 
       /*--- Apply to the linear system ---*/
-      Ti = node[iPoint]->GetTemperature();
-      Res_Visc[CReactiveNSVariable::RHOE_INDEX_SOL] = (dTdn + C*(Ti-Tj))*Area;
+      Res_Visc[CReactiveNSVariable::RHOE_INDEX_SOL] = ktr*dTdn*Area;
+      //1)dTdn = (Ti - Tj)/dij;
+      //Res_Visc[CReactiveNSVariable::RHOE_INDEX_SOL] = (ktr*dTdn + C*(Twall-Ti)/dij)*Area;
+      //2)dTdn = (Ti - Tj)/dij;
+      //Ti = node[iPoint]->GetTemperature();
+      //Res_Visc[CReactiveNSVariable::RHOE_INDEX_SOL] = (ktr*dTdn + ktr*C*(Twall-Ti)/dij)*Area;
+      //3)dTdn = (Twall - Tj)/dij;
+      //Res_Visc[CReactiveNSVariable::RHOE_INDEX_SOL] = ktr*dTdn*Area;
+      //bool nonPhys_temp = node[iPoint]->SetTemperature(Twall);
+      //SU2_Assert(nonPhys_temp == false,"The wall temperature to impose is not a valid temperature");
 
       LinSysRes.SubtractBlock(iPoint, Res_Visc);
 
@@ -3527,9 +3594,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
       if(grid_movement) {
         /*--- Get the grid velocity at the current boundary node ---*/
         auto GridVel = geometry->node[iPoint]->GetGridVel();
-        su2double ProjGridVel = 0.0;
-        for(iDim = 0; iDim < nDim; ++iDim)
-          ProjGridVel += GridVel[iDim]*UnitNormal[iDim]*Area;
+        su2double ProjGridVel = std::inner_product(GridVel, GridVel + nDim, UnitNormal, 0.0);
 
         /*--- Retrieve other primitive quantities and viscosities ---*/
         su2double Density  = node[iPoint]->GetDensity();
@@ -3537,38 +3602,42 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         su2double laminar_viscosity = node[iPoint]->GetLaminarViscosity();
 
         unsigned short jDim;
-        RealMatrix Grad_Vel(nDim,nDim);
-        for(iDim = 0; iDim < nDim; ++iDim) {
+        su2double Grad_Vel[nDim][nDim] = {};
+        for(iDim = 0; iDim < nDim; ++iDim)
           for(jDim = 0; jDim < nDim; ++jDim)
-            Grad_Vel(iDim,jDim) = node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + iDim, jDim);
-        }
+            Grad_Vel[iDim][jDim] = node[iPoint]->GetGradient_Primitive(CReactiveNSVariable::VX_INDEX_GRAD + iDim, jDim);
 
         /*--- Divergence of the velocity ---*/
         su2double div_vel = 0.0;
         for(iDim = 0; iDim < nDim; ++iDim)
-          div_vel += Grad_Vel(iDim,iDim);
+          div_vel += Grad_Vel[iDim][iDim];
 
         /*--- Compute the viscous stress tensor ---*/
-        RealMatrix tau(nDim,nDim);
-        RealMatrix delta(nDim,nDim);
-        delta.setZero();
+        su2double tau[nDim][nDim] = {};
+        su2double delta[nDim][nDim] = {};
+
         for(iDim = 0; iDim < nDim; iDim++) {
-          delta(iDim,iDim) = 1.0;
+          /*--- Fill delta's row of zeros for safety ---*/
+          std::fill(delta[iDim], delta[iDim] + nDim, 0.0);
+          /*--- Compute dleta and tau---*/
+          delta[iDim][iDim] = 1.0;
           for(jDim = 0; jDim < nDim; jDim++)
-            tau(iDim,jDim) = laminar_viscosity*(Grad_Vel(iDim,jDim) + Grad_Vel(jDim,iDim)) - TWO3*laminar_viscosity*div_vel*delta(iDim,jDim);
+            tau[iDim][jDim] = laminar_viscosity*(Grad_Vel[iDim][jDim] + Grad_Vel[jDim][iDim]) -
+                                                 TWO3*laminar_viscosity*div_vel*delta[iDim][jDim];
         }
 
         /*--- Dot product of the stress tensor with the grid velocity ---*/
-        RealVec tau_vel(nDim);
+        su2double tau_vel[nDim] = {};
+        std::fill(tau_vel, tau_vel + nDim, 0.0);
         for(iDim = 0; iDim < nDim; ++iDim) {
-          for(jDim = 0 ; jDim < nDim; ++jDim)
-            tau_vel[iDim] += tau(iDim,jDim)*GridVel[jDim];
+          for(jDim = 0; jDim < nDim; ++jDim)
+            tau_vel[iDim] += tau[iDim][jDim]*GridVel[jDim];
         }
 
         /*--- Compute the convective and viscous residuals (energy eqn.) ---*/
         std::fill(Res_Conv, Res_Conv + nVar, 0.0);
-        Res_Conv[CReactiveNSVariable::RHOE_INDEX_SOL] = Pressure*ProjGridVel;
-        for(iDim = 0 ; iDim < nDim; iDim++)
+        Res_Conv[CReactiveNSVariable::RHOE_INDEX_SOL] = Pressure*ProjGridVel*Area;
+        for(iDim = 0; iDim < nDim; iDim++)
           Res_Visc[CReactiveNSVariable::RHOE_INDEX_SOL] += tau_vel[iDim]*UnitNormal[iDim]*Area;
 
         /*--- Implicit Jacobian contributions due to moving walls ---*/

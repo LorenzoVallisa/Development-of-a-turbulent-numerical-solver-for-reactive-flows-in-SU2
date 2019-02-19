@@ -12,7 +12,7 @@
  *  \brief Main class for defining a variable for chemically reacting inviscid flows.
  *  \author G. Orlando.
  */
-class CReactiveEulerVariable:public CVariable {
+class CReactiveEulerVariable: public CVariable {
 public:
   typedef std::vector<su2double> RealVec;
   typedef su2double** SU2Matrix;
@@ -99,9 +99,10 @@ public:
    * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
    * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveEulerVariable(const su2double val_pressure, const RealVec& val_massfrac, const RealVec& val_velocity, const su2double val_temperature,
-                         unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies, unsigned short val_nprimvar,
-                         unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config);
+	CReactiveEulerVariable(const su2double val_pressure, const RealVec& val_massfrac, const RealVec& val_velocity,
+                         const su2double val_temperature, unsigned short val_nDim, unsigned short val_nvar,
+                         unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
+                         unsigned short val_nprimvarlim, CConfig* config);
 
 	/*!
 	 * \overload Class constructor
@@ -213,7 +214,8 @@ public:
 	inline void SetGradient_PrimitiveZero(unsigned short val_primvar) override {
     SU2_Assert(Gradient_Primitive != NULL, "The matrix for gradient primitive has not been allocated");
     for(unsigned short iVar = 0; iVar < val_primvar; ++iVar) {
-      SU2_Assert(Gradient_Primitive[iVar] != NULL, std::string("The row " + std::to_string(iVar) + " of gradient primitive has not been allocated"));
+      SU2_Assert(Gradient_Primitive[iVar] != NULL,
+                 std::string("The row " + std::to_string(iVar) + " of gradient primitive has not been allocated"));
       std::fill(Gradient_Primitive[iVar], Gradient_Primitive[iVar] + nDim, 0.0);
     }
   }
@@ -233,7 +235,8 @@ public:
 	 * \param[in] val_dim - Index of the dimension.
    */
   su2double GetGradient_Primitive(unsigned short val_var, unsigned short val_dim) override {
-    SU2_Assert(Gradient_Primitive[val_var] != NULL,std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
+    SU2_Assert(Gradient_Primitive[val_var] != NULL,
+               std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
     return Gradient_Primitive[val_var][val_dim];
   }
 
@@ -244,7 +247,8 @@ public:
 	 * \param[in] val_value - Value to add to the gradient of the selected primitive variable.
 	 */
 	inline void AddGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    SU2_Assert(Gradient_Primitive[val_var] != NULL,std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
+    SU2_Assert(Gradient_Primitive[val_var] != NULL,
+               std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
     Gradient_Primitive[val_var][val_dim] += val_value;
   }
 
@@ -255,7 +259,8 @@ public:
 	 * \param[in] val_value - Value to subtract to the gradient of the selected primitive variable.
 	 */
 	inline void SubtractGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    SU2_Assert(Gradient_Primitive[val_var] != NULL,std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
+    SU2_Assert(Gradient_Primitive[val_var] != NULL,
+               std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
     Gradient_Primitive[val_var][val_dim] -= val_value;
   }
 
@@ -266,7 +271,8 @@ public:
 	 * \param[in] val_value - Value of the gradient.
 	 */
 	inline void SetGradient_Primitive(unsigned short val_var, unsigned short val_dim, su2double val_value) override {
-    SU2_Assert(Gradient_Primitive[val_var] != NULL,std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
+    SU2_Assert(Gradient_Primitive[val_var] != NULL,
+               std::string("The row " + std::to_string(val_var) + " of gradient primitive hasn't been allocated"));
     Gradient_Primitive[val_var][val_dim] = val_value;
   }
 
@@ -395,8 +401,8 @@ public:
   }
 
   /*!
-   * \brief Get the energy of the flow.
-   * \return Value of the energy of the flow.
+   * \brief Get the total energy of the flow.
+   * \return Value of the total energy of the flow.
    */
   inline su2double GetEnergy(void) override {
     SU2_Assert(Solution != NULL,"The array with the solution has not been allocated");
@@ -465,7 +471,7 @@ const unsigned short CReactiveEulerVariable::P_INDEX_LIM = CReactiveEulerVariabl
  *  \brief Main class for defining a variable for chemically reacting viscous flows.
  *  \author G. Orlando.
  */
-class CReactiveNSVariable:public CReactiveEulerVariable {
+class CReactiveNSVariable: public CReactiveEulerVariable {
 public:
   typedef Eigen::Matrix<su2double,Eigen::Dynamic,Eigen::Dynamic,Eigen::RowMajor> RealMatrix;
 
@@ -508,9 +514,9 @@ public:
    * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
    * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveNSVariable(const su2double val_pressure, const RealVec& val_massfrac, const RealVec& val_velocity,const su2double val_temperature,
-                      unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies, unsigned short val_nprimvar,
-                      unsigned short val_nprimvargrad,unsigned short val_nprimvarlim, CConfig* config);
+	CReactiveNSVariable(const su2double val_pressure, const RealVec& val_massfrac, const RealVec& val_velocity,
+                      const su2double val_temperature, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies,
+                      unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config);
 
   /*!
 	 * \overload Class constructor

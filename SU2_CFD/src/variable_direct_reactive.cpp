@@ -79,13 +79,10 @@ CReactiveEulerVariable::CReactiveEulerVariable(const su2double val_pressure, con
   bool US_System = (config->GetSystemMeasurements() == US);
   if(US_System)
     dim_temp *= 5.0/9.0;
-  //su2double Sound_Speed = library->ComputeFrozenSoundSpeed(dim_temp,val_massfrac,P,rho);
 
   /*--- Compute energy (RHOE) from supplied primitive quanitites ---*/
   /*
-  su2double sqvel = 0.0;
-  for(iDim = 0; iDim < nDim; ++iDim)
-    sqvel += val_mach[iDim]*Sound_Speed * val_mach[iDim]*Sound_speed;
+  su2double sqvel = std::inner_product(val_velocity.cbegin(), val_velocity.cend(), val_velocity.cbegin());
   su2double e_tot = library->ComputeEnergy(dim_temp,val_massfrac)/config->GetEnergy_Ref();
   rhoE = rho*(0.5*sqvel + e_tot);
   */
@@ -159,7 +156,7 @@ bool CReactiveEulerVariable::SetPrimVar(CConfig* config) {
   bool nonPhys = Cons2PrimVar(config, Solution, Primitive.data());
   if(nonPhys) {
     std::copy(Solution_Old,Solution_Old + nVar,Solution);
-    bool check_old = Cons2PrimVar(config,Solution,Primitive.data());
+    bool check_old = Cons2PrimVar(config, Solution, Primitive.data());
     SU2_Assert(check_old == true, "Neither the old solution is feasible to set primitive variables: problem unsolvable");
   }
   return nonPhys;

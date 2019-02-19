@@ -37,9 +37,6 @@ protected:
   RealVec   Velocity_Inf,  /*!< \brief Free stream flow velocity. */
             MassFrac_Inf;  /*!< \brief Free stream species mass fraction. */
 
-  RealVec   Primitive_i,   /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point i. */
-            Primitive_j;   /*!< \brief Auxiliary nPrimVar vector for storing the primitive at point j. */
-
   RealVec   PrimVar_i,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at point i. */
             PrimVar_j,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at point j. */
             PrimVar_Vertex,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at boundary node. */
@@ -51,7 +48,9 @@ protected:
             Primitive; /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at boundary node. */
 
   RealMatrix C_Mat,S_Mat; /*!< \brief Auxiliary matrices for least squares computation. */
-  RealMatrix rotMatrix; /*!< \brief Auxiliary matrix for MPI parallel simulations. */
+
+  RealVec Ys_i,Ys_j;  /*!< \brief Auxiliary vectors to store mass fractions at node i and j. */
+  RealVec Ys;         /*!< \brief Auxiliary vector to store mass fractions. */
 
 public:
 
@@ -100,7 +99,7 @@ public:
    * \param[in] Output - boolean to determine whether to print output.
    * \return - The number of non-physical points.
    */
-  unsigned long SetPrimitive_Variables(CSolver **solver_container, CConfig *config, bool Output) override;
+  unsigned long SetPrimitive_Variables(CSolver** solver_container, CConfig* config, bool Output) override;
 
   /*!
    * \brief Set gradient primitive variables static const unsigned Green Gauss.
@@ -217,6 +216,12 @@ public:
     */
    void Source_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics, CNumerics* second_numerics,
                         CConfig* config, unsigned short iMesh) override;
+
+   /*!
+    * \brief Set the free-stream solution all over the domain.
+    * \param[in] config - Definition of the particular problem.
+    */
+    void SetFreeStream_Solution(CConfig* config) override;
 
    /*!
     * \brief Impose via the residual the Euler wall boundary condition.

@@ -65,7 +65,7 @@ public:
  * \brief Class for computing viscous flux using the average gradients for a chemically reactive flow.
  * \author G. Orlando
  */
-class CAvgGradReactive_Flow : public CNumerics {
+class CAvgGradReactive_Flow: public CNumerics {
 public:
   using RealVec = CReactiveEulerVariable::RealVec;
   using RealMatrix = CReactiveNSVariable::RealMatrix;
@@ -188,9 +188,10 @@ public:
    * \param[in] config - Definition of the particular problem
   */
   virtual void GetViscousProjJacs(const Vec& val_Mean_PrimVar, const RealMatrix& val_Mean_GradPrimVar,
-                                  const RealVec& val_diffusion_coeff, const su2double val_laminar_viscosity, const su2double val_thermal_conductivity,
-                                  const su2double val_dist_ij, SmartArr val_normal, const su2double val_dS, su2double* val_Proj_Visc_Flux,
-                                  su2double** val_Proj_Jac_Tensor_i, su2double** val_Proj_Jac_Tensor_j, CConfig* config);
+                                  const RealVec& val_diffusion_coeff, const su2double val_laminar_viscosity,
+                                  const su2double val_thermal_conductivity, const su2double val_dist_ij, SmartArr val_normal,
+                                  const su2double val_dS, su2double* val_Proj_Visc_Flux, su2double** val_Proj_Jac_Tensor_i,
+                                  su2double** val_Proj_Jac_Tensor_j, CConfig* config);
 
  /*!
    * \brief Compute the viscous flow residual using average gradient method.
@@ -209,8 +210,10 @@ public:
    * \param[in] val_grad_j - Value to assign at point j.
    */
   inline void SetPrimVarGradient(unsigned short val_nvar, unsigned short val_nDim, su2double val_grad_i, su2double val_grad_j) {
-    SU2_Assert(PrimVar_Grad_i[val_nvar] != NULL, std::string("The row " + std::to_string(val_nvar) + " of gradient primitive has not been allocated"));
-    SU2_Assert(PrimVar_Grad_j[val_nvar] != NULL, std::string("The row " + std::to_string(val_nvar) + " of gradient primitive has not been allocated"));
+    SU2_Assert(PrimVar_Grad_i[val_nvar] != NULL,
+               std::string("The row " + std::to_string(val_nvar) + " of gradient primitive has not been allocated"));
+    SU2_Assert(PrimVar_Grad_j[val_nvar] != NULL,
+               std::string("The row " + std::to_string(val_nvar) + " of gradient primitive has not been allocated"));
     PrimVar_Grad_i[val_nvar][val_nDim] = val_grad_i;
     PrimVar_Grad_j[val_nvar][val_nDim] = val_grad_j;
   }
