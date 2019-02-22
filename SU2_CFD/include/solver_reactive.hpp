@@ -39,21 +39,19 @@ protected:
 
   RealVec   PrimVar_i,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at point i. */
             PrimVar_j,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at point j. */
-            PrimVar_Vertex,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at boundary node. */
-            PrimVar_Average,  /*!< \brief Auxiliary nPrimVarGrad vector for storing average of primitive.. */
-            Partial_Res;  /*!< \brief Auxiliary nPrimVarGrad vector. */
+            PrimVar_Vertex;  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at boundary node. */
 
   RealVec   Prim_i, /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point i. */
             Prim_j, /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point j. */
             Primitive; /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at boundary node. */
 
-  RealMatrix C_Mat,S_Mat; /*!< \brief Auxiliary matrices for least squares computation. */
+  RealVec   Buffer_Receive_U, /*!< \brief Auxiliary vector to receive information in case of parallel simulation. */
+            Buffer_Send_U;    /*!< \brief Auxiliary vector to send information in case of parallel simulation. */
 
   RealVec Ys_i,Ys_j;  /*!< \brief Auxiliary vectors to store mass fractions at node i and j. */
   RealVec Ys;         /*!< \brief Auxiliary vector to store mass fractions. */
 
 public:
-
   /*!
 	 * \brief Default constructor of the class.
 	 */
@@ -170,7 +168,8 @@ public:
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    * \param[in] Iteration - Index of the current iteration.
    */
-  void SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iMesh, unsigned long Iteration) override;
+  void SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config,
+                    unsigned short iMesh, unsigned long Iteration) override;
 
   /*!
    * \brief Compute the time step for solving the Navier-Stokes equations.
@@ -180,8 +179,8 @@ public:
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    * \param[in] Iteration - Index of the current iteration.
    */
-   void SetResidual_DualTime(CGeometry* geometry, CSolver** solver_container, CConfig* config,
-                             unsigned short iRKStep, unsigned short iMesh, unsigned short RunTime_EqSystem) override;
+   void SetResidual_DualTime(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iRKStep,
+                             unsigned short iMesh, unsigned short RunTime_EqSystem) override;
 
   /*!
    * \brief Compute the spatial integration static const unsigned a centered scheme.
@@ -203,7 +202,8 @@ public:
    * \param[in] config - Definition of the particular problem.
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    */
-  void Upwind_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics, CConfig* config, unsigned short iMesh) override;
+  void Upwind_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
+                       CConfig* config, unsigned short iMesh) override;
 
    /*!
     * \brief Source term integration.
@@ -231,7 +231,8 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Euler_Wall(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics, CConfig* config, unsigned short val_marker) override;
+   void BC_Euler_Wall(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
+                      CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose the far-field boundary condition.
@@ -254,8 +255,8 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
-                 CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) override;
+   void BC_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
+                 CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose a supersonic inlet boundary condition.
@@ -266,8 +267,8 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Supersonic_Inlet(CGeometry *geometry, CSolver **solver_container, CNumerics *conv_numerics, CNumerics *visc_numerics,
-                            CConfig *config, unsigned short val_marker) override;
+   void BC_Supersonic_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
+                            CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose a supersonic outlet boundary condition.
@@ -278,8 +279,8 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Supersonic_Outlet(CGeometry *geometry, CSolver **solver_container, CNumerics *conv_numerics, CNumerics *visc_numerics,
-                             CConfig *config, unsigned short val_marker) override {}
+   void BC_Supersonic_Outlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
+                             CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose the outlet boundary condition.
@@ -347,8 +348,10 @@ public:
  */
 class CReactiveNSSolver:public CReactiveEulerSolver {
 protected:
-
   su2double Viscosity_Inf;	/*!< \brief Viscosity at the infinity. */
+
+  RealVec Xs_i,Xs_j;  /*!< \brief Auxiliary vectors to store mole fractions at node i and j. */
+  RealVec Xs;         /*!< \brief Auxiliary vector to store mole fractions. */
 
 public:
 
@@ -411,7 +414,8 @@ public:
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    * \param[in] Iteration - Index of the current iteration.
    */
-   void SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iMesh, unsigned long Iteration) override;
+   void SetTime_Step(CGeometry* geometry, CSolver** solver_container, CConfig* config,
+                     unsigned short iMesh, unsigned long Iteration) override;
 
   /*!
    * \brief Compute the viscous residuals.

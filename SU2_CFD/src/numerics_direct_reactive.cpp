@@ -266,9 +266,9 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   su2double rho, T;
 
   /*--- Initialize ---*/
-  std::fill(Proj_Flux_Tensor,Proj_Flux_Tensor + nVar,0.0);
+  std::fill(Proj_Flux_Tensor, Proj_Flux_Tensor + nVar, 0.0);
   for(iVar = 0; iVar < nVar; ++iVar)
-    std::fill(Flux_Tensor[iVar],Flux_Tensor[iVar] + nDim, 0.0);
+    std::fill(Flux_Tensor[iVar], Flux_Tensor[iVar] + nDim, 0.0);
 
   /*--- Rename for convenience ---*/
   mu  = val_viscosity;
@@ -292,7 +292,8 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
     div_vel += val_grad_primvar(VX_INDEX_AVGGRAD + iDim,iDim);
 
   /*--- Pre-compute mixture quantities ---*/
-  RealVec Normalization_Vec(nDim);
+  su2double Normalization_Vec[nDim];
+  std::fill(Normalization_Vec, Normalization_Vec + nDim, 0.0);
   for(iDim = 0; iDim < nDim; ++iDim) {
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
       Normalization_Vec[iDim] += val_diffusion_coeff[iSpecies]*val_grad_primvar(RHOS_INDEX_AVGGRAD + iSpecies,iDim);
@@ -350,7 +351,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
 //
 //
 void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
-                                               const double val_viscosity, const double val_thermal_conductivity,
+                                               const su2double val_viscosity, const su2double val_thermal_conductivity,
                                                const RealMatrix& val_Dij, CConfig* config) {
   SU2_Assert(Proj_Flux_Tensor != NULL, "The array for the projected viscous flux has not been allocated");
   SU2_Assert(Flux_Tensor != NULL, "The matrix for the viscous flux tensor has not been allocated");
@@ -497,12 +498,6 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
 
   /*--- Compute the mean ---*/
   Mean_PrimVar = 0.5*(PrimVar_i + PrimVar_j);
-
-  /*
-  if(grid_movement)
-    for(iDim = 0; iDim < nDim; ++iDim)
-      Mean_PrimVar[CReactiveNSVariable::VX_INDEX_PRIM + nDim] -= 0.5*(GridVel_i[iDim] + GridVel_j[iDim]);
-  */
 
   /*--- Compute the vector from i to j ---*/
   for(iDim = 0; iDim < nDim; ++iDim)
