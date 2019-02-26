@@ -36,6 +36,8 @@ CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim, unsigned
   nSecondaryVarGrad = 0;
   nPrimVarLim = val_nprimvarlim;
 
+  US_System = (config->GetSystemMeasurements() == US);
+
   library = LibraryPtr(new Framework::ReactingModelLibrary(config->GetConfigLibFile()));
 
   Primitive.resize(nPrimVar);
@@ -75,7 +77,6 @@ CReactiveEulerVariable::CReactiveEulerVariable(const su2double val_pressure, con
   rho *= config->GetGas_Constant_Ref();
 
   su2double dim_temp = T*config->GetTemperature_Ref();
-  bool US_System = (config->GetSystemMeasurements() == US);
   if(US_System)
     dim_temp *= 5.0/9.0;
 
@@ -102,12 +103,6 @@ CReactiveEulerVariable::CReactiveEulerVariable(const su2double val_pressure, con
   /*--- Assign primitive variables ---*/
   Primitive.at(T_INDEX_PRIM) = T;
   Primitive.at(P_INDEX_PRIM) = P;
-
-  /*--- Set specific heat at constant pressure ---*/
-  //Cp = library->ComputeCP(dim_temp,val_massfrac);
-  Cp /= config->GetEnergy_Ref()*config->GetTemperature_Ref();
-  if(US_System)
-    Cp *= 3.28084*3.28084*9.0/5.0;
 }
 
 //
@@ -129,21 +124,8 @@ CReactiveEulerVariable::CReactiveEulerVariable(const RealVec& val_solution, unsi
   std::copy(val_solution.cbegin(),val_solution.cend(),Solution);
   std::copy(val_solution.cbegin(),val_solution.cend(),Solution_Old);
 
-  /*--- Initialize T and P to the free stream for Secant method ---*/
+  /*--- Initialize T to the free stream for the secant method ---*/
   Primitive.at(T_INDEX_PRIM) = config->GetTemperature_FreeStream();
-  Primitive.at(P_INDEX_PRIM) = config->GetPressure_FreeStream();
-
-  /*--- Set specific heat at constant pressure ---*/
-  su2double dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
-  bool US_System = (config->GetSystemMeasurements() == US);
-  for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-    Ys[iSpecies] = Solution[RHOS_INDEX_SOL]/Solution[RHO_INDEX_SOL];
-  if(US_System)
-    dim_temp *= 5.0/9.0;
-  //Cp = library->ComputeCP(dim_temp,Ys);
-  Cp /= config->GetEnergy_Ref()*config->GetTemperature_Ref();
-  if(US_System)
-    Cp *= 3.28084*3.28084*9.0/5.0;
 }
 
 //
@@ -179,13 +161,12 @@ bool CReactiveEulerVariable::SetPrimVar(CConfig* config) {
 
   /*--- Set specific heat at constant pressure ---*/
   su2double dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
-  bool US_System = (config->GetSystemMeasurements() == US);
   if(US_System)
     dim_temp *= 5.0/9.0;
   //Cp = library->ComputeCP(dim_temp,GetMassFractions());
-  Cp /= config->GetEnergy_Ref()*config->GetTemperature_Ref();
+  Cp *= config->GetTemperature_Ref()/config->GetEnergy_Ref();
   if(US_System)
-    Cp *= 3.28084*3.28084*9.0/5.0;
+    Cp *= 3.28084*3.28084*5.0/9.0;
 
   return nonPhys;
 }
@@ -226,7 +207,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   maxBIter = 32;        // Maximum Bisection method iterations
 
   /*--- Rename variables forconvenience ---*/
-  rhoE  = U[RHOE_INDEX_SOL];          // Density * total energy [J/m3]
+  rhoE = U[RHOE_INDEX_SOL];          // Density * total energy [J/m3]
 
   /*--- Assign species mass fraction and mixture density ---*/
   // NOTE: If any species densities are < 0, these values are re-assigned
@@ -268,7 +249,6 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   T = V[T_INDEX_PRIM];
   Told = T + 1.0;
   NRconvg = false;
-  bool US_System = (config->GetSystemMeasurements() == US);
   for(iIter = 0; iIter < maxNIter; ++iIter) {
     /*--- Execute a secant root-finding method to find T ---*/
     su2double dim_temp, dim_temp_old;
@@ -474,11 +454,11 @@ inline void CReactiveEulerVariable::SetVelocity_Old(su2double* val_velocity) {
  */
 //
 //
-CReactiveNSVariable::CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies, unsigned short val_nprimvar,
-                                         unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config):
-                                         CReactiveEulerVariable(val_nDim,val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,val_nprimvarlim,config) {
-  Laminar_Viscosity = 0.0;
-  Thermal_Conductivity = 0.0;
+CReactiveNSVariable::CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies,
+                                         unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim,
+                                         CConfig* config): CReactiveEulerVariable(val_nDim, val_nvar, val_nSpecies, val_nprimvar,
+                                                                                  val_nprimvargrad, val_nprimvarlim, config),
+                                                           Laminar_Viscosity(), Thermal_Conductivity() {
   Diffusion_Coeffs.resize(nSpecies,nSpecies);
 }
 
@@ -493,25 +473,10 @@ CReactiveNSVariable::CReactiveNSVariable(const su2double val_pressure, const Rea
                                          const su2double val_temperature, unsigned short val_nDim, unsigned short val_nvar,
                                          unsigned short val_nSpecies,unsigned short val_nprimvar, unsigned short val_nprimvargrad,
                                          unsigned short val_nprimvarlim, CConfig* config):
-                                         CReactiveEulerVariable(val_pressure,val_massfrac,val_velocity,val_temperature,val_nDim,
-                                                                val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,val_nprimvarlim,config) {
-  su2double dim_temp, dim_press;
-  bool US_System = (config->GetSystemMeasurements() == US);
-  dim_temp = val_temperature*config->GetTemperature_Ref();
-  dim_press = val_pressure*config->GetPressure_Ref()/101325.0;
-  if(US_System) {
-    dim_temp *= 5.0/9.0;
-    dim_press *= 47.8803;
-  }
-
-  /*--- Compute transport properties --- */
-  //Laminar_Viscosity = library->GetLambda(dim_temp,val_massfrac)/config->GetViscosity_Ref();
-  if(US_System)
-    Laminar_Viscosity *= 0.02088553108;
-  //Thermal_Conductivity = library->GetEta(dim_temp,val_massfrac)/config->GetConductivity_Ref();
-  if(US_System)
-    Thermal_Conductivity *= 0.12489444444;
-  //Diffusion_Coeffs = library->GetDij_SM(dim_temp,dim_press)/(config->GetVelocity_Ref()*config->GetLength_Ref()*1e-4);
+                                         CReactiveEulerVariable(val_pressure, val_massfrac, val_velocity, val_temperature, val_nDim,
+                                                                val_nvar, val_nSpecies, val_nprimvar, val_nprimvargrad,
+                                                                val_nprimvarlim, config), Laminar_Viscosity(), Thermal_Conductivity() {
+  Diffusion_Coeffs.resize(nSpecies,nSpecies);
 }
 
 //
@@ -521,29 +486,12 @@ CReactiveNSVariable::CReactiveNSVariable(const su2double val_pressure, const Rea
  */
 //
 //
-CReactiveNSVariable::CReactiveNSVariable(const RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies,
-                                         unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim,
-                                         CConfig* config):
+CReactiveNSVariable::CReactiveNSVariable(const RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar,
+                                         unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
+                                         unsigned short val_nprimvarlim, CConfig* config):
                                          CReactiveEulerVariable(val_solution,val_nDim,val_nvar,val_nSpecies,val_nprimvar,val_nprimvargrad,
-                                                                val_nprimvarlim,config) {
-  su2double dim_temp, dim_press;
-  bool US_System = (config->GetSystemMeasurements() == US);
-  dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
-  dim_press = Primitive[P_INDEX_PRIM]*config->GetPressure_Ref()/101325.0;
-  if(US_System) {
-    dim_temp *= 5.0/9.0;
-    dim_press *= 47.8803;
-  }
-
-  /*--- Compute transport properties --- */
-  Ys = GetMassFractions();
-  //Laminar_Viscosity = library->GetLambda(dim_temp,Ys)/config->GetViscosity_Ref();
-  if(US_System)
-    Laminar_Viscosity *= 0.02088553108;
-  //Thermal_Conductivity = library->GetEta(dim_temp,Ys)/config->GetConductivity_Ref();
-  if(US_System)
-    Thermal_Conductivity *= 0.12489444444;
-  //Diffusion_Coeffs = library->GetDij_SM(dim_temp,dim_press)/(config->GetVelocity_Ref()*config->GetLength_Ref()*1e-4);
+                                                                val_nprimvarlim,config), Laminar_Viscosity(), Thermal_Conductivity() {
+  Diffusion_Coeffs.resize(nSpecies,nSpecies);
 }
 
 //
@@ -558,7 +506,6 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
   bool nonPhys = CReactiveEulerVariable::SetPrimVar(config);
 
   su2double dim_temp, dim_press;
-  bool US_System = (config->GetSystemMeasurements() == US);
   dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
   dim_press = Primitive[P_INDEX_PRIM]*config->GetPressure_Ref()/101325.0;
   if(US_System) {

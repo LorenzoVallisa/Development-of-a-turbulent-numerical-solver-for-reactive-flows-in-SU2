@@ -24,6 +24,8 @@ protected:
   static unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
   unsigned short nPrimVarLim; /*!< \brief Number of primitive variables to limit in the problem. */
 
+  bool US_System;             /*!< \brief Flag for US units. */    
+
   su2double Cp;                 /*!< \brief Specific heat at constant pressure. */
 
   /*--- Primitive variable definition ---*/
@@ -451,6 +453,15 @@ public:
   }
 
   /*!
+   * \brief Get the projected velocity in a unitary vector direction (compressible solver).
+   * \param[in] val_vector - Direction of projection.
+   * \return Value of the projected velocity.
+   */
+  inline su2double GetSpecificHeatCp(void) override {
+    return Cp;
+  }
+
+  /*!
    * \brief Set the velocity vector from the old solution.
    * \param[in] val_velocity - Pointer to the velocity.
    */
@@ -488,7 +499,7 @@ public:
   /*!
 	 * \brief Default constructor of the class.
 	 */
-  CReactiveNSVariable():CReactiveEulerVariable(),Laminar_Viscosity(),Thermal_Conductivity() {}
+  CReactiveNSVariable(): CReactiveEulerVariable(),Laminar_Viscosity(),Thermal_Conductivity() {}
 
   /*!
    * \overloaded Class constructor
@@ -594,6 +605,7 @@ public:
 	inline void SetWallTemperature(su2double temperature_wall) override {
     Primitive.at(T_INDEX_PRIM) = temperature_wall;
   }
+
 };
 const unsigned short CReactiveNSVariable::RHOS_INDEX_GRAD = CReactiveNSVariable::P_INDEX_GRAD + 1;
 

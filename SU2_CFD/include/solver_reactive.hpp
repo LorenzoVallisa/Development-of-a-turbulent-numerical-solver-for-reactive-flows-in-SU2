@@ -27,6 +27,8 @@ protected:
         second_order, /*!< \brief True if second order recosntruction is applied. */
         limiter; /*!< \brief True if limiting strategy is applied. */
 
+  bool  US_System;  /*!< \brief True if using US units. */
+
   RealVec   Lower_Limit,   /*!< \brief Lower limit conserved variables. */
             Upper_Limit;   /*!< \brief Upper limit conserved variables. */
 
@@ -295,23 +297,11 @@ public:
                   CConfig* config, unsigned short val_marker) override;
 
    /*!
-    * \brief Impose the symmetry plane boundary condition.
+    * \brief Set the initial conditions.
     * \param[in] geometry - Geometrical definition of the problem.
-    * \param[in] solver_container - Container vector with all the solutions.
-    * \param[in] conv_numerics - Description of the numerical method for convective term.
-    * \param[in] visc_numerics - Description of the numerical method for viscous term.
+    * \param[in] solver_container - Container with all the solutions.
     * \param[in] config - Definition of the particular problem.
-    * \param[in] val_marker - Surface marker where the boundary condition is applied.
-    */
-   void BC_Sym_Plane(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
-                     CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) override {}
-
-    /*!
-     * \brief Set the initial conditions.
-     * \param[in] geometry - Geometrical definition of the problem.
-     * \param[in] solver_container - Container with all the solutions.
-     * \param[in] config - Definition of the particular problem.
-     * \param[in] ExtIter - External iteration.
+    * \param[in] ExtIter - External iteration.
     */
    void SetInitialCondition(CGeometry** geometry, CSolver*** solver_container, CConfig *config, unsigned long ExtIter) override;
 
@@ -428,18 +418,6 @@ public:
    */
    void Viscous_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
                          CConfig* config, unsigned short iMesh, unsigned short iRKStep) override;
-
-  /*!
-   * \brief Impose the Navier-Stokes boundary condition (strong).
-   * \param[in] geometry - Geometrical definition of the problem.
-   * \param[in] solver_container - Container vector with all the solutions.
-   * \param[in] conv_numerics - Description of the numerical method for convective term.
-   * \param[in] visc_numerics - Description of the numerical method for viscous term.
-   * \param[in] config - Definition of the particular problem.
-   * \param[in] val_marker - Surface marker where the boundary condition is applied.
-  */
-  void BC_HeatFlux_Wall(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
-                        CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) override;
 
   /*!
    * \brief Impose an isothermal wall boundary condition (no-slip).
