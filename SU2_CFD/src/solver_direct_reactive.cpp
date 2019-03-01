@@ -2794,7 +2794,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
   unsigned short iVar, iDim, jDim, iSpecies;
   unsigned long iVertex, iPoint, Point_Normal;
 
-  su2double Pressure, P_Exit, Velocity2, Entropy, Density, Energy, dim_temp,
+  su2double Pressure, P_Exit, Velocity2, Entropy, Density, Energy, dim_cp,
             Riemann, Vn, SoundSpeed, Gamma, Gamma_Minus_One, Mach_Exit, Vn_Exit, Area;
   su2double V_outlet[nPrimVar];
   su2double Velocity[nDim], Normal[nDim], UnitNormal[nDim];
@@ -2859,17 +2859,18 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
               to update the conservative variables. Compute the entropy and the
               acoustic Riemann variable. These invariants, as well as the
               tangential velocity components, are extrapolated. ---*/
-        Entropy = Pressure*std::pow(1.0/Density, Gamma);
         Gamma_Minus_One = Gamma - 1.0;
         Riemann = Vn + 2.0*SoundSpeed/Gamma_Minus_One;
 
         /*--- Compute the new fictious state at the outlet ---*/
-        Pressure = P_Exit;
+        Pressure = V_domain[CReactiveEulerVariable::P_INDEX_PRIM];
 
         /*--- Secant method to determine the temperature ---*/
         double a;
-        //const double a = Pressure*config->GetGas_Constant_Ref()/library->ComputeRgas(Ys);
-        const double b = Pressure/Entropy;
+        //const double a = library->ComputeRgas(Ys)*std::log(P_exit/Pressure);
+        su2double T = V_domain[CReactiveEulerVariable::T_INDEX_PRIM];
+        const double b = node[iPoint]->GetSpecificHeatCp()/T;
+
         bool NRconvg, Bconvg;
         su2double NRtol = 1.0E-6;    // Tolerance for the Secant method
         su2double Btol = 1.0E-4;    // Tolerance for the Bisection method
@@ -2877,76 +2878,85 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         unsigned short maxBIter = 32;        // Maximum Bisection method iterations
         unsigned short iIter;
 
-        su2double T = V_domain[CReactiveEulerVariable::T_INDEX_PRIM];
         su2double Told = T + 1.0;
+        su2double Tcurr = T;
         su2double Tnew;
         NRconvg = false;
-        su2double gamma;
-        su2double dim_temp_old, gamma_old;
+        su2double dim_temp, dim_temp_old;
+        su2double dim_cp_old;
+
+        /*--- Application of Cavalieri-Simposn's rule ---*/
+        auto f = std::function<double(double)>([&](double temp){
+          su2double temp1_dim = (T + temp)/2.0*config->GetTemperature_Ref();
+          su2double temp2_dim = temp;
+          if(US_System) {
+            temp1_dim *= 5.0/9.0;
+            temp2_dim *= 5.0/9.0;
+          }
+          //su2double cp1 = library->ComputeCp(temp1_dim,Ys);
+          //su2double cp2 = library->ComputeCp(temp2_dim,Ys);
+          su2double cp1,cp2;
+          cp1 *= config->GetTemperature_Ref()/config->GetEnergy_Ref();
+          cp2 *= config->GetTemperature_Ref()/config->GetEnergy_Ref();
+          if(US_System) {
+            cp1 *= 3.28084*3.28084*5.0/9.0;
+            cp2 *= 3.28084*3.28084*5.0/9.0;
+          }
+          return (temp-T)*(b + 8.0*cp1/(temp + T) + cp2/temp)/6.0;
+        });
 
         /*--- Execute a secant root-finding method to find the outlet temperature ---*/
         for(iIter = 0; iIter < maxNIter; ++iIter) {
-          dim_temp = T*config->GetTemperature_Ref();
-          dim_temp_old = Told*config->GetTemperature_Ref();
-          if(US_System) {
-            dim_temp *= 5.0/9.0;
-            dim_temp_old *= 5.0/9.0;
-          }
-          //gamma = library->ComputeFrozenGamma(dim_temp,Ys);
-          //gamma_old = library->ComputeFrozenGamma(dim_temp_old,Ys);
-          su2double tmp = std::pow(a/T,gamma);
-          su2double f = tmp - b;
-          su2double df = tmp - std::pow(a/Told,gamma_old);
-          Tnew = T - f*(T-Told)/df;
+          su2double tmp = f(Tcurr);
+          su2double F = tmp - a;
+          su2double dF = tmp - f(Told);
+          Tnew = Tcurr - F*(Tcurr - Told)/dF;
 
           /*--- Check for convergence ---*/
-          if(std::abs(Tnew - T) < NRtol) {
+          if(std::abs(Tnew - Tcurr) < NRtol) {
             NRconvg = true;
             break;
           }
           else {
-            Told = T;
-            T = Tnew;
+            Told  = Tcurr;
+            Tcurr = Tnew;
           }
         }
 
         if(NRconvg)
-          V_outlet[CReactiveEulerVariable::T_INDEX_PRIM] = T;
+          V_outlet[CReactiveEulerVariable::T_INDEX_PRIM] = Tcurr;
         else {
           /*--- Execute the bisection root-finding method ---*/
           Bconvg = false;
           su2double Ta = 50;
           su2double Tb = 8.0e4;
           for(iIter = 0; iIter < maxBIter; ++iIter) {
-            T = (Ta + Tb)/2.0;
-            dim_temp = T*config->GetTemperature_Ref();;
-            if(US_System)
-              dim_temp *= 5.0/9.0;
-            //gamma = library->ComputeFrozenGamma(dim_temp,Ys);
+            Tcurr = (Ta + Tb)/2.0;
+            su2double F = f(Tcurr) - a;
 
-            su2double f = std::pow(a/T,gamma) - b;
-
-            if(std::abs(f) < Btol) {
-              V_outlet[CReactiveEulerVariable::T_INDEX_PRIM] = T;
+            if(std::abs(F) < Btol) {
+              V_outlet[CReactiveEulerVariable::T_INDEX_PRIM] = Tcurr;
               Bconvg = true;
               break;
             }
             else {
-              if(f > 0)
-                Ta = T;
+              if(F > 0.0)
+                Ta = Tcurr;
               else
-                Tb = T;
+                Tb = Tcurr;
             }
+          }
 
           /*--- If absolutely no convergence, then something is going really wrong ---*/
           if(!Bconvg)
             throw std::runtime_error("Convergence not achieved for bisection method");
-          }
         }
 
         /*--- Complete the fictious state at the outlet ---*/
-        Density  = a/V_outlet[CReactiveEulerVariable::T_INDEX_PRIM];
-        dim_temp = V_outlet[CReactiveEulerVariable::T_INDEX_PRIM]*config->GetTemperature_Ref();
+        Pressure = P_Exit;
+        su2double Temperature = V_outlet[CReactiveEulerVariable::T_INDEX_PRIM];
+        //Density  = library->ComputeDensity(Pressure,Temperature,Ys)
+        dim_temp = Temperature*config->GetTemperature_Ref();
         if(US_System)
           dim_temp *= 5.0/9.0;
         //Gamma = library->Frozen_GammaSoundSpeed(dim_temp,Ys);

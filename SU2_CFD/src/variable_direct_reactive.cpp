@@ -309,11 +309,11 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
         else
           Tb = T;
       }
+    }
 
     /*--- If absolutely no convergence, then something is going really wrong ---*/
     if(!Bconvg)
       throw std::runtime_error("Convergence not achieved for bisection method");
-    }
   }
 
   if(V[T_INDEX_PRIM] < Tmin) {
