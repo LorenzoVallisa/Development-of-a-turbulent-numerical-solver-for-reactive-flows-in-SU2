@@ -67,6 +67,7 @@ using namespace std;
 
 class CConfig {
 private:
+  /*--- New information to be read from config ---*/
   string Library_Name; /*!< \brief Name of library for physical-chemical options.*/
   string Config_File_Lib; /*!< \brief Name of the to configure the library.*/
   unsigned short nSpecies; /*!< \brief Number of species in the mixture.*/
@@ -1188,6 +1189,11 @@ public:
    * \brief Get library name for physical-chemical properties.
   */
   string GetConfigLibFile(void) const;
+
+  //typedef std::shared_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
+  //static LibraryPtr GetLibrary(void) const {
+    //return LibraryPtr(new Framework::ReactingModelLibrary(config->GetConfigLibFile()))
+  //}
 
 
   /*!

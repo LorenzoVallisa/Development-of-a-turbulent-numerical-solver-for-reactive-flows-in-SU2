@@ -758,9 +758,9 @@ void CMultiGridIntegration::NonDimensional_Parameters(CGeometry **geometry, CSol
       /*--- Evaluate convergence monitor ---*/
       if (config->GetConvCriteria() == RESIDUAL) {
         if (config->GetResidual_Func_Flow() == RHO_RESIDUAL)
-          (*monitor) = std::log10(solver_container[FinestMesh][REACTIVE_SOL]->GetRes_RMS(CReactiveEulerVariable::RHO_INDEX_SOL));
+          (*monitor) = std::log10(solver_container[FinestMesh][REACTIVE_SOL]->GetRes_RMS(CReactiveEulerVariable::GetRHO_INDEX_SOL()));
         else if (config->GetResidual_Func_Flow() == RHO_ENERGY_RESIDUAL)
-          (*monitor) = std::log10(solver_container[FinestMesh][REACTIVE_SOL]->GetRes_RMS(CReactiveEulerVariable::RHOE_INDEX_SOL));
+          (*monitor) = std::log10(solver_container[FinestMesh][REACTIVE_SOL]->GetRes_RMS(CReactiveEulerVariable::GetRHOE_INDEX_SOL()));
       }
 
       break;

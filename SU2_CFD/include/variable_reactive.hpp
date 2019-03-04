@@ -17,14 +17,15 @@ public:
   typedef std::vector<su2double> RealVec;
   typedef su2double** SU2Matrix;
   typedef std::shared_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
+  //using LibraryPtr = CConfig::LibraryPtr;
 
 protected:
   static LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
-  static unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
+  unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
   unsigned short nPrimVarLim; /*!< \brief Number of primitive variables to limit in the problem. */
 
-  bool US_System;             /*!< \brief Flag for US units. */    
+  bool US_System;             /*!< \brief Flag for US units. */
 
   su2double Cp;                 /*!< \brief Specific heat at constant pressure. */
 
@@ -36,8 +37,7 @@ protected:
   RealVec    dTdU;                /*!< \brief Partial derivative of temperature w.r.t. conserved variables. */
 
   RealVec Ys;               /*!< \brief Auxiliary vector to store mass fractions separately. */
-
-public:
+  RealVec Ri;               /*!< \brief Auxiliary vector to store specific gas constat for each species. */
 
   /**
    * Mapping between the primitive variable name and its position in the physical data
@@ -71,6 +71,8 @@ public:
   static constexpr unsigned short T_INDEX_LIM = 0;
   static constexpr unsigned short VX_INDEX_LIM = 1;
   static const unsigned short P_INDEX_LIM;
+
+public:
 
   /*!
 	 * \brief Default constructor of the class.
@@ -147,8 +149,144 @@ public:
    * \brief Get the number of species in the mixture.
    * \return Number of species in the problem.
    */
-  inline static const unsigned short GetnSpecies(void) {
+  inline unsigned short GetnSpecies(void) {
     return nSpecies;
+  }
+
+  /*!
+   * \brief Get the index of temperature in primitive variables array
+   * \return Index of temperature in primitive variables array
+   */
+  inline static const unsigned short GetT_INDEX_PRIM(void) {
+    return T_INDEX_PRIM;
+  }
+
+  /*!
+   * \brief Get the index of velocity along x in primitive variables array
+   * \return Index of velocity along x in primitive variables array
+   */
+  inline static const unsigned short GetVX_INDEX_PRIM(void) {
+    return VX_INDEX_PRIM;
+  }
+
+  /*!
+   * \brief Get the index of pressure in primitive variables array
+   * \return Index of pressure in primitive variables array
+   */
+  inline static const unsigned short GetP_INDEX_PRIM(void) {
+    return P_INDEX_PRIM;
+  }
+
+  /*!
+   * \brief Get the index of density in primitive variables array
+   * \return Index of density in primitive variables array
+   */
+  inline static const unsigned short GetRHO_INDEX_PRIM(void) {
+    return RHO_INDEX_PRIM;
+  }
+
+  /*!
+   * \brief Get the index of total enthalpy in primitive variables array
+   * \return Index of total enthalpy in primitive variables array
+   */
+  inline static const unsigned short GetH_INDEX_PRIM(void) {
+    return H_INDEX_PRIM;
+  }
+
+  /*!
+   * \brief Get the index of speed of sound in primitive variables array
+   * \return Index of speed of sound in primitive variables array
+   */
+  inline static const unsigned short GetA_INDEX_PRIM(void) {
+    return A_INDEX_PRIM;
+  }
+
+  /*!
+   * \brief Get the index of mass fractions in primitive variables array
+   * \return Index of mass fractions in primitive variables array
+   */
+  inline static const unsigned short GetRHOS_INDEX_PRIM(void) {
+    return RHOS_INDEX_PRIM;
+  }
+
+  /*!
+   * \brief Get the index of density in conserved variables array
+   * \return Index of density in conserved variables array
+   */
+  inline static const unsigned short GetRHO_INDEX_SOL(void) {
+    return RHO_INDEX_SOL;
+  }
+
+  /*!
+   * \brief Get the index of momentum along x in conserved variables array
+   * \return Index of momentum along x in conserved variables array
+   */
+  inline static const unsigned short GetRHOVX_INDEX_SOL(void) {
+    return RHOVX_INDEX_SOL;
+  }
+
+  /*!
+   * \brief Get the index of density times total energy in conserved variables array
+   * \return Index of density times totla energy in conserved variables array
+   */
+  inline static const unsigned short GetRHOE_INDEX_SOL(void) {
+    return RHOE_INDEX_SOL;
+  }
+
+  /*!
+   * \brief Get the index of partial densities in conserved variables array
+   * \return Index of partial densities in conserved variables array
+   */
+  inline static const unsigned short GetRHOS_INDEX_SOL(void) {
+    return RHOS_INDEX_SOL;
+  }
+
+  /*!
+   * \brief Get the index of temperature in primitive gradient
+   * \return Index of temperature in primitive gradient
+   */
+  inline static const unsigned short GetT_INDEX_GRAD(void) {
+    return T_INDEX_GRAD;
+  }
+
+  /*!
+   * \brief Get the index of velocity along x in primitive gradient
+   * \return Index of velocity along x in primitive gradient
+   */
+  inline static const unsigned short GetVX_INDEX_GRAD(void) {
+    return VX_INDEX_GRAD;
+  }
+
+  /*!
+   * \brief Get the index of pressure in primitive gradient
+   * \return Index of pressure in primitive gradient
+   */
+  inline static const unsigned short GetP_INDEX_GRAD(void) {
+    return P_INDEX_GRAD;
+  }
+
+  /*!
+   * \brief Get the index of temperature for limited variables
+   * \return Index of temperature for limited variables
+   */
+  inline static const unsigned short GetT_INDEX_LIM(void) {
+    return T_INDEX_LIM;
+  }
+
+  /*!
+   * \brief Get the index of velocity along x for limited variables
+   * \return Index of velocity along x for limited variables
+   */
+  inline static const unsigned short GetVX_INDEX_LIM(void) {
+    return VX_INDEX_LIM;
+  }
+
+  /*!
+   * \brief Get the index of pressure for limited variables
+   * \return Index of pressure for limited variables
+   */
+  inline static const unsigned short GetP_INDEX_LIM(void) {
+    return P_INDEX_LIM;
   }
 
   /*!
@@ -328,27 +466,29 @@ public:
 
   /*!
    * \brief Calculates partial derivative of pressure w.r.t. conserved variables \f$\frac{\partial P}{\partial U}\f$
+   * \param[in] V - Actual state
    * \param[in] config - Configuration settings
-   * \param[in] dPdU - Passed-by-reference array to assign the derivatives
+   * \param[in] dPdU - Array to assign the derivatives
    */
   void CalcdPdU(su2double* V, CConfig* config, su2double* dPdU) override;
 
   /*!
-   * \brief Calculates partial derivative of temperature w.r.t. conserved variables \f$\frac{\partial P}{\partial U}\f$
+   * \brief Calculates partial derivative of temperature w.r.t. conserved variables \f$\frac{\partial T}{\partial U}\f$
+   * \param[in] V - Actual state
    * \param[in] config - Configuration settings
-   * \param[in] dTdU - Passed-by-reference array to assign the derivatives
+   * \param[in] dTdU - Srray to assign the derivatives
    */
   void CalcdTdU(su2double* V, CConfig* config, su2double* dTdU) override;
 
   /*!
-   * \brief Set partial derivative of pressure w.r.t. density \f$\frac{\partial P}{\partial \rho_s}\f$
+   * \brief Get partial derivative of pressure w.r.t. density \f$\frac{\partial P}{\partial \rho_s}\f$
    */
   inline su2double* GetdPdU(void) override {
     return dPdU.data();
   }
 
   /*!
-   * \brief Set partial derivative of temperature w.r.t. density \f$\frac{\partial T}{\partial \rho_s}\f$
+   * \brief Get partial derivative of temperature w.r.t. density \f$\frac{\partial T}{\partial \rho_s}\f$
    */
   inline su2double* GetdTdU(void) override {
     return dTdU.data();
@@ -494,7 +634,7 @@ protected:
   su2double  Thermal_Conductivity;   /*!< \brief Thermal conductivity of the gas mixture. */
 
 public:
-  static const unsigned short RHOS_INDEX_GRAD;
+  static const unsigned short RHOS_INDEX_GRAD; /*!< \brief Index for position of mole fractions in primitives gradient. */
 
   /*!
 	 * \brief Default constructor of the class.
@@ -548,7 +688,15 @@ public:
   /*!
 	 * \brief Destructor of the class.
 	 */
-	virtual ~CReactiveNSVariable() {};
+	virtual ~CReactiveNSVariable() {}
+
+  /*!
+   * \brief Get the index of mole fractions in primitive gradient
+   * \return Index of mole fractions in primitive gradient
+   */
+  inline static const unsigned short GetRHOS_INDEX_GRAD(void) {
+    return RHOS_INDEX_GRAD;
+  }
 
   /*!
    * \brief Set all primitive variables and transport properties for compressible flows.

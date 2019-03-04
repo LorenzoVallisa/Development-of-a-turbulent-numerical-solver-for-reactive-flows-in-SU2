@@ -1,8 +1,8 @@
 #include "../include/variable_reactive.hpp"
 #include "../../Common/include/reacting_model_library.hpp"
 
-unsigned short CReactiveEulerVariable::nSpecies = 0;
 CReactiveEulerVariable::LibraryPtr CReactiveEulerVariable::library = NULL;
+//CReactiveEulerVariable::LibraryPtr CReactiveEulerVariable::library = CConfig::GetLibrary();
 
 //
 //
@@ -11,12 +11,11 @@ CReactiveEulerVariable::LibraryPtr CReactiveEulerVariable::library = NULL;
  */
 //
 //
-CReactiveEulerVariable::CReactiveEulerVariable():CVariable() {
+CReactiveEulerVariable::CReactiveEulerVariable(): CVariable(), nSpecies(), nPrimVarLim(), US_System(false), Cp() {
   nPrimVar = 0;
   nPrimVarGrad = 0;
   nSecondaryVar = 0;
   nSecondaryVarGrad = 0;
-  nPrimVarLim = 0;
 }
 
 //
@@ -46,10 +45,13 @@ CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim, unsigned
     Gradient_Primitive[iVar] = new su2double[nDim];
   Limiter_Primitive.resize(nPrimVarLim);
 
-  Solution_Max = new su2double[nPrimVarLim];
-  Solution_Min = new su2double[nPrimVarLim];
+  dTdU.resize(nVar);
+  dPdU.resize(nVar);
 
   Ys.resize(nSpecies);
+  Ri = library->GetRigas();
+  for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+    Ri[iSpecies] /= config->GetGas_Constant_Ref();
 }
 
 //
@@ -164,9 +166,13 @@ bool CReactiveEulerVariable::SetPrimVar(CConfig* config) {
   if(US_System)
     dim_temp *= 5.0/9.0;
   //Cp = library->ComputeCP(dim_temp,GetMassFractions());
-  Cp *= config->GetTemperature_Ref()/config->GetEnergy_Ref();
+  Cp /= config->GetGas_Constant_Ref();
   if(US_System)
     Cp *= 3.28084*3.28084*5.0/9.0;
+
+  /*--- Set temperature and pressure derivatives ---*/
+  CalcdTdU(Primitive.data(), config, dTdU.data());
+  CalcdPdU(Primitive.data(), config, dPdU.data());
 
   return nonPhys;
 }
@@ -242,7 +248,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   sqvel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
 
   /*--- Translational-Rotational Temperature ---*/
-  const su2double Rgas = library->ComputeRgas(Ys)/config->GetGas_Constant_Ref();
+  const su2double Rgas = std::inner_product(Ri.cbegin(), Ri.cend(), Ys.cbegin(), 0.0);
   const su2double C1 = (-rhoE + rho*sqvel)/(rho*Rgas);
   const su2double C2 = 1.0/Rgas;
 
@@ -344,9 +350,57 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
 
   /*--- Enthalpy ---*/
   V[H_INDEX_PRIM] = (U[RHOE_INDEX_SOL] + V[P_INDEX_PRIM])/rho;
+  //V[H_INDEX_PRIM] = (U[RHOE_INDEX_SOL] + V[P_INDEX_PRIM]*std::accumulate(Ys.cbegin(),Ys.cend(),0.0))/rho;
 
   return nonPhys;
 }
+
+//
+//
+/*!
+ *\brief Compute temperature derivatives
+ */
+//
+//
+void CReactiveEulerVariable::CalcdTdU(su2double* V, CConfig* config, su2double* dTdU) {
+  /*--- Check memory allocation---*/
+  SU2_Assert(dTdU != NULL,"The array to store the derivatives of temperature w.r.t. conserved variables has not been allocated");
+
+}
+
+//
+//
+/*!
+ *\brief Compute pressure derivatives
+ */
+//
+//
+void CReactiveEulerVariable::CalcdPdU(su2double* V, CConfig* config, su2double* dPdU) {
+  /*--- Check memory allocation---*/
+  SU2_Assert(dPdU != NULL,"The array to store the derivatives of pressure w.r.t. conserved variables has not been allocated");
+
+  /*--- Useful quantities ---*/
+  std::copy(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM + nSpecies), Ys.begin());
+  su2double dim_cp = Cp*config->GetGas_Constant_Ref();
+  if(US_System)
+    Cp /= 3.28084*3.28084*5.0/9.0;
+  //su2double gamma = library->ComputeFrozenGamma_FromCP(dim_cp,Ys);
+
+  /*--- Rename for convenience ---*/
+  su2double T = V[T_INDEX_PRIM];
+  su2double rho = V[RHO_INDEX_PRIM];
+  su2double P = V[P_INDEX_PRIM];
+
+  /*--- Compute derivatives ---*/
+  su2double sq_vel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
+  //dPdU[RHO_INDEX_SOL] = gamma - 1.0 - 0.5*sq_vel;
+  //for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+  //  dPdU[RHOVX_INDEX_SOL + iDim] = gamma - 1.0;
+  //dPdU[RHOE_INDEX_SOL] = gamma - 1.0;
+  //for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+  //  dPdU[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*T - (gamma - 1.0)*Ys[iSpecies]*rho;
+}
+
 
 //
 //
@@ -369,6 +423,8 @@ void CReactiveEulerVariable::Prim2ConsVar(CConfig* config, su2double* V, su2doub
     U[RHOVX_INDEX_SOL + iDim] = V[RHO_INDEX_PRIM]*V[VX_INDEX_PRIM + iDim];
 
   /*--- Set energies ---*/
+  //su2double sigma = std::accumulate(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM + nSpecies));
+  //U[RHOE_INDEX_SOL] = V[RHO_INDEX_PRIM]*V[H_INDEX_PRIM] - V[P_INDEX_PRIM]*sigma;
   U[RHOE_INDEX_SOL] = V[RHO_INDEX_PRIM]*V[H_INDEX_PRIM] - V[P_INDEX_PRIM];
 }
 
@@ -419,7 +475,7 @@ bool CReactiveEulerVariable::SetPressure(CConfig* config) {
 //
 bool CReactiveEulerVariable::SetSoundSpeed(CConfig* config) {
   su2double dim_temp = Primitive.at(T_INDEX_PRIM)*config->GetTemperature_Ref();
-  if(config->GetSystemMeasurements() == US)
+  if(US_System)
     dim_temp *= 5.0/9.0;
   su2double Sound_Speed;
   //su2double Sound_Speed = library->ComputeFrozenSoundSpeed(dim_temp, GetMassFractions(), Primitive.at(P_INDEX_PRIM), Primitive.at(RHO_INDEX_PRIM));

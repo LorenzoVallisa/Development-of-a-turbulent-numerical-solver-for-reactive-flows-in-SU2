@@ -53,6 +53,21 @@ protected:
   RealVec Ys_i,Ys_j;  /*!< \brief Auxiliary vectors to store mass fractions at node i and j. */
   RealVec Ys;         /*!< \brief Auxiliary vector to store mass fractions. */
 
+protected:
+  unsigned short T_INDEX_PRIM,VX_INDEX_PRIM,
+                 P_INDEX_PRIM,RHO_INDEX_PRIM,
+                 H_INDEX_PRIM,A_INDEX_PRIM,
+                 RHOS_INDEX_PRIM;               /*!< \brief Mapping for position in primitives array. */
+
+  unsigned short RHO_INDEX_SOL,RHOVX_INDEX_SOL,
+                 RHOE_INDEX_SOL,RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
+
+  unsigned short T_INDEX_GRAD,VX_INDEX_GRAD,
+                 P_INDEX_GRAD;                 /*!< \brief Mapping for position in primitives gradient. */
+
+  unsigned short T_INDEX_LIM,VX_INDEX_LIM,
+                 P_INDEX_LIM;                 /*!< \brief Mapping for position for limited variables. */
+
 public:
   /*!
 	 * \brief Default constructor of the class.
@@ -343,12 +358,15 @@ protected:
   RealVec Xs_i,Xs_j;  /*!< \brief Auxiliary vectors to store mole fractions at node i and j. */
   RealVec Xs;         /*!< \brief Auxiliary vector to store mole fractions. */
 
+protected:
+  unsigned short RHOS_INDEX_GRAD; /*!< \brief Index for position of mole fractions in primitive gradient. */
+
 public:
 
   /*!
 	 * \brief Default constructor of the class.
 	 */
-  CReactiveNSSolver(): CReactiveEulerSolver(), Viscosity_Inf() {}
+  CReactiveNSSolver(): CReactiveEulerSolver(), Viscosity_Inf(), RHOS_INDEX_GRAD() {}
 
 	/*!
 	 * \overloaded Constructor of the class

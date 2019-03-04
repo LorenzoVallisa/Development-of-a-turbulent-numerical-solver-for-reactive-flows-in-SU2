@@ -36,6 +36,29 @@ CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_n
                   CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
+  /*--- Set local variables to access indices in proper arrays ---*/
+  T_INDEX_PRIM    = CReactiveEulerVariable::GetT_INDEX_PRIM();
+  VX_INDEX_PRIM   = CReactiveEulerVariable::GetVX_INDEX_PRIM();
+  P_INDEX_PRIM    = CReactiveEulerVariable::GetP_INDEX_PRIM();
+  RHO_INDEX_PRIM  = CReactiveEulerVariable::GetRHO_INDEX_PRIM();
+  H_INDEX_PRIM    = CReactiveEulerVariable::GetH_INDEX_PRIM();
+  A_INDEX_PRIM    = CReactiveEulerVariable::GetT_INDEX_PRIM();
+  RHOS_INDEX_PRIM = CReactiveEulerVariable::GetRHOS_INDEX_PRIM();
+
+  RHO_INDEX_SOL   = CReactiveEulerVariable::GetRHO_INDEX_SOL();
+  RHOVX_INDEX_SOL = CReactiveEulerVariable::GetRHOVX_INDEX_SOL();
+  RHOE_INDEX_SOL  = CReactiveEulerVariable::GetRHOE_INDEX_SOL();
+  RHOS_INDEX_SOL  = CReactiveEulerVariable::GetRHOS_INDEX_SOL();
+
+  T_INDEX_GRAD    = CReactiveEulerVariable::GetT_INDEX_GRAD();
+  VX_INDEX_GRAD   = CReactiveEulerVariable::GetVX_INDEX_GRAD();
+  P_INDEX_GRAD    = CReactiveEulerVariable::GetP_INDEX_GRAD();
+
+  T_INDEX_LIM     = CReactiveEulerVariable::GetT_INDEX_LIM();
+  VX_INDEX_LIM    = CReactiveEulerVariable::GetVX_INDEX_LIM();
+  P_INDEX_LIM     = CReactiveEulerVariable::GetP_INDEX_LIM();
+
+  /*--- Resize local vectors ---*/
   Phi_i.resize(nVar);
   Phi_j.resize(nVar);
 }
@@ -61,81 +84,85 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
   su2double sq_vel_i, sq_vel_j,  /*!< \brief squared velocity. */
             Temperature_i, Temperature_j, /*!< \brief Temperature at node i and at node j. */
             Sound_Speed_i, Sound_Speed_j, /*!< \brief Sound speed at node i and at node j. */
-	          ProjVelocity_i, ProjVelocity_j; /*!< \brief Projected velocities at node i and at node j. */
+	          ProjVelocity_i, ProjVelocity_j, /*!< \brief Projected velocities at node i and at node j. */
+            ProjGridVel_i = 0.0, ProjGridVel_j = 0.0; /*!< \brief Grid velocities at node i and at node j. */
 
   ::Compute_Outward_UnitNormal(nDim,Normal,UnitNormal);
 
   /*--- Point i: compute energy,pressure,sound speed and enthalpy  ---*/
-	sq_vel_i = std::inner_product(V_i + CReactiveEulerVariable::VX_INDEX_PRIM, V_i + (CReactiveEulerVariable::VX_INDEX_PRIM + nDim),
-                                V_i + CReactiveEulerVariable::VX_INDEX_PRIM,0.0);
-  Density_i = V_i[CReactiveEulerVariable::RHO_INDEX_PRIM];
-  Pressure_i = V_i[CReactiveEulerVariable::P_INDEX_PRIM];
-  Enthalpy_i = V_i[CReactiveEulerVariable::H_INDEX_PRIM];
-  Temperature_i = V_i[CReactiveEulerVariable::T_INDEX_PRIM];
-  Sound_Speed_i = V_i[CReactiveEulerVariable::A_INDEX_PRIM];
+	sq_vel_i = std::inner_product(V_i + VX_INDEX_PRIM, V_i + (VX_INDEX_PRIM + nDim), V_i + VX_INDEX_PRIM, 0.0);
+  Density_i = V_i[RHO_INDEX_PRIM];
+  Pressure_i = V_i[P_INDEX_PRIM];
+  Enthalpy_i = V_i[H_INDEX_PRIM];
+  Temperature_i = V_i[T_INDEX_PRIM];
+  Sound_Speed_i = V_i[A_INDEX_PRIM];
 
   /*--- Point j: compute squared velocity,energy,pressure,sound speed and ethalpy  ---*/
-  sq_vel_j = std::inner_product(V_j + CReactiveEulerVariable::VX_INDEX_PRIM, V_j + (CReactiveEulerVariable::VX_INDEX_PRIM + nDim),
-                                V_j + CReactiveEulerVariable::VX_INDEX_PRIM,0.0);
-  Density_j = V_j[CReactiveEulerVariable::RHO_INDEX_PRIM];
-  Pressure_j = V_j[CReactiveEulerVariable::P_INDEX_PRIM];
-  Enthalpy_j = V_j[CReactiveEulerVariable::H_INDEX_PRIM];
-  Temperature_j = V_j[CReactiveEulerVariable::T_INDEX_PRIM];
-  Sound_Speed_j = V_j[CReactiveEulerVariable::A_INDEX_PRIM];
+  sq_vel_j = std::inner_product(V_j + VX_INDEX_PRIM, V_j + (VX_INDEX_PRIM + nDim), V_j + VX_INDEX_PRIM, 0.0);
+  Density_j = V_j[RHO_INDEX_PRIM];
+  Pressure_j = V_j[P_INDEX_PRIM];
+  Enthalpy_j = V_j[H_INDEX_PRIM];
+  Temperature_j = V_j[T_INDEX_PRIM];
+  Sound_Speed_j = V_j[A_INDEX_PRIM];
 
   /*--- Projected velocities ---*/
-  ProjVelocity_i = std::inner_product(V_i + CReactiveEulerVariable::VX_INDEX_PRIM, V_i + (CReactiveEulerVariable::VX_INDEX_PRIM + nDim),
-                                      UnitNormal,0.0);
-  ProjVelocity_j = std::inner_product(V_j + CReactiveEulerVariable::VX_INDEX_PRIM, V_j + (CReactiveEulerVariable::VX_INDEX_PRIM + nDim),
-                                      UnitNormal,0.0);
+  ProjVelocity_i = std::inner_product(V_i + VX_INDEX_PRIM, V_i + (VX_INDEX_PRIM + nDim), UnitNormal, 0.0);
+  ProjVelocity_j = std::inner_product(V_j + VX_INDEX_PRIM, V_j + (VX_INDEX_PRIM + nDim), UnitNormal, 0.0);
 
-  /*
+  /*--- Grid movement correction ---*/
+  bool grid_movement = config->GetGrid_Movement();
   if(grid_movement) {
-    ProjVelocity_i -= std::inner_product(GridVel_i,GridVel_i + nDim,UnitNormal,0.0);
-    ProjVelocity_j -= std::inner_product(GridVel_j,GridVel_j + nDim,UnitNormal,0.0);
+    ProjGridVel_i = std::inner_product(GridVel_i, GridVel_i + nDim, UnitNormal, 0.0);
+    ProjGridVel_j = std::inner_product(GridVel_j, GridVel_j + nDim, UnitNormal, 0.0);
+    ProjVelocity_i -= ProjGridVel_i;
+    ProjVelocity_j -= ProjGridVel_j;
   }
-  */
 
-  /*--- Calculate L/R Mach numbers ---*/
+  /*--- Compute L/R Mach numbers for reference Mach ---*/
   su2double mL = std::sqrt(sq_vel_i)/SoundSpeed_i;
   su2double mR = std::sqrt(sq_vel_j)/SoundSpeed_j;
 
-  /*--- Calculate Mean sound speed ---*/
-  su2double MeanSoundSpeed = 0.5*(SoundSpeed_i + SoundSpeed_j);
-
-  /*--- Calculate adjusted polynomial function AUSM +-Up ---*/
+  /*--- Compute user defined Mach number ---*/
   su2double mRef,mF;
   if(mL >= 1.0 || mR >= 1.0)
     mRef = 1.0;
   else
     mRef = std::min(1.0,std::max(1e-4,(0.25*(mL+mR)*(mL+mR))));
 
-  /*--- Calculate Normal L/R Mach numbers ---*/
+  /*--- Compute Mean sound speed ---*/
+  su2double MeanSoundSpeed = 0.5*(SoundSpeed_i + SoundSpeed_j);
+
+  /*--- Compute Normal L/R Mach numbers ---*/
   mL  = ProjVelocity_i/MeanSoundSpeed;
   mR  = ProjVelocity_j/MeanSoundSpeed;
-  mF = std::sqrt(0.5*(mL*mL + mR*mR));
+
+  /*--- Compute mean local Mach number and reference Mach number ---*/
+  mF  = std::sqrt(0.5*(mL*mL + mR*mR));
   mRef = std::min(1.0,std::max(mF,mRef));
+
+  /*--- Set constants ---*/
   const su2double fa = mRef*(2.0 - mRef);
   const su2double alpha = 3.0/16.0*(5.0*fa*fa - 4.0);
-  const double beta = 0.125;
+  const su2double beta = 0.125;
 
   su2double mLP,mRM,pLP,pRM;
 
+  /*--- Compute adjusted polynomial function AUSM +-Up ---*/
   if(std::abs(mL) < 1.0) {
-    mLP = 0.25*(mL + 1.0)*(mL + 1.0) + beta*(mL*mL - 1.0)*(mL*mL - 1.0);
+    mLP = 0.25*(mL + 1.0)*(mL + 1.0)* + beta*(mL*mL - 1.0)*(mL*mL - 1.0);
     pLP = 0.25*(mL + 1.0)*(mL + 1.0)*(2.0 - mL) + alpha*mL*(mL*mL - 1.0);
   }
   else {
-    mLP = 0.5*(mL + abs(mL));
+    mLP = 0.5*(mL + std::abs(mL));
     pLP = 0.5*(1.0 + std::abs(mL)/mL);
   }
 
   if(std::abs(mR) < 1.0) {
     mRM = -0.25*(mR - 1.0)*(mR - 1.0) - beta*(mR*mR - 1.0)*(mR*mR - 1.0);
-    pRM = 0.25*(mR - 1.0)*(mR - 1.0)*(mR + 2.0) - alpha*mR*(mR*mR - 1.0)*(mR*mR - 1.0);
+    pRM = 0.25*(mR - 1.0)*(mR - 1.0)*(2.0 + mR) - alpha*mR*(mR*mR - 1.0)*(mR*mR - 1.0);
   }
   else {
-    mRM = 0.5*(mR - abs(mR));
+    mRM = 0.5*(mR - std::abs(mR));
     pRM = 0.5*(1.0 - std::abs(mR)/mR);
   }
 
@@ -144,36 +171,35 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
   const su2double sigma = 1.0;
 
   su2double m12 = mLP + mRM;
-  su2double mP = kP/fa*std::max(1.0 - sigma*mF*mF, 0.0)*(Pressure_i - Pressure_j)/(Pressure_i + Pressure_j);
-  m12 += mP;
+  m12 -= kP*std::max(1.0 - sigma*mF*mF, 0.0)*(Pressure_j - Pressure_i)/(0.5*(Density_i + Density_j)*MeanSoundSpeed*MeanSoundSpeed);
   su2double mLF = 0.5*(m12 + std::abs(m12));
   su2double mRF = 0.5*(m12 - std::abs(m12));
-
-  su2double pLF = pLP*Pressure_i + pRM*Pressure_j;
   m12 = MeanSoundSpeed*(mLF*Density_i + mRF*Density_j);
 
   /*--- Compute the state at node i and at node j ---*/
-  Phi_i[CReactiveEulerVariable::RHO_INDEX_SOL] = 1.0;
-  Phi_j[CReactiveEulerVariable::RHO_INDEX_SOL] = 1.0;
+  Phi_i[RHO_INDEX_SOL] = 1.0;
+  Phi_j[RHO_INDEX_SOL] = 1.0;
   for(iDim = 0; iDim < nDim; ++iDim) {
-    Phi_i[CReactiveEulerVariable::RHOVX_INDEX_SOL + iDim] = V_i[CReactiveEulerVariable::VX_INDEX_PRIM + iDim];
-    Phi_j[CReactiveEulerVariable::RHOVX_INDEX_SOL + iDim] = V_j[CReactiveEulerVariable::VX_INDEX_PRIM + iDim];
+    Phi_i[RHOVX_INDEX_SOL + iDim] = V_i[VX_INDEX_PRIM + iDim];
+    Phi_j[RHOVX_INDEX_SOL + iDim] = V_j[VX_INDEX_PRIM + iDim];
   }
-  Phi_i[CReactiveEulerVariable::RHOE_INDEX_SOL] = Enthalpy_i;
-  Phi_j[CReactiveEulerVariable::RHOE_INDEX_SOL] = Enthalpy_j;
+  Phi_i[RHOE_INDEX_SOL] = Enthalpy_i + ProjGridVel_i*Pressure_i/(Density_i*ProjVelocity_i);
+  Phi_j[RHOE_INDEX_SOL] = Enthalpy_j + ProjGridVel_j*Pressure_j/(Density_j*ProjVelocity_j);
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-    Phi_i[CReactiveEulerVariable::RHOS_INDEX_SOL + iSpecies] = V_i[CReactiveEulerVariable::RHOS_INDEX_PRIM + iSpecies];
-    Phi_j[CReactiveEulerVariable::RHOS_INDEX_SOL + iSpecies] = V_j[CReactiveEulerVariable::RHOS_INDEX_PRIM + iSpecies];
+    Phi_i[RHOS_INDEX_SOL + iSpecies] = V_i[RHOS_INDEX_PRIM + iSpecies];
+    Phi_j[RHOS_INDEX_SOL + iSpecies] = V_j[RHOS_INDEX_PRIM + iSpecies];
   }
 
-  /*--- Calculate the numerical flux ---*/
+  /*--- Compute the pure convective part of the numerical flux ---*/
   for(iVar = 0; iVar < nVar; ++iVar)
-    val_residual[iVar] = 0.5*(m12*(Phi_i[iVar] + Phi_j[iVar]) - std::abs(m12)*(Phi_j[iVar] - Phi_i[iVar]))*Area;
+    val_residual[iVar] = 0.5*(m12*(Phi_i[iVar] + Phi_j[iVar]) + std::abs(m12)*(Phi_i[iVar] - Phi_j[iVar]))*Area;
 
+  /*--- Add to the numerical flux the pressure contribution ---*/
   const su2double Ku = 0.75;
+  su2double pLF = pLP*Pressure_i + pRM*Pressure_j;
+  pLF -= Ku*pLP*pRM*(Density_i + Density_j)*fa*MeanSoundSpeed*(ProjVelocity_j - ProjVelocity_i);
   for(iDim = 0; iDim < nDim; ++iDim) {
-    val_residual[CReactiveEulerVariable::VX_INDEX_PRIM + iDim] +=
-    (pLF*UnitNormal[iDim] - Ku*pLP*pRM*(Density_i + Density_j)*m12*ProjVelocity_i*UnitNormal[iDim])*Area;
+    val_residual[VX_INDEX_PRIM + iDim] += pLF*UnitNormal[iDim]*Area;
   }
 
   if(implicit)
@@ -202,6 +228,34 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
   limiter = config->GetViscous_Limiter_Flow();
 
+  /*--- Set local variables to access indices in proper arrays ---*/
+  T_INDEX_PRIM    = CReactiveNSVariable::GetT_INDEX_PRIM();
+  VX_INDEX_PRIM   = CReactiveNSVariable::GetVX_INDEX_PRIM();
+  P_INDEX_PRIM    = CReactiveNSVariable::GetP_INDEX_PRIM();
+  RHO_INDEX_PRIM  = CReactiveNSVariable::GetRHO_INDEX_PRIM();
+  H_INDEX_PRIM    = CReactiveNSVariable::GetH_INDEX_PRIM();
+  A_INDEX_PRIM    = CReactiveNSVariable::GetT_INDEX_PRIM();
+  RHOS_INDEX_PRIM = CReactiveNSVariable::GetRHOS_INDEX_PRIM();
+
+  RHO_INDEX_SOL   = CReactiveNSVariable::GetRHO_INDEX_SOL();
+  RHOVX_INDEX_SOL = CReactiveNSVariable::GetRHOVX_INDEX_SOL();
+  RHOE_INDEX_SOL  = CReactiveNSVariable::GetRHOE_INDEX_SOL();
+  RHOS_INDEX_SOL  = CReactiveNSVariable::GetRHOS_INDEX_SOL();
+
+  T_INDEX_GRAD    = CReactiveNSVariable::GetT_INDEX_GRAD();
+  VX_INDEX_GRAD   = CReactiveNSVariable::GetVX_INDEX_GRAD();
+  P_INDEX_GRAD    = CReactiveNSVariable::GetP_INDEX_GRAD();
+  RHOS_INDEX_GRAD = CReactiveNSVariable::GetRHOS_INDEX_GRAD();
+
+  T_INDEX_LIM     = CReactiveNSVariable::GetT_INDEX_LIM();
+  VX_INDEX_LIM    = CReactiveNSVariable::GetVX_INDEX_LIM();
+  P_INDEX_LIM     = CReactiveNSVariable::GetP_INDEX_LIM();
+
+  T_INDEX_AVGGRAD    = 0;
+  VX_INDEX_AVGGRAD   = 1;
+  RHOS_INDEX_AVGGRAD = VX_INDEX_AVGGRAD + CReactiveNSVariable::GetnDim();
+
+  /*--- Resize local vectors --*/
   Edge_Vector.resize(nDim);
 
   PrimVar_i.resize(nPrimVar);
@@ -212,7 +266,6 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
 
   Mean_GradPrimVar.resize(nPrimVarAvgGrad, nDim);
 
-  Gamma.resize(nSpecies,nSpecies);
   Gamma_tilde.resize(nSpecies,nSpecies);
 }
 
@@ -273,8 +326,8 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   /*--- Rename for convenience ---*/
   mu  = val_viscosity;
   ktr = val_therm_conductivity;
-  rho = val_primvar[CReactiveNSVariable::RHO_INDEX_PRIM];
-  T   = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
+  rho = val_primvar[RHO_INDEX_PRIM];
+  T   = val_primvar[T_INDEX_PRIM];
 
   /*--- Compute partial enthalpies ---*/
   bool US_System = (config->GetSystemMeasurements() == SI);
@@ -313,28 +366,27 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   /*--- Density contribution ---*/
   for(iDim = 0; iDim < nDim; ++iDim) {
     /*--- Density contribution ---*/
-    Flux_Tensor[CReactiveNSVariable::RHO_INDEX_SOL][iDim] = 0.0;
+    Flux_Tensor[RHO_INDEX_SOL][iDim] = 0.0;
 
     /*--- Shear stress related terms ---*/
-    Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] = 0.0;
+    Flux_Tensor[RHOE_INDEX_SOL][iDim] = 0.0;
     for(jDim = 0; jDim < nDim; ++jDim) {
-      Flux_Tensor[CReactiveNSVariable::RHOVX_INDEX_SOL + jDim][iDim]  = tau[iDim][jDim];
-      Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] += tau[iDim][jDim]*val_primvar[CReactiveNSVariable::VX_INDEX_PRIM+jDim];
+      Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim]  = tau[iDim][jDim];
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau[iDim][jDim]*val_primvar[VX_INDEX_PRIM+jDim];
     }
 
     /*--- Species diffusion velocity ---*/
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] = rho*(val_diffusion_coeff[iSpecies]*
-                                                                               val_grad_primvar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) -
-                                                                               val_primvar[CReactiveNSVariable::RHOS_INDEX_PRIM+iSpecies]*
-                                                                               Normalization_Vec[iDim]);
+      Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim] = rho*
+                                                     (val_diffusion_coeff[iSpecies]*val_grad_primvar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) -
+                                                      val_primvar[RHOS_INDEX_PRIM+iSpecies]*Normalization_Vec[iDim]);
+
       /*--- Heat flux due to species diffusion term ---*/
-      Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] +=
-      Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim]*hs[iSpecies];
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] += Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim]*hs[iSpecies];
     }
 
     /*--- Heat transfer terms ---*/
-    Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] += ktr*val_grad_primvar(T_INDEX_AVGGRAD,iDim);
+    Flux_Tensor[RHOE_INDEX_SOL][iDim] += ktr*val_grad_primvar(T_INDEX_AVGGRAD,iDim);
   }
 
   for(iVar = 0; iVar < nVar; ++iVar) {
@@ -368,10 +420,10 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
     std::fill(Flux_Tensor[iVar],Flux_Tensor[iVar] + nDim, 0.0);
 
   /*--- Rename for convenience ---*/
-  rho = val_primvar[CReactiveNSVariable::RHO_INDEX_PRIM];
+  rho = val_primvar[RHO_INDEX_PRIM];
   mu  = val_viscosity;
   ktr = val_thermal_conductivity;
-  T = val_primvar[CReactiveNSVariable::T_INDEX_PRIM];
+  T = val_primvar[T_INDEX_PRIM];
 
   /*--- Compute partial enthalpies ---*/
   bool US_System = (config->GetSystemMeasurements() == SI);
@@ -384,8 +436,8 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   //  std::transform(hs.begin(),hs.end(),hs.begin(),[config](su2double elem){return elem*3.28084*3.28084;});
 
   /*--- Extract molar fractions, their gradient and mass fractions ---*/
-  std::copy(val_primvar.data() + CReactiveNSVariable::RHOS_INDEX_PRIM,
-            val_primvar.data() + (CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies), Xs.begin());
+  std::copy(val_primvar.data() + RHOS_INDEX_PRIM,
+            val_primvar.data() + (RHOS_INDEX_PRIM + nSpecies), Xs.begin());
   Grad_Xs = val_grad_primvar.block(RHOS_INDEX_AVGGRAD,0,nSpecies,nDim);
   //Ys = library->GetMassFromMolar(Xs);
 
@@ -413,24 +465,24 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
     auto Grad_Xs_iDim = Grad_Xs.col(iDim);
     su2double Grad_sigma_iDim = Grad_Xs_iDim.sum();
 
-    Flux_Tensor[CReactiveNSVariable::RHO_INDEX_SOL][iDim] = rho*Grad_sigma_iDim/sigma_alpha;
+    Flux_Tensor[RHO_INDEX_SOL][iDim] = rho*Grad_sigma_iDim/sigma_alpha;
 
     /*--- Shear stress related terms ---*/
-    Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] = 0.0;
+    Flux_Tensor[RHOE_INDEX_SOL][iDim] = 0.0;
     for(jDim = 0; jDim < nDim; ++jDim) {
-      Flux_Tensor[CReactiveNSVariable::RHOVX_INDEX_SOL + jDim][iDim]  = tau[iDim][jDim];
-      Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] += tau[iDim][jDim]*val_primvar[CReactiveNSVariable::VX_INDEX_PRIM + jDim];
+      Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim]  = tau[iDim][jDim];
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau[iDim][jDim]*val_primvar[VX_INDEX_PRIM + jDim];
     }
 
     /*--- Heat transfer terms ---*/
-    Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] += ktr*val_grad_primvar(T_INDEX_AVGGRAD,iDim);
+    Flux_Tensor[RHOE_INDEX_SOL][iDim] += ktr*val_grad_primvar(T_INDEX_AVGGRAD,iDim);
 
     /*--- Heat flux due to species diffusion term ---*/
     auto Jd_iDim = Solve_SM(rho, alpha, val_Dij, Xs, Grad_Xs_iDim, Ys);
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim] = Jd_iDim[iSpecies];
-      Flux_Tensor[CReactiveNSVariable::RHOE_INDEX_SOL][iDim] +=
-      Flux_Tensor[CReactiveNSVariable::RHOS_INDEX_SOL + iSpecies][iDim]*hs[iSpecies];
+      Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim] = Jd_iDim[iSpecies];
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] +=
+      Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim]*hs[iSpecies];
     }
   }
 
@@ -489,12 +541,10 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   std::copy(V_j, V_j + nPrimVar, PrimVar_j.data());
 
   /*-- Use Molar fractions instead of mass fractions ---*/
-  //Xs_i = library->GetMolarFromMass(RealVec(PrimVar_i.data() + CReactiveNSVariable::RHOS_INDEX_PRIM,
-  //                                         PrimVar_i.data() + (CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies));
-  //Xs_j = library->GetMolarFromMass(RealVec(PrimVar_j.data() + CReactiveNSVariable::RHOS_INDEX_PRIM,
-  //                                         PrimVar_i.data() + (CReactiveNSVariable::RHOS_INDEX_PRIM + nSpecies));
-  std::copy(Xs_i.cbegin(), Xs_i.cend(), PrimVar_i.data() + CReactiveNSVariable::RHOS_INDEX_PRIM);
-  std::copy(Xs_j.cbegin(), Xs_j.cend(), PrimVar_j.data() + CReactiveNSVariable::RHOS_INDEX_PRIM);
+  //Xs_i = library->GetMolarFromMass(RealVec(PrimVar_i.data() + RHOS_INDEX_PRIM, PrimVar_i.data() + (RHOS_INDEX_PRIM + nSpecies));
+  //Xs_j = library->GetMolarFromMass(RealVec(PrimVar_j.data() + RHOS_INDEX_PRIM, PrimVar_j.data() + (RHOS_INDEX_PRIM + nSpecies));
+  std::copy(Xs_i.cbegin(), Xs_i.cend(), PrimVar_i.data() + RHOS_INDEX_PRIM);
+  std::copy(Xs_j.cbegin(), Xs_j.cend(), PrimVar_j.data() + RHOS_INDEX_PRIM);
 
   /*--- Compute the mean ---*/
   Mean_PrimVar = 0.5*(PrimVar_i + PrimVar_j);
@@ -507,50 +557,45 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   if(!limiter) {
     for(iDim = 0; iDim < nDim; ++iDim) {
       /*--- Temperature ---*/
-      Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::T_INDEX_GRAD][iDim] +
-                                                    PrimVar_Grad_j[CReactiveNSVariable::T_INDEX_GRAD][iDim]);
+      Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) = 0.5*(PrimVar_Grad_i[T_INDEX_GRAD][iDim] + PrimVar_Grad_j[T_INDEX_GRAD][iDim]);
 
       /*--- Velocities ---*/
       for(jDim = 0; jDim < nDim; ++jDim)
-        Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::VX_INDEX_GRAD + jDim][iDim] +
-                                                              PrimVar_Grad_i[CReactiveNSVariable::VX_INDEX_GRAD + jDim][iDim]);
+        Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) = 0.5*(PrimVar_Grad_i[VX_INDEX_GRAD + jDim][iDim] +
+                                                              PrimVar_Grad_i[VX_INDEX_GRAD + jDim][iDim]);
 
       /*--- Molar Fractions ---*/
       for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies][iDim] +
-                                                                    PrimVar_Grad_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies][iDim]);
+        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(PrimVar_Grad_i[RHOS_INDEX_GRAD + iSpecies][iDim] +
+                                                                    PrimVar_Grad_i[RHOS_INDEX_GRAD + iSpecies][iDim]);
     }
   }
   else {
     for(iDim = 0; iDim < nDim; ++iDim) {
       /*--- Temperature ---*/
-      Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::T_INDEX_GRAD][iDim]*
-                                                    PrimVar_Lim_i[CReactiveNSVariable::T_INDEX_LIM] +
-                                                    PrimVar_Grad_j[CReactiveNSVariable::T_INDEX_GRAD][iDim]*
-                                                    PrimVar_Lim_j[CReactiveNSVariable::T_INDEX_LIM]);
+      Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) = 0.5*(PrimVar_Grad_i[T_INDEX_GRAD][iDim]*PrimVar_Lim_i[T_INDEX_LIM] +
+                                                    PrimVar_Grad_j[T_INDEX_GRAD][iDim]*PrimVar_Lim_j[T_INDEX_LIM]);
       /*--- Velocities ---*/
       for(jDim = 0; jDim < nDim; ++jDim)
-        Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::VX_INDEX_GRAD + jDim][iDim]*
-                                                              PrimVar_Lim_i[CReactiveNSVariable::VX_INDEX_LIM + jDim] +
-                                                              PrimVar_Grad_i[CReactiveNSVariable::VX_INDEX_GRAD + jDim][iDim]*
-                                                              PrimVar_Lim_j[CReactiveNSVariable::VX_INDEX_LIM + jDim]);
+        Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) = 0.5*(PrimVar_Grad_i[VX_INDEX_GRAD + jDim][iDim]*PrimVar_Lim_i[VX_INDEX_LIM + jDim] +
+                                                              PrimVar_Grad_i[VX_INDEX_GRAD + jDim][iDim]*PrimVar_Lim_j[VX_INDEX_LIM + jDim]);
       /*--- Molar Fractions ---*/
       for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(PrimVar_Grad_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies][iDim] +
-                                                                    PrimVar_Grad_i[CReactiveNSVariable::RHOS_INDEX_GRAD + iSpecies][iDim]);
+        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) = 0.5*(PrimVar_Grad_i[RHOS_INDEX_GRAD + iSpecies][iDim] +
+                                                                    PrimVar_Grad_i[RHOS_INDEX_GRAD + iSpecies][iDim]);
     }
   }
 
   Proj_Mean_GradPrimVar_Edge = Mean_GradPrimVar*Edge_Vector;
   su2double dist_ij_2 = std::inner_product(Edge_Vector.data(), Edge_Vector.data() + Edge_Vector.size(), Edge_Vector.data(), 0.0);
   if(dist_ij_2 > EPS) {
-    Diff_PrimVar[T_INDEX_AVGGRAD] = V_j[CReactiveNSVariable::T_INDEX_PRIM] - V_i[CReactiveNSVariable::T_INDEX_PRIM];
+    Diff_PrimVar[T_INDEX_AVGGRAD] = V_j[T_INDEX_PRIM] - V_i[T_INDEX_PRIM];
+    /*--- Difference of velocities ---*/
     for(iDim = 0; iDim < nDim; ++iDim)
-      Diff_PrimVar[VX_INDEX_AVGGRAD + iDim] = V_j[CReactiveNSVariable::VX_INDEX_PRIM + iDim] -
-                                              V_i[CReactiveNSVariable::VX_INDEX_PRIM + iDim];
+      Diff_PrimVar[VX_INDEX_AVGGRAD + iDim] = V_j[VX_INDEX_PRIM + iDim] - V_i[VX_INDEX_PRIM + iDim];
+    /*--- Difference of mole fractions ---*/
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-      Diff_PrimVar[RHOS_INDEX_AVGGRAD + iSpecies] = V_j[CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies] -
-                                                    V_i[CReactiveNSVariable::RHOS_INDEX_PRIM + iSpecies];
+      Diff_PrimVar[RHOS_INDEX_AVGGRAD + iSpecies] = V_j[RHOS_INDEX_PRIM + iSpecies] - V_i[RHOS_INDEX_PRIM + iSpecies];
 
     Mean_GradPrimVar -= (Proj_Mean_GradPrimVar_Edge - Diff_PrimVar)*Edge_Vector.transpose()/dist_ij_2;
   }
@@ -578,6 +623,29 @@ CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVa
                  CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
+  /*--- Set local variables to access indices in proper arrays ---*/
+  T_INDEX_PRIM    = CReactiveEulerVariable::GetT_INDEX_PRIM();
+  VX_INDEX_PRIM   = CReactiveEulerVariable::GetVX_INDEX_PRIM();
+  P_INDEX_PRIM    = CReactiveEulerVariable::GetP_INDEX_PRIM();
+  RHO_INDEX_PRIM  = CReactiveEulerVariable::GetRHO_INDEX_PRIM();
+  H_INDEX_PRIM    = CReactiveEulerVariable::GetH_INDEX_PRIM();
+  A_INDEX_PRIM    = CReactiveEulerVariable::GetT_INDEX_PRIM();
+  RHOS_INDEX_PRIM = CReactiveEulerVariable::GetRHOS_INDEX_PRIM();
+
+  RHO_INDEX_SOL   = CReactiveEulerVariable::GetRHO_INDEX_SOL();
+  RHOVX_INDEX_SOL = CReactiveEulerVariable::GetRHOVX_INDEX_SOL();
+  RHOE_INDEX_SOL  = CReactiveEulerVariable::GetRHOE_INDEX_SOL();
+  RHOS_INDEX_SOL  = CReactiveEulerVariable::GetRHOS_INDEX_SOL();
+
+  T_INDEX_GRAD    = CReactiveEulerVariable::GetT_INDEX_GRAD();
+  VX_INDEX_GRAD   = CReactiveEulerVariable::GetVX_INDEX_GRAD();
+  P_INDEX_GRAD    = CReactiveEulerVariable::GetP_INDEX_GRAD();
+
+  T_INDEX_LIM     = CReactiveEulerVariable::GetT_INDEX_LIM();
+  VX_INDEX_LIM    = CReactiveEulerVariable::GetVX_INDEX_LIM();
+  P_INDEX_LIM     = CReactiveEulerVariable::GetP_INDEX_LIM();
+
+  /*--- Resize local vectors ---*/
   Ys.resize(nSpecies);
 }
 
@@ -598,9 +666,9 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
   std::fill(val_residual, val_residual + nVar, 0.0);
 
   /*--- Nonequilibrium chemistry source term from library ---*/
-  std::copy(V_i + CReactiveEulerVariable::RHOS_INDEX_PRIM, V_i + (CReactiveEulerVariable::RHOS_INDEX_PRIM + nSpecies), Ys.begin());
-  rho = V_i[CReactiveEulerVariable::RHO_INDEX_PRIM];
-  temp = V_i[CReactiveEulerVariable::T_INDEX_PRIM];
+  std::copy(V_i + RHOS_INDEX_PRIM, V_i + (RHOS_INDEX_PRIM + nSpecies), Ys.begin());
+  rho = V_i[RHO_INDEX_PRIM];
+  temp = V_i[T_INDEX_PRIM];
   dim_temp = temp*config->GetTemperature_Ref();
   dim_rho = rho*config->GetDensity_Ref();
 
