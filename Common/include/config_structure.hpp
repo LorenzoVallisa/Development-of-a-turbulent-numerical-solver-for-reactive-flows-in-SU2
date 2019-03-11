@@ -1190,12 +1190,6 @@ public:
   */
   string GetConfigLibFile(void) const;
 
-  //typedef std::shared_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
-  //static LibraryPtr GetLibrary(void) const {
-    //return LibraryPtr(new Framework::ReactingModelLibrary(config->GetConfigLibFile()))
-  //}
-
-
   /*!
    * \brief Get reference origin for moment computation.
    * \param[in] val_marker - the marker we are monitoring.

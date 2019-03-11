@@ -94,6 +94,13 @@ public:
   }
 
   /*!
+   * \brief Get the pointer to the external library for physical-chemical properties
+   */
+  inline static LibraryPtr GetLibrary(void) {
+    return library;
+  }
+
+  /*!
  	 * \brief Looking for non physical points in the initial solution
  	 * \param[in] config - Definition of the particular problem.
  	 */

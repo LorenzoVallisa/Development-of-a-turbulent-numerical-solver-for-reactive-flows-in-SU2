@@ -51,8 +51,9 @@ public:
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nVar - Number of variables of the problem.
 	 * \param[in] config - Definition of the particular problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
 	 */
-  CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, CConfig* config);
+  CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr);
 
   /*!
 	 * \brief Destructor of the class.
@@ -135,10 +136,11 @@ private:
 
   RealVec hs;                   /*!< \brief Auxiliary vector to store partial enthalpy for species diffusion flux contribution. */
 
+  Vec Jd;                       /*!< \brief Auxiliary vectors to store S-M solution. */
+
   unsigned short T_INDEX_AVGGRAD,VX_INDEX_AVGGRAD,
                  RHOS_INDEX_AVGGRAD;                /*!< \brief Mapping between the primitive variable gradient name
                                                                 for average computations and its position in the physical data. */
-
 public:
 
   /*!
@@ -155,8 +157,9 @@ public:
    * \param[in] val_nDim - Number of dimension of the problem.
    * \param[in] val_nVar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
    */
-  CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, CConfig* config);
+  CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr);
 
   /*!
    * \brief Destructor of the class.
@@ -265,8 +268,8 @@ private:
    * \param[in] val_grad_xs - Component along the desired dimension of gradient of molar fractions.
    * \param[in] val_ys - Mass fractions.
    */
-  Vec Solve_SM(const su2double val_density, const su2double val_alpha, const RealMatrix& val_Dij,
-               const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys);
+  void Solve_SM(const su2double val_density, const su2double val_alpha, const RealMatrix& val_Dij,
+                const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys);
 };
 
 /*!
@@ -278,6 +281,7 @@ class CSourceReactive: public CNumerics {
 public:
   using RealVec = CReactiveEulerVariable::RealVec;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
+  using RealMatrix = CReactiveNSVariable::RealMatrix;
 
 protected:
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
@@ -306,6 +310,8 @@ private:
 private:
   RealVec omega; /*!< \brief Auxiliary vector for mass production term. */
 
+  RealMatrix source_jac; /*!< \brief Auxiliary vector for mass production term. */
+
 public:
   /*!
    * \brief Default constructor of the class.
@@ -319,8 +325,9 @@ public:
    * \param[in] val_nDim - Number of dimensions of the problem.
    * \param[in] val_nVar - Number of variables of the problem.
    * \param[in] config - Definition of the particular problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
    */
-  CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config);
+  CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr);
 
   /*!
    * \brief Destructor of the class.

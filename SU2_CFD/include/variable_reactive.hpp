@@ -17,10 +17,9 @@ public:
   typedef std::vector<su2double> RealVec;
   typedef su2double** SU2Matrix;
   typedef std::shared_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
-  //using LibraryPtr = CConfig::LibraryPtr;
 
 protected:
-  static LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
+  LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
   unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
   unsigned short nPrimVarLim; /*!< \brief Number of primitive variables to limit in the problem. */
@@ -37,7 +36,8 @@ protected:
   RealVec    dTdU;                /*!< \brief Partial derivative of temperature w.r.t. conserved variables. */
 
   RealVec Ys;               /*!< \brief Auxiliary vector to store mass fractions separately. */
-  RealVec Ri;               /*!< \brief Auxiliary vector to store specific gas constat for each species. */
+  static RealVec Ri;        /*!< \brief Auxiliary vector to store specific gas constat for each species. */
+  RealVec Int_Energies;     /*!< \brief Auxiliary vector to store internal energy for each species. */
 
   /**
    * Mapping between the primitive variable name and its position in the physical data
@@ -87,10 +87,11 @@ public:
    * \param[in] val_nprimvar - Number of primitive variables of the problem.
    * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
    * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
    * \param[in] config - Definition of the particular problem.
    */
   CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies, unsigned short val_nprimvar,
-                         unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config);
+                         unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
 	 * \overload Class constructor
@@ -103,12 +104,13 @@ public:
    * \param[in] val_nprimvar - Number of primitive variables of the problem.
    * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
    * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
    * \param[in] config - Definition of the particular problem.
 	 */
 	CReactiveEulerVariable(const su2double val_pressure, const RealVec& val_massfrac, const RealVec& val_velocity,
                          const su2double val_temperature, unsigned short val_nDim, unsigned short val_nvar,
                          unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
-                         unsigned short val_nprimvarlim, CConfig* config);
+                         unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
 	/*!
 	 * \overload Class constructor
@@ -119,10 +121,12 @@ public:
    * \param[in] val_nprimvar - Number of primitive variables of the problem.
    * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
    * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
    * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveEulerVariable(const RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies,
-                         unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config);
+	CReactiveEulerVariable(const RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar,
+                         unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
+                         unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
 	 * \brief Destructor of the class.
@@ -135,14 +139,6 @@ public:
    */
   inline static const unsigned short GetnDim(void) {
     return nDim;
-  }
-
-  /*!
-   * \brief Get the loaded library
-   * \return Pointer to loaded library
-   */
-  inline static LibraryPtr GetLibrary(void) {
-    return library;
   }
 
   /*!
@@ -593,9 +589,17 @@ public:
   }
 
   /*!
-   * \brief Get the projected velocity in a unitary vector direction (compressible solver).
-   * \param[in] val_vector - Direction of projection.
-   * \return Value of the projected velocity.
+   * \brief Get the squared velocity.
+   * \return Value of the squared velocity.
+   */
+  inline su2double GetVelocity2(void) override {
+    return std::inner_product(Primitive.cbegin() + VX_INDEX_PRIM, Primitive.cbegin() + (VX_INDEX_PRIM + nDim),
+                              Primitive.cbegin() + VX_INDEX_PRIM, 0.0);
+  }
+
+  /*!
+   * \brief Get the specific heat at constant pressure.
+   * \return Value of the specific heat at constant pressure.
    */
   inline su2double GetSpecificHeatCp(void) override {
     return Cp;
@@ -649,10 +653,11 @@ public:
    * \param[in] val_nprimvar - Number of primitive variables of the problem.
    * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
    * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
    * \param[in] config - Definition of the particular problem.
    */
   CReactiveNSVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies, unsigned short val_nprimvar,
-                      unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config);
+                      unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
 	 * \overload Class constructor
@@ -665,11 +670,13 @@ public:
    * \param[in] val_nprimvar - Number of gradient of primitive variables of the problem.
    * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
    * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
    * \param[in] config - Definition of the particular problem.
 	 */
 	CReactiveNSVariable(const su2double val_pressure, const RealVec& val_massfrac, const RealVec& val_velocity,
-                      const su2double val_temperature, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies,
-                      unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config);
+                      const su2double val_temperature, unsigned short val_nDim, unsigned short val_nvar,
+                      unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
+                      unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
 	 * \overload Class constructor
@@ -680,10 +687,12 @@ public:
    * \param[in] val_nprimvar - Number of primitive variables of the problem.
    * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
    * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
    * \param[in] config - Definition of the particular problem.
 	 */
-	CReactiveNSVariable(const RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies,
-                      unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, CConfig* config);
+	CReactiveNSVariable(const RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar,
+                      unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
+                      unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
 	 * \brief Destructor of the class.

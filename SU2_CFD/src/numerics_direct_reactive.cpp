@@ -1,7 +1,6 @@
 #include "../include/numerics_reactive.hpp"
 #include <Eigen/IterativeLinearSolvers>
 
-#include "../../Common/include/reacting_model_library.hpp"
 #include "../../Common/include/not_implemented_exception.hpp"
 #include "../../Common/include/move_pointer.hpp"
 #include "../../Common/include/su2_assert.hpp"
@@ -32,8 +31,8 @@ namespace {
 /*!
  * \brief Constructor of the class CUpwReactiveAUSM
  */
-CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
-                  CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
+CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr):
+                  CNumerics(val_nDim,val_nVar,config), library(lib_ptr), nSpecies(library->GetNSpecies()) {
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
   /*--- Set local variables to access indices in proper arrays ---*/
@@ -75,10 +74,11 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
   //AD::SetPreaccIn(V_i, nSpecies + nDim + 5);
   //AD::SetPreaccIn(V_j, nSpecies + nDim + 5);
   //AD::SetPreaccIn(Normal, nDim);
-
-  SU2_Assert(val_residual != NULL,"The array of residual for convective flux has not been allocated");
-  SU2_Assert(V_i != NULL,"The array of primitive variables at node i has not been allocated");
-  SU2_Assert(V_j != NULL,"The array of primitive variables at node j has not been allocated");
+  if(config->GetExtIter() == 0) {
+    SU2_Assert(val_residual != NULL,"The array of residual for convective flux has not been allocated");
+    SU2_Assert(V_i != NULL,"The array of primitive variables at node i has not been allocated");
+    SU2_Assert(V_j != NULL,"The array of primitive variables at node j has not been allocated");
+  }
 
   unsigned short iDim, iVar, iSpecies; /*!< \brief Indexes for iterations. */
   su2double sq_vel_i, sq_vel_j,  /*!< \brief squared velocity. */
@@ -216,8 +216,8 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
  */
 //
 //
-CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
-  CNumerics(val_nDim,val_nVar,config),library(CReactiveNSVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
+CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr):
+  CNumerics(val_nDim,val_nVar,config), library(lib_ptr), nSpecies(library->GetNSpecies()) {
 
   Laminar_Viscosity_i = Laminar_Viscosity_j = 0.0;
   Thermal_Conductivity_i = Thermal_Conductivity_j = 0.0;
@@ -276,7 +276,7 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
  */
 //
 //
-CAvgGradReactive_Flow::Vec CAvgGradReactive_Flow::Solve_SM(const su2double val_density, const su2double val_alpha, const RealMatrix& val_Dij,
+void CAvgGradReactive_Flow::Solve_SM(const su2double val_density, const su2double val_alpha, const RealMatrix& val_Dij,
                                                            const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys) {
   su2double toll = 1e-11;
 
@@ -294,9 +294,7 @@ CAvgGradReactive_Flow::Vec CAvgGradReactive_Flow::Solve_SM(const su2double val_d
 
   Eigen::BiCGSTAB<RealMatrix> bicg(Gamma_tilde);
   bicg.setTolerance(toll);
-  Vec Jd = bicg.solve(val_grad_xs);
-
-  return Jd;
+  Jd = bicg.solve(val_grad_xs);
 }
 
 //
@@ -309,9 +307,11 @@ CAvgGradReactive_Flow::Vec CAvgGradReactive_Flow::Solve_SM(const su2double val_d
 void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
                                                const su2double val_viscosity, const su2double val_therm_conductivity,
                                                const RealVec& val_diffusion_coeff, CConfig* config) {
-  SU2_Assert(Proj_Flux_Tensor != NULL, "The array for the projected viscous flux has not been allocated");
-  SU2_Assert(Flux_Tensor != NULL, "The matrix for the viscous flux tensor has not been allocated");
-  SU2_Assert(tau != NULL,"The matrix for the stress tensor has not been allocated");
+  if(config->GetExtIter() == 0) {
+    SU2_Assert(Proj_Flux_Tensor != NULL, "The array for the projected viscous flux has not been allocated");
+    SU2_Assert(Flux_Tensor != NULL, "The matrix for the viscous flux tensor has not been allocated");
+    SU2_Assert(tau != NULL,"The matrix for the stress tensor has not been allocated");
+  }
 
   /*--- We need a non-standard primitive vector with mass fractions instead of partial densities ---*/
  	unsigned short iSpecies, iVar, iDim, jDim;
@@ -335,9 +335,12 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   if(US_System)
     dim_temp *= 5.0/9.0;
   //hs = library->ComputePartialEnthalpy(dim_temp);
-  //std::transform(hs.begin(),hs.end(),hs.begin(),[config](su2double elem){return elem*config->GetEnergy_Ref();});
-  //if(US_System)
-  //  std::transform(hs.begin(),hs.end(),hs.begin(),[config](su2double elem){return elem*3.28084*3.28084;});
+  //for(auto& elem: hs)
+  //  elem *= config->GetEnergy_Ref();
+  //if(US_System) {
+  //  for(auto& elem: hs)
+  //    elem *= 3.28084*3.28084;
+  //}
 
   /*--- Compute the velocity divergence ---*/
   div_vel = 0.0;
@@ -405,9 +408,11 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
 void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
                                                const su2double val_viscosity, const su2double val_thermal_conductivity,
                                                const RealMatrix& val_Dij, CConfig* config) {
-  SU2_Assert(Proj_Flux_Tensor != NULL, "The array for the projected viscous flux has not been allocated");
-  SU2_Assert(Flux_Tensor != NULL, "The matrix for the viscous flux tensor has not been allocated");
-  SU2_Assert(tau != NULL,"The matrix for the stress tensor has not been allocated");
+  if(config->GetExtIter() == 0) {
+    SU2_Assert(Proj_Flux_Tensor != NULL, "The array for the projected viscous flux has not been allocated");
+    SU2_Assert(Flux_Tensor != NULL, "The matrix for the viscous flux tensor has not been allocated");
+    SU2_Assert(tau != NULL,"The matrix for the stress tensor has not been allocated");
+  }
 
   /*--- We need a non-standard primitive vector with molar fractions instead of partial densities ---*/
  	unsigned short iSpecies, iVar, iDim, jDim;
@@ -430,10 +435,12 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   su2double dim_temp = T*config->GetTemperature_Ref();
   if(US_System)
     dim_temp *= 5.0/9.0;
-  //hs = library->ComputePartialEnthalpy(dim_temp);
-  //std::transform(hs.begin(),hs.end(),hs.begin(),[config](su2double elem){return elem*config->GetEnergy_Ref();});
-  //if(US_System)
-  //  std::transform(hs.begin(),hs.end(),hs.begin(),[config](su2double elem){return elem*3.28084*3.28084;});
+  //for(auto& elem: hs)
+  //  elem *= config->GetEnergy_Ref();
+  //if(US_System) {
+  //  for(auto& elem: hs)
+  //    elem *= 3.28084*3.28084;
+  //}
 
   /*--- Extract molar fractions, their gradient and mass fractions ---*/
   std::copy(val_primvar.data() + RHOS_INDEX_PRIM,
@@ -478,9 +485,9 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
     Flux_Tensor[RHOE_INDEX_SOL][iDim] += ktr*val_grad_primvar(T_INDEX_AVGGRAD,iDim);
 
     /*--- Heat flux due to species diffusion term ---*/
-    auto Jd_iDim = Solve_SM(rho, alpha, val_Dij, Xs, Grad_Xs_iDim, Ys);
+    Solve_SM(rho, alpha, val_Dij, Xs, Grad_Xs_iDim, Ys);
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim] = Jd_iDim[iSpecies];
+      Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim] = Jd[iSpecies];
       Flux_Tensor[RHOE_INDEX_SOL][iDim] +=
       Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim]*hs[iSpecies];
     }
@@ -518,13 +525,15 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const Vec& val_Mean_PrimVar, cons
 //
 void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i,
                                             su2double** val_Jacobian_j, CConfig* config) {
-  SU2_Assert(V_i != NULL, "The array for the primitive variables at node i has not been allocated");
-  SU2_Assert(V_j != NULL, "The array for the primitive variables at node j has not been allocated");
-  SU2_Assert(PrimVar_Lim_i != NULL, "The array for the primitive variables at node i has not been allocated");
-  SU2_Assert(PrimVar_Lim_j != NULL, "The array for the primitive variables at node j has not been allocated");
+  if(config->GetExtIter() == 0) {
+    SU2_Assert(V_i != NULL, "The array for the primitive variables at node i has not been allocated");
+    SU2_Assert(V_j != NULL, "The array for the primitive variables at node j has not been allocated");
+    SU2_Assert(PrimVar_Lim_i != NULL, "The array for the primitive variables at node i has not been allocated");
+    SU2_Assert(PrimVar_Lim_j != NULL, "The array for the primitive variables at node j has not been allocated");
 
-  SU2_Assert(Mean_GradPrimVar.rows() == nPrimVarAvgGrad, "The number of rows in the mean gradient is not correct");
-  SU2_Assert(Mean_GradPrimVar.cols() == nDim, "The number of columns in the mean gradient is not correct");
+    SU2_Assert(Mean_GradPrimVar.rows() == nPrimVarAvgGrad, "The number of rows in the mean gradient is not correct");
+    SU2_Assert(Mean_GradPrimVar.cols() == nDim, "The number of columns in the mean gradient is not correct");
+  }
 
   unsigned short iVar, iDim, jDim, iSpecies; /*!< \brief Indexes for iterations. */
 
@@ -619,8 +628,8 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
  */
 //
 //
-CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config):
-                 CNumerics(val_nDim,val_nVar,config),library(CReactiveEulerVariable::GetLibrary()),nSpecies(library->GetNSpecies()) {
+CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr):
+                 CNumerics(val_nDim,val_nVar,config), library(lib_ptr), nSpecies(library->GetNSpecies()) {
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
   /*--- Set local variables to access indices in proper arrays ---*/
@@ -657,13 +666,16 @@ CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVa
 //
 //
 void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_Jacobian_i, CConfig* config) {
-  SU2_Assert(val_residual != NULL,"The array for residuals has not been allocated");
-  SU2_Assert(V_i != NULL,"The array of primitive varaibles has not been allocated");
+  /*--- Memory check ---*/
+  if(config->GetExtIter() == 0) {
+    SU2_Assert(val_residual != NULL,"The array for residuals has not been allocated");
+    SU2_Assert(V_i != NULL,"The array of primitive variables has not been allocated");
+  }
+
+  /*--- Local varaibles ---*/
+  unsigned short iVar;
 
   su2double rho, temp, dim_temp, dim_rho;
-
-  /*--- Initialize residual array ---*/
-  std::fill(val_residual, val_residual + nVar, 0.0);
 
   /*--- Nonequilibrium chemistry source term from library ---*/
   std::copy(V_i + RHOS_INDEX_PRIM, V_i + (RHOS_INDEX_PRIM + nSpecies), Ys.begin());
@@ -671,15 +683,59 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
   temp = V_i[T_INDEX_PRIM];
   dim_temp = temp*config->GetTemperature_Ref();
   dim_rho = rho*config->GetDensity_Ref();
+  bool US_System = (config->GetSystemMeasurements() == SI);
+  if(US_System) {
+    dim_temp *= 5.0/9.0;
+    dim_rho *= 3.28084*3.28084*3.28084/0.0685218;
+  }
 
-  //omega = library->GetMassProductionTerm(dim_temp,dim_rho,Ys);
+  //omega = library->GetMassProductionTerm(dim_temp, dim_rho, Ys);
 
   /*--- Assign to the residual. NOTE: We need to invert the sign since it is a residual that will be ADDED to the total one ---*/
-  std::copy(omega.cbegin(),omega.cend(),val_residual);
-  for(unsigned short iVar = 0; iVar < nVar; ++iVar)
-    val_residual[iVar] *= -Volume/(config->GetDensity_Ref()*config->GetTime_Ref());
+  std::copy(omega.cbegin(), omega.cend(), val_residual);
+  for(iVar = 0; iVar < nVar; ++iVar)
+    val_residual[iVar] *= -Volume/(config->GetDensity_Ref()/config->GetTime_Ref());
+  if(US_System) {
+    for(iVar = 0; iVar < nVar; ++iVar)
+      val_residual[iVar] /= 3.28084*3.28084*3.28084/0.0685218;
+  }
 
   /*--- Implicit computation ---*/
-  if(implicit)
+  if(implicit) {
     throw Common::NotImplemented("Implicit method for source chemistry residual not yet implemented. Setting explicit");
+
+    /*--- Check memory ---*/
+    if(config->GetExtIter() == 0) {
+      SU2_Assert(S_i != NULL,"The array of primitive variables derivatives has not been allocated");
+      SU2_Assert(val_Jacobian_i != NULL,"The matrix for source term jacobian has not been allocated");
+      for(iVar = 0; iVar < nVar; ++iVar)
+        SU2_Assert(val_Jacobian_i[iVar] != NULL,
+                   std::string("The row " + std::to_string(iVar) + " of source chemistry jacobian has not been allocated"));
+    }
+
+    unsigned short iDim;
+    /*--- No source from density,momentum and total energy ---*/
+    for(iVar = 0; iVar < nVar; ++iVar) {
+      val_Jacobian_i[RHO_INDEX_SOL][iVar] = 0.0;
+      for(iDim = 0; iDim < nDim; ++iDim)
+        val_Jacobian_i[RHOVX_INDEX_SOL + iDim][iVar] = 0.0;
+      val_Jacobian_i[RHOE_INDEX_SOL][iVar] = 0.0;
+    }
+
+    /*--- Jacobian from partial densities equations ---*/
+    //source_jac = library->GetSourceJacobian(dim_temp, dim_rho);
+    su2double fixed;
+    for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+      fixed = source_jac(iSpecies,0)*config->GetTime_Ref()*config->GetTemperature_Ref()/config->GetDensity_Ref();
+      if(US_System)
+        fixed *= (5.0/9.0)*(0.0685218/(3.28084*3.28084*3.28084));
+      val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] = fixed*S_i[RHO_INDEX_SOL]*Volume;
+      for(iDim = 0; iDim < nDim; ++iDim)
+        val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOVX_INDEX_SOL + iDim] = fixed*S_i[RHOVX_INDEX_SOL + iDim]*Volume;
+      val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOE_INDEX_SOL] = fixed*S_i[RHOE_INDEX_SOL]*Volume;
+      for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
+        val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies] =
+        fixed*S_i[RHOS_INDEX_SOL + jSpecies]*Volume + source_jac(iSpecies,jSpecies + 1)*config->GetTime_Ref()*Volume;
+    }
+  } /*--- End of implicit computation ---*/
 }
