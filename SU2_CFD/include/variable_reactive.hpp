@@ -630,12 +630,12 @@ const unsigned short CReactiveEulerVariable::P_INDEX_LIM = CReactiveEulerVariabl
  */
 class CReactiveNSVariable: public CReactiveEulerVariable {
 public:
-  typedef Eigen::Matrix<su2double,Eigen::Dynamic,Eigen::Dynamic,Eigen::RowMajor> RealMatrix;
+  using RealMatrix = Eigen::MatrixXd;
 
 protected:
-	RealMatrix Diffusion_Coeffs;    /*!< \brief Binary diffusion coefficients of the mixture. */
-  su2double  Laminar_Viscosity;	/*!< \brief Viscosity of the fluid. */
+  su2double  Laminar_Viscosity;	/*!< \brief Laminar viscosity of the fluid. */
   su2double  Thermal_Conductivity;   /*!< \brief Thermal conductivity of the gas mixture. */
+  RealMatrix Diffusion_Coeffs;    /*!< \brief Binary diffusion coefficients of the mixture. */
 
 public:
   static const unsigned short RHOS_INDEX_GRAD; /*!< \brief Index for position of mole fractions in primitives gradient. */
@@ -733,8 +733,8 @@ public:
 	 * \brief Get the species diffusion coefficient.
 	 * \return Value of the species diffusion coefficient.
 	 */
-  inline RealMatrix GetBinaryDiffusionCoeff(void) {
-    return Diffusion_Coeffs;
+  inline su2double* GetDiffusionCoeff(void) override {
+    return Diffusion_Coeffs.data();
   }
 
   /*!

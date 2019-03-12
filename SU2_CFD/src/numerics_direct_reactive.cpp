@@ -277,15 +277,15 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
 //
 //
 void CAvgGradReactive_Flow::Solve_SM(const su2double val_density, const su2double val_alpha, const RealMatrix& val_Dij,
-                                                           const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys) {
-  su2double toll = 1e-11;
+                                     const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys) {
+  const su2double toll = 1e-11;
 
   /*--- Rename for convenience ---*/
   su2double rho = val_density;
   su2double alpha = val_alpha;
 
   /*--- Compute original matrix of Stefan-Maxwell equations ---*/
-  //Gamma = library->GetGamma(rho,val_xs,val_ys,val_Dij)
+  //Gamma = library->GetGamma(rho, val_xs, val_ys, val_Dij)
 
   /*--- Add artificial diffusion part ---*/
   for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
@@ -543,6 +543,8 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   /*--- Mean transport coefficients ---*/
   Mean_Laminar_Viscosity = 2.0/(1.0/Laminar_Viscosity_i + 1.0/Laminar_Viscosity_j);
   Mean_Thermal_Conductivity = 2.0/(1.0/Thermal_Conductivity_i + 1.0/Thermal_Conductivity_j);
+  Dij_i = Eigen::Map<RealMatrix>(Diffusion_Coeff_i, nSpecies, nSpecies);
+  Dij_j = Eigen::Map<RealMatrix>(Diffusion_Coeff_j, nSpecies, nSpecies);
   Mean_Dij = 2.0/(Dij_i.cwiseInverse() + Dij_j.cwiseInverse()).array();
 
   /*--- Copy primitive varaibles ---*/

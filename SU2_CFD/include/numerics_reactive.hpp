@@ -132,7 +132,7 @@ private:
   RealMatrix Dij_i, Dij_j;      /*!< \brief Binary diffusion coefficients at point i and j. */
   RealMatrix Mean_Dij;          /*!< \brief Harmonic average of binary diffusion coefficients at point i and j. */
 
-  RealMatrix Gamma,Gamma_tilde;  /*!< \brief Auxiliary matrices for solving Stefan-Maxwell equations. */
+  RealMatrix Gamma, Gamma_tilde;  /*!< \brief Auxiliary matrices for solving Stefan-Maxwell equations. */
 
   RealVec hs;                   /*!< \brief Auxiliary vector to store partial enthalpy for species diffusion flux contribution. */
 

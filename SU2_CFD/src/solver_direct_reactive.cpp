@@ -2400,17 +2400,15 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
         visc_numerics->SetThermalConductivity(node[iPoint]->GetThermalConductivity(), node[iPoint]->GetThermalConductivity());
 
         /*--- Species binary coefficients ---*/
-        auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics);
-        SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
-        auto ns_variable = dynamic_cast<CReactiveNSVariable*>(node[iPoint]);
-        SU2_Assert(ns_variable != NULL, "The cast compute the binary diffusion coefficients has not been successfull");
-        avggrad_numerics->SetBinaryDiffCoeff(ns_variable->GetBinaryDiffusionCoeff(), ns_variable->GetBinaryDiffusionCoeff());
+        visc_numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
+
+        /*--- Compute the residual ---*/
         try {
           visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
         }
         catch(const std::exception& e) {
           std::cout<<e.what()<<std::endl;
-          avggrad_numerics->SetExplicit();
+          dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics)->SetExplicit();
           visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
         }
         LinSysRes.SubtractBlock(iPoint, Residual);
@@ -2692,11 +2690,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
         visc_numerics->SetThermalConductivity(node[iPoint]->GetThermalConductivity(), node[iPoint]->GetThermalConductivity());
 
         /*--- Species binary coefficients ---*/
-        auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics);
-        SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
-        auto ns_variable = dynamic_cast<CReactiveNSVariable*>(node[iPoint]);
-        SU2_Assert(ns_variable != NULL, "The cast compute the binary diffusion coefficients has not been successfull");
-        avggrad_numerics->SetBinaryDiffCoeff(ns_variable->GetBinaryDiffusionCoeff(), ns_variable->GetBinaryDiffusionCoeff());
+        visc_numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
 
         /*--- Compute and update residual ---*/
         try {
@@ -2704,7 +2698,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
         }
         catch(const std::exception& e) {
           std::cout<<e.what()<<std::endl;
-          avggrad_numerics->SetExplicit();
+          dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics)->SetExplicit();
           visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
         }
         LinSysRes.SubtractBlock(iPoint, Residual);
@@ -2802,11 +2796,7 @@ void CReactiveEulerSolver::BC_Supersonic_Outlet(CGeometry* geometry, CSolver** s
         visc_numerics->SetThermalConductivity(node[iPoint]->GetThermalConductivity(), node[iPoint]->GetThermalConductivity());
 
         /*--- Species binary coefficients ---*/
-        auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics);
-        SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
-        auto ns_variable = dynamic_cast<CReactiveNSVariable*>(node[iPoint]);
-        SU2_Assert(ns_variable != NULL, "The cast compute the binary diffusion coefficients has not been successfull");
-        avggrad_numerics->SetBinaryDiffCoeff(ns_variable->GetBinaryDiffusionCoeff(), ns_variable->GetBinaryDiffusionCoeff());
+        visc_numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
 
         /*--- Compute and update residual ---*/
         try {
@@ -2814,7 +2804,7 @@ void CReactiveEulerSolver::BC_Supersonic_Outlet(CGeometry* geometry, CSolver** s
         }
         catch(const std::exception& e) {
           std::cout<<e.what()<<std::endl;
-          avggrad_numerics->SetExplicit();
+          dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics)->SetExplicit();
           visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
         }
         LinSysRes.SubtractBlock(iPoint, Residual);
@@ -3073,11 +3063,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         visc_numerics->SetThermalConductivity(node[iPoint]->GetThermalConductivity(), node[iPoint]->GetThermalConductivity());
 
         /*--- Species binary coefficients ---*/
-        auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics);
-        SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
-        auto ns_variable = dynamic_cast<CReactiveNSVariable*>(node[iPoint]);
-        SU2_Assert(ns_variable != NULL, "The cast compute the binary diffusion coefficients has not been successfull");
-        avggrad_numerics->SetBinaryDiffCoeff(ns_variable->GetBinaryDiffusionCoeff(), ns_variable->GetBinaryDiffusionCoeff());
+        visc_numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
 
         /*--- Compute and update residual ---*/
         try {
@@ -3085,7 +3071,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         }
         catch(const std::exception& e) {
           std::cout<<e.what()<<std::endl;
-          avggrad_numerics->SetExplicit();
+          dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics)->SetExplicit();
           visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
         }
         LinSysRes.SubtractBlock(iPoint, Residual);
@@ -3687,10 +3673,7 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
     numerics->SetThermalConductivity(node[iPoint]->GetThermalConductivity(), node[jPoint]->GetThermalConductivity());
 
     /*--- Species binary coefficients ---*/
-    auto avggrad_numerics = dynamic_cast<CAvgGradReactive_Flow*>(numerics);
-    SU2_Assert(avggrad_numerics != NULL, "The cast to compute the viscous flux has not been successfull");
-    avggrad_numerics->SetBinaryDiffCoeff(dynamic_cast<CReactiveNSVariable*>(node[iPoint])->GetBinaryDiffusionCoeff(),
-                                         dynamic_cast<CReactiveNSVariable*>(node[jPoint])->GetBinaryDiffusionCoeff());
+    numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
 
     /*--- Compute the residual ---*/
     try {
@@ -3698,7 +3681,7 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
     }
     catch(const std::exception& e) {
       std::cout<<e.what()<<std::endl;
-      avggrad_numerics->SetExplicit();
+      dynamic_cast<CAvgGradReactive_Flow*>(numerics)->SetExplicit();
       numerics->ComputeResidual(Res_Visc, Jacobian_i, Jacobian_j, config);
     }
 
