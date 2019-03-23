@@ -530,15 +530,24 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\par CONFIG_CATEGORY: Problem Definition \ingroup Config */
   /*--- Options related to problem definition and partitioning ---*/
 
+  /*--- NOTE: New options ---*/
   /*!\brief LIB_NAME \n  DESCRIPTION: Library name for physical-chemical properties */
-  addStringOption("LIB_NAME",Library_Name,"");
+  addStringOption("LIB_NAME", Library_Name, "");
 
   /*!\brief CONFIG_LIB_FILE \n  DESCRIPTION: Name of file to configure the library */
-  addStringOption("CONFIG_LIB_FILE",Config_File_Lib,"");
+  addStringOption("CONFIG_LIB_FILE", Config_File_Lib, "");
+
+  /*!\brief LIB_PATH \n  DESCRIPTION: Path where to look for files specified in Config_File_Lib */
+  addStringOption("LIB_PATH", Library_Path, "");
 
   /*!\brief FREESTREAM_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
   addDoubleListOption("FREESTREAM_MASS_FRAC", nSpecies, MassFrac_FreeStream);
 
+  /*!\brief INLET_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
+  addInletOption("INLET_MASS_FRAC", nMarker_Inlet, Marker_Inlet, tmp1, tmp2, Inlet_MassFrac);
+
+
+  /*--- NOTE: Already present options ---*/
   /*!\brief REF_AREA\n DESCRIPTION: Reference density for adimensionalitazion (1.0 kg/m3 by default) \ingroup Config*/
   addDoubleOption("REF_DENSITY", Density_Ref, 1.0);
 
@@ -5824,6 +5833,15 @@ void CConfig::SetGlobalParam(unsigned short val_solver,
       }
       break;
   }
+}
+
+/*--- NOTE: New function to compute inlet mass fractions ---*/
+su2double* CConfig::GetInlet_MassFrac(string val_marker) const {
+  unsigned short iMarker_Inlet;
+  for(iMarker_Inlet = 0; iMarker_Inlet < nMarker_Inlet; ++iMarker_Inlet)
+    if(Marker_Inlet[iMarker_Inlet] == val_marker)
+      break;
+  return Inlet_MassFrac[iMarker_Inlet];
 }
 
 su2double* CConfig::GetPeriodicRotCenter(string val_marker) {

@@ -68,9 +68,13 @@ using namespace std;
 class CConfig {
 private:
   /*--- New information to be read from config ---*/
-  string Library_Name; /*!< \brief Name of library for physical-chemical options.*/
-  string Config_File_Lib; /*!< \brief Name of the to configure the library.*/
-  unsigned short nSpecies; /*!< \brief Number of species in the mixture.*/
+  string Library_Name;        /*!< \brief Name of library for physical-chemical options.*/
+  string Config_File_Lib;     /*!< \brief Name of the file to configure the library.*/
+  string Library_Path;        /*!< \brief Name of the library to llok for files to configure the library.*/
+  su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
+  su2double* tmp1;
+  su2double* tmp2;
+  unsigned short nSpecies;    /*!< \brief Number of species in the mixture.*/
 
   SU2_Comm SU2_Communicator; /*!< \brief MPI communicator of SU2.*/
   int rank;
@@ -1180,16 +1184,49 @@ public:
   bool TokenizeString(string & str, string & option_name,
                       vector<string> & option_value);
 
+  /*--- NOTE: New functions ---*/
   /*!
    * \brief Get library name for physical-chemical properties.
+   * \return Name of library.
   */
-  string GetLibraryName(void) const;
+  string GetLibraryName(void) const {
+    return Library_Name;
+  }
 
   /*!
-   * \brief Get library name for physical-chemical properties.
+   * \brief Get library's configuration file name for physical-chemical properties.
+   * \return Name of library's configuration file.
   */
-  string GetConfigLibFile(void) const;
+  string GetConfigLibFile(void) const {
+    return Config_File_Lib;
+  }
 
+  /*!
+   * \brief Get library path for physical-chemical properties.
+   * \return Name of library path.
+  */
+  string GetLibraryPath(void) const {
+    return Library_Path;
+  }
+
+  /*!
+   * \brief Get number of species involved
+   * \return Name of library.
+  */
+  unsigned short GetnSpecies(void) const {
+    return nSpecies;
+  }
+
+  /*!
+   * \brief Get mass fraction for a deisred inlet boundary
+   * \param[in] val_index - Index corresponding to the inlet boundary.
+   * \return Inlet mass fractions.
+  */
+  su2double* GetInlet_MassFrac(string val_index) const;
+
+
+
+  /*--- NOTE: ALready present functions ---*/
   /*!
    * \brief Get reference origin for moment computation.
    * \param[in] val_marker - the marker we are monitoring.
