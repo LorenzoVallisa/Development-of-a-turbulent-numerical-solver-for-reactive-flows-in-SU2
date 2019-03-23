@@ -290,7 +290,7 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
       su2double dim_temp = Temperature_Inf*config->GetTemperature_Ref();
       if(US_System)
         dim_temp *= 5.0/9.0;
-      //hs_Tot = library->ComputeEnthalpy(Temperature_Inf,MassFrac_Inf)/config->GetEnergy_Ref()
+      //hs_Tot = library->ComputeEnthalpy(Temperature_Inf, MassFrac_Inf)/config->GetEnergy_Ref();
       if(US_System)
         hs_Tot *= 3.28084*3.28084;
       Solution[RHOE_INDEX_SOL] = rho*(hs_Tot + 0.5*sqvel) - Pressure_Inf;
@@ -347,7 +347,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    Temperature_FreeStream = config->GetTemperature_FreeStream();
    Density_FreeStream = library->ComputeDensity(Pressure_FreeStream,Temperature_FreeStream,MassFrac_Inf);
    config->SetDensity_FreeStream(Density_FreeStream);
-   //SoundSpeed_FreeStream = library->ComputeFrozenSoundSpeed(Temperature_FreeStream,MassFrac_Inf);
+   //SoundSpeed_FreeStream = library->ComputeFrozenSoundSpeed(Temperature_FreeStream, MassFrac_Inf);
 
    /*--- Compute the modulus of the free stream velocity ---*/
    ModVel_FreeStream = std::inner_product(config->GetVelocity_FreeStream(), config->GetVelocity_FreeStream() + nDim,
@@ -2436,9 +2436,9 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
   unsigned short iDim;
   unsigned long iVertex, iPoint, Point_Normal;
 
-  su2double Velocity2, Temperature, Pressure, Density, Tot_Enthalpy, Enthalpy,
-            SoundSpeed, Rgas, Vel_Mag, Gamma, dim_temp, h_b, bb, Area;
-  su2double Normal[nDim], UnitNormal[nDim], Velocity[nDim], Flow_Dir[nDim];
+  su2double Velocity2, Temperature, Pressure, Density, Tot_Enthalpy, Entropy, Riemann, SoundSpeed, SoundSpeed2,
+            Vn, Vel_Mag, Gamma, Gamma_Minus_One, dim_temp, alpha, Area;
+  su2double Normal[nDim], UnitNormal[nDim], Velocity[nDim];
   su2double V_inlet[nPrimVar];
 
   unsigned short Kind_Inlet = config->GetKind_Inlet();
@@ -2447,6 +2447,8 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
   bool gravity              = config->GetGravityForce();
 
   Ys = RealVec(config->GetInlet_MassFrac(Marker_Tag), config->GetInlet_MassFrac(Marker_Tag) + nSpecies);
+  SU2_Assert(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0 < EPS, "The mass fractions don0t sum up to 1 in inlet boundary");
+  auto Flow_Dir = config->GetInlet_FlowDir(Marker_Tag);
 
   /*--- Loop over all the vertices on this boundary marker ---*/
   for(iVertex = 0; iVertex < geometry->nVertex[val_marker]; ++iVertex) {
@@ -2473,117 +2475,128 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
       /*--- Subsonic inflow: there is one outgoing characteristic (u-c),
             therefore we can specify all but one state variable at the inlet.
             The outgoing Riemann invariant provides the final piece of info. ---*/
-      auto Flow_Dir = config->GetInlet_FlowDir(Marker_Tag);
+      switch (Kind_Inlet) {
+        /*--- Total properties have been specified at the inlet. ---*/
+        case TOTAL_CONDITIONS: {
+          /*--- Store primitives and set some variables for clarity. ---*/
+          Temperature = V_domain[T_INDEX_PRIM];
+          Density = V_domain[RHO_INDEX_PRIM];
+          Pressure = V_domain[P_INDEX_PRIM];
+          Velocity2 = Vn = 0.0;
+          for(iDim = 0; iDim < nDim; iDim++) {
+            Velocity[iDim] = V_domain[VX_INDEX_PRIM + iDim];
+            Velocity2 += Velocity[iDim]*Velocity[iDim];
+            Vn += Velocity[iDim]*UnitNormal[iDim];
+          }
+          SoundSpeed = V_domain[A_INDEX_PRIM];
+          Tot_Enthalpy = V_domain[H_INDEX_PRIM];
+          dim_temp = Temperature*config->GetTemperature_Ref();
+          if(US_System)
+            dim_temp *= 5.0/9.0;
+          //Gamma = library->ComputeFrozenGamma(dim_temp, Ys);
+          Gamma_Minus_One = Gamma - 1.0;
+          Entropy = Pressure*std::pow(1.0/Density, Gamma);
+          Riemann = Vn + 2.0*SoundSpeed/Gamma_Minus_One;
 
-      /*--- Store primitives and set some variables for clarity. ---*/
-      Temperature = V_domain[T_INDEX_PRIM];
-      Density = V_domain[RHO_INDEX_PRIM];
-      Velocity2 = 0.0;
-      for(iDim = 0; iDim < nDim; iDim++) {
-        Velocity[iDim] = V_domain[VX_INDEX_PRIM + iDim];
-        Velocity2 += Velocity[iDim]*Velocity[iDim];
-      }
-      SoundSpeed = V_domain[A_INDEX_PRIM];
-      Tot_Enthalpy = V_domain[H_INDEX_PRIM];
-      Enthalpy = Tot_Enthalpy - 0.5*Velocity2;
-      //Rgas = library->ComputeRgas(Ys)/config->GetGas_Constant_Ref();
+          /*--- Compute inlet velocity magnitude ---*/
+          alpha = std::inner_product(UnitNormal, UnitNormal + nDim, Flow_Dir, 0.0);
+          /*--- Coefficients in the quadratic equation for the velocity ---*/
+          su2double aa = 1.0 + 0.5*Gamma_Minus_One*alpha*alpha;
+          su2double bb = -Gamma_Minus_One*alpha*Riemann;
+          su2double cc =  0.5*Gamma_Minus_One*Riemann*Riemann - 2.0*Tot_Enthalpy;
 
-      /*--- Compute some constant quantities. ---*/
-      const su2double alpha = std::inner_product(UnitNormal, UnitNormal + nDim, Flow_Dir, 0.0);
-      const su2double b = 1.5*Rgas*Temperature - Enthalpy;
-      const su2double c = Rgas*Rgas*Temperature;
-      const su2double known = 0.5*SoundSpeed + std::sqrt(Velocity2)*alpha;
+          /*--- Solve quadratic equation for velocity magnitude. NOTE: Value must
+                be positive, so the choice of root is clear. ---*/
+          su2double dd = bb*bb - 4.0*aa*cc;
+          dd = std::sqrt(std::max(0.0, dd));
+          Vel_Mag = (-bb + dd)/(2.0*aa);
+          Vel_Mag = std::max(0.0, Vel_Mag);
+          Velocity2 = Vel_Mag*Vel_Mag;
 
-      /*--- Flags and settings for Secant method. ---*/
-      bool NRconvg, Bconvg;
-      su2double NRtol = 1.0e-6;    // Tolerance for the Secant method
-      su2double Btol = 1.0e-4;    // Tolerance for the Bisection method
-      unsigned short maxNIter = 10;        // Maximum Secant method iterations
-      unsigned short maxBIter = 50;        // Maximum Bisection method iterations
-      unsigned short iIter;
+          /*--- Update sound speed ---*/
+          SoundSpeed2 = Gamma_Minus_One*(Tot_Enthalpy - 0.5*Velocity2);
+          /*--- Mach squared (cut between 0-1), use to adapt velocity ---*/
+          su2double Mach2 = Velocity2/SoundSpeed2;
+          Mach2 = std::min(1.0, Mach2);
+          Velocity2 = Mach2*SoundSpeed2;
+          Vel_Mag   = std::sqrt(Velocity2);
+          SoundSpeed2 = Gamma_Minus_One*(Tot_Enthalpy - 0.5*Velocity2);
 
-      su2double Told = Temperature + 1.0;
-      su2double Tcurr = Temperature;
-      su2double Tnew;
-      NRconvg = false;
+          /*--- Update temperature and density ---*/
+          //Rgas = library->GetRgas()/config->GetGas_Constant_Ref();
+          su2double Rgas;
+          Temperature = SoundSpeed2/(Gamma*Rgas);
+          Density = std::pow(Rgas*Temperature/Entropy, 1.0/(Gamma - 1.0));
+          Pressure = Density*Temperature*Rgas;
 
-      /*--- Useful function for Secant method. ---*/
-      auto f = std::function<su2double(su2double)>([&](double T){
-        dim_temp = T*config->GetTemperature_Ref();
-        if(US_System)
-          dim_temp *= 5.0/9.0;
-        //h_b = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
-        if(US_System)
-          h_b *= 3.28084*3.28084;
-        //Gamma = library->ComputeFrozenGamma(dim_temp, Ys);
-        su2double c_b = std::sqrt(Gamma*Rgas*T);
-        bb = b + h_b - 1.5*Rgas*T;
-        su2double rho_b = (bb + std::sqrt(bb*bb + T*c))*Density/(Rgas*T);
-        return std::sqrt(2.0*std::abs(Tot_Enthalpy - h_b))*alpha + 0.5*c_b + 0.5*rho_b*SoundSpeed/Density - 0.5*Density*c_b/rho_b;
-      });
+          /*--- Set inlet state ---*/
+          V_inlet[T_INDEX_PRIM] = Temperature;
+          for(iDim = 0; iDim < nDim; ++iDim)
+            V_inlet[VX_INDEX_PRIM + iDim] = Vel_Mag*Flow_Dir[iDim];
+          V_inlet[P_INDEX_PRIM] = Pressure;
+          V_inlet[RHO_INDEX_PRIM] = Density;
+          V_inlet[H_INDEX_PRIM] = Tot_Enthalpy;
+          V_inlet[A_INDEX_PRIM] = std::sqrt(SoundSpeed2);
+          std::copy(Ys.cbegin(), Ys.cend(), V_inlet + RHOS_INDEX_PRIM);
 
-      /*--- Execute a secant root-finding method to find the inlet temperature ---*/
-      for(iIter = 0; iIter < maxNIter; ++iIter) {
-        su2double tmp = f(Tcurr);
-        su2double F = tmp - known;
-        su2double dF = tmp - f(Told);
-        Tnew = Tcurr - F*(Tcurr - Told)/dF;
-
-        /*--- Check for convergence ---*/
-        if(std::abs(Tnew - Tcurr) < NRtol) {
-          NRconvg = true;
           break;
         }
-        else {
-          Told  = Tcurr;
-          Tcurr = Tnew;
+
+        /*--- Mass flow has been specified at the inlet. ---*/
+        case MASS_FLOW: {
+          /*--- Retrieve the specified mass flow for the inlet. ---*/
+          Density = config->GetInlet_Ttotal(Marker_Tag);
+          Vel_Mag = config->GetInlet_Ptotal(Marker_Tag);
+
+          /*--- Non-dim. the inputs if necessary. ---*/
+          Density /= config->GetDensity_Ref();
+          Vel_Mag /= config->GetVelocity_Ref();
+
+          /*--- Get primitives from current inlet state. ---*/
+          for(iDim = 0; iDim < nDim; ++iDim)
+            Velocity[iDim] = V_domain[VX_INDEX_PRIM + iDim];
+          Pressure = V_domain[P_INDEX_PRIM];
+          SoundSpeed = V_domain[A_INDEX_PRIM];
+
+          /*--- Compute the acoustic Riemann invariant that is extrapolated
+                from the domain interior. ---*/
+          Temperature = V_domain[T_INDEX_PRIM];
+          dim_temp = Temperature*config->GetTemperature_Ref();
+          if(US_System)
+            dim_temp *= 5.0/9.0;
+          //Gamma = library->ComputeFrozenGamma(dim_temp, Ys);
+          Gamma_Minus_One = Gamma - 1.0;
+          Vn = std::inner_product(Velocity, Velocity + nDim, UnitNormal, 0.0);
+          Riemann = Vn + 2.0*SoundSpeed/Gamma_Minus_One;
+
+          /*--- Speed of sound squared for fictitious inlet state ---*/
+          alpha = std::inner_product(UnitNormal, UnitNormal + nDim, Flow_Dir, 0.0);
+          SoundSpeed = Riemann - Vel_Mag*alpha;
+          SoundSpeed = std::max(0.0, 0.5*Gamma_Minus_One*SoundSpeed);
+          SoundSpeed2 = SoundSpeed*SoundSpeed;
+
+          /*--- Pressure for the fictitious inlet state ---*/
+          Pressure = SoundSpeed2*Density/Gamma;
+
+          /*--- Set primitive variables using the derived quantities ---*/
+          //V_inlet[T_INDEX_PRIM] = library->ComputeTemperature(Pressure, Density, Ys)*config->GetGas_Constant_Ref();
+          for(iDim = 0; iDim < nDim; ++iDim)
+            V_inlet[VX_INDEX_PRIM + iDim] = Vel_Mag*Flow_Dir[iDim];
+          V_inlet[P_INDEX_PRIM] = Pressure;
+          V_inlet[RHO_INDEX_PRIM] = Density;
+          Temperature = V_inlet[T_INDEX_PRIM];
+          dim_temp = Temperature*config->GetTemperature_Ref();
+          if(US_System)
+            dim_temp *= 5.0/9.0;
+          //V_inlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
+          if(US_System)
+            V_inlet[H_INDEX_PRIM] *= 3.28084*3.28084*5.0/9.0;
+          V_inlet[A_INDEX_PRIM] = SoundSpeed;
+          std::copy(Ys.cbegin(), Ys.cend(), V_inlet + RHOS_INDEX_PRIM);
+
+          break;
         }
       }
-
-      if(NRconvg)
-        V_inlet[T_INDEX_PRIM] = Tcurr;
-      else {
-        /*--- Execute the bisection root-finding method ---*/
-        Bconvg = false;
-        su2double Ta = 200.0;
-        su2double Tb = 6.0e3;
-        for(iIter = 0; iIter < maxBIter; ++iIter) {
-          Tcurr = 0.5*(Ta + Tb);
-          su2double F = f(Tcurr) - known;
-
-          if(std::abs(F) < Btol) {
-            V_inlet[T_INDEX_PRIM] = Tcurr;
-            Bconvg = true;
-            break;
-          }
-          else {
-            if(F > 0.0)
-              Ta = Tcurr;
-            else
-              Tb = Tcurr;
-          }
-        }
-
-        /*--- If absolutely no convergence, then something is going really wrong ---*/
-        if(!Bconvg)
-          throw std::runtime_error("Convergence not achieved for bisection method");
-      }
-
-      /*--- Complete the fictious state at the inlet ---*/
-      Temperature = V_inlet[T_INDEX_PRIM];
-      dim_temp = Temperature*config->GetTemperature_Ref();
-      //h_b = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
-      if(US_System)
-        h_b *= 3.28084*3.28084;
-      bb = b + h_b - 1.5*Rgas*Temperature;
-      V_inlet[RHO_INDEX_PRIM] = (bb + std::sqrt(bb*bb + Temperature*c))*Density/(Rgas*Temperature);
-      Vel_Mag = std::sqrt(2.0*std::abs(Tot_Enthalpy - h_b));
-      for(iDim = 0; iDim < nDim; ++iDim)
-        V_inlet[VX_INDEX_PRIM + iDim] = Vel_Mag*Flow_Dir[iDim];
-      V_inlet[P_INDEX_PRIM] = V_inlet[RHO_INDEX_PRIM]*Rgas*Temperature;
-      V_inlet[H_INDEX_PRIM] = Tot_Enthalpy;
-      //Gamma = library->ComputeFrozenGamma(dim_temp, Ys);
-      V_inlet[A_INDEX_PRIM] = std::sqrt(Gamma*Rgas*Temperature);
 
       /*--- Set various quantities in the solver class ---*/
       conv_numerics->SetPrimitive(V_domain, V_inlet);
@@ -2836,216 +2849,35 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
               to update the conservative variables. Compute the entropy and the
               acoustic Riemann variable. These invariants, as well as the
               tangential velocity components, are extrapolated. ---*/
-        su2double Vn, Vn_Exit, diff_v, int_res;
+        su2double Vn, Vn_Exit, Entropy, Riemann, Gamma_Minus_One, dim_temp;
 
-        /*--- Secant method to determine the temperature ---*/
-        su2double Rgas;
-        //Rgas = library->GetRgas();
-        Pressure = V_domain[P_INDEX_PRIM];
-        su2double a = Rgas/config->GetGas_Constant_Ref()*std::log(P_Exit/Pressure);
-        su2double b = node[iPoint]->GetSpecificHeatCp()/Temperature;
-
-        bool NRconvg, Bconvg;
-        su2double NRtol = 1.0e-6;    // Tolerance for the Secant method
-        su2double Btol = 1.0e-4;    // Tolerance for the Bisection method
-        unsigned short maxNIter = 10;        // Maximum Secant method iterations
-        unsigned short maxBIter = 50;        // Maximum Bisection method iterations
-        unsigned short iIter;
-
-        su2double Told = Temperature + 1.0;
-        su2double Tcurr = Temperature;
-        su2double Tnew;
-        NRconvg = false;
-
-        /*--- Application of Cavalieri-Simpson's rule ---*/
-        auto f = std::function<su2double(su2double)>([&](double T){
-          su2double temp1_dim = (Temperature + T)/2.0*config->GetTemperature_Ref();
-          su2double temp2_dim = T;
-          if(US_System) {
-            temp1_dim *= 5.0/9.0;
-            temp2_dim *= 5.0/9.0;
-          }
-          //su2double cp  = library->ComputeCp((temp1_dim + temp2_dim)/2.0, Ys);
-          //su2double cp2 = library->ComputeCp(temp2_dim, Ys);
-          su2double cp, cp2;
-          cp  /= config->GetGas_Constant_Ref();
-          cp2 /= config->GetGas_Constant_Ref();
-          if(US_System) {
-            cp *= 3.28084*3.28084*5.0/9.0;
-            cp2 *= 3.28084*3.28084*5.0/9.0;
-          }
-          return (T - Temperature)*(b + 8.0*cp/(T + Temperature) + cp2/T)/6.0;
-        });
-
-        /*--- Execute a secant root-finding method to find the outlet temperature ---*/
-        for(iIter = 0; iIter < maxNIter; ++iIter) {
-          su2double tmp = f(Tcurr);
-          su2double F = tmp - a;
-          su2double dF = tmp - f(Told);
-          Tnew = Tcurr - F*(Tcurr - Told)/dF;
-
-          /*--- Check for convergence ---*/
-          if(std::abs(Tnew - Tcurr) < NRtol) {
-            NRconvg = true;
-            break;
-          }
-          else {
-            Told  = Tcurr;
-            Tcurr = Tnew;
-          }
-        }
-
-        if(NRconvg)
-          V_outlet[T_INDEX_PRIM] = Tcurr;
-        else {
-          /*--- Execute the bisection root-finding method ---*/
-          Bconvg = false;
-          su2double Ta = 200.0;
-          su2double Tb = 6.0e3;
-          for(iIter = 0; iIter < maxBIter; ++iIter) {
-            Tcurr = 0.5*(Ta + Tb);
-            su2double F = f(Tcurr) - a;
-
-            if(std::abs(F) < Btol) {
-              V_outlet[T_INDEX_PRIM] = Tcurr;
-              Bconvg = true;
-              break;
-            }
-            else {
-              if(F > 0.0)
-                Ta = Tcurr;
-              else
-                Tb = Tcurr;
-            }
-          }
-
-          /*--- If absolutely no convergence, then something is going really wrong ---*/
-          if(!Bconvg)
-            throw std::runtime_error("Convergence not achieved for bisection method");
-        }
-
-        /*--- Start completing the fictious state at the outlet ---*/
-        V_outlet[P_INDEX_PRIM] = P_Exit;
-        V_outlet[RHO_INDEX_PRIM] = P_Exit/(Rgas*V_outlet[T_INDEX_PRIM]);
-
-        /*--- Use Riemann invaraint with another quadrature formula to compute the velocity ---*/
+        /*--- Compute entropy and Riemann invariant ---*/
+        Entropy = Pressure*std::pow(1.0/Density, Gamma);
         Vn = std::inner_product(Velocity, Velocity + nDim, UnitNormal, 0.0);
-        unsigned short nQuadPoint = 3;
-        su2double Quad_Temperature[nQuadPoint], Quad_Density[nQuadPoint];
-        su2double Weights[nQuadPoint];
-        unsigned short iQuadPoint;
+        Gamma_Minus_One = Gamma - 1.0;
+        Riemann = Vn - 2.0*SoundSpeed/Gamma_Minus_One;
 
-        /*--- Set density points and weights (Gauss-Legnedre 3 points) ---*/
-        Quad_Density[0] = 0.5*(V_outlet[RHO_INDEX_PRIM] - V_domain[RHO_INDEX_PRIM])*(-std::sqrt(3.0/5.0)) +
-                          0.5*(V_outlet[RHO_INDEX_PRIM] + V_domain[RHO_INDEX_PRIM]);
-        Quad_Density[1] = 0.5*(V_outlet[RHO_INDEX_PRIM] + V_domain[RHO_INDEX_PRIM]);
-        Quad_Density[2] = 0.5*(V_outlet[RHO_INDEX_PRIM] - V_domain[RHO_INDEX_PRIM])*(std::sqrt(3.0/5.0)) +
-                          0.5*(V_outlet[RHO_INDEX_PRIM] + V_domain[RHO_INDEX_PRIM]);
-        Weights[0] = Weights[2] = 5.0/9.0;
-        Weights[1] = 8.0/9.0;
-
-        /*--- New function for Simspon's rule in case of density ---*/
-        auto f_quad = std::function<su2double(su2double)>([&](double T){
-          return f(T) - Rgas*std::log(T/Temperature);
-        });
-
-        Temperature = V_domain[T_INDEX_PRIM];
-        Density = V_domain[RHO_INDEX_PRIM];
-        for(iQuadPoint = 0; iQuadPoint < nQuadPoint; ++iQuadPoint) {
-          /*--- Initialize variables for Secant method ---*/
-          Told = Temperature + 1.0;
-          Tcurr = Temperature;
-          NRconvg = false;
-          a = Rgas*std::log(Quad_Density[iQuadPoint]/Density);
-          dim_temp = Temperature*config->GetTemperature_Ref();
-          if(US_System)
-            dim_temp *= 5.0/9.0;
-          //su2double cp = library->ComputeCp(dim_temp, Ys)/config->GetEnergy_Ref();
-          //if(US_System)
-          //  cp *= 3.28084*3.28084*5.0/9.0;
-          //b = cp/Temperature;
-
-          /*--- Secant method loop ---*/
-          for(iIter = 0; iIter < maxNIter; ++iIter) {
-            su2double tmp = f_quad(Tcurr);
-            su2double F = tmp - a;
-            su2double dF = tmp - f_quad(Told);
-            Tnew = Tcurr - F*(Tcurr - Told)/dF;
-
-            /*--- Check for convergence ---*/
-            if(std::abs(Tnew - Tcurr) < NRtol) {
-              NRconvg = true;
-              break;
-            }
-            else {
-              Told  = Tcurr;
-              Tcurr = Tnew;
-            }
-          }
-
-          if(NRconvg)
-            Quad_Temperature[iQuadPoint] = Tcurr;
-          else {
-            /*--- Execute the bisection root-finding method ---*/
-            Bconvg = false;
-            su2double Ta = 200.0;
-            su2double Tb = 6.0e3;
-            for(iIter = 0; iIter < maxBIter; ++iIter) {
-              Tcurr = 0.5*(Ta + Tb);
-              su2double F = f_quad(Tcurr) - a;
-
-              if(std::abs(F) < Btol) {
-                Quad_Temperature[iQuadPoint] = Tcurr;
-                Bconvg = true;
-                break;
-              }
-              else {
-                if(F > 0.0)
-                  Ta = Tcurr;
-                else
-                  Tb = Tcurr;
-              }
-            }
-
-            /*--- If absolutely no convergence, then something is going really wrong ---*/
-            if(!Bconvg)
-              throw std::runtime_error("Convergence not achieved for bisection method");
-          }
-          Temperature = Quad_Temperature[iQuadPoint];
-          Density = Quad_Density[iQuadPoint];
-        }
-
-        /*--- Compute boundary normal velocity with 3 points Gauss-Legnedre quadrature rule ---*/
-        int_res = 0.0;
-        for(iQuadPoint = 0; iQuadPoint < nQuadPoint; ++iQuadPoint) {
-          Temperature = Quad_Temperature[iQuadPoint];
-          dim_temp = Temperature*config->GetTemperature_Ref();
-          if(US_System)
-            dim_temp *= 5.0/9.0;
-          //Gamma = library->ComputeFrozenGamma(dim_temp, Ys);
-          int_res += Weights[iQuadPoint]*std::sqrt(Gamma*Rgas*Temperature)/Quad_Density[iQuadPoint];
-        }
-        int_res *= 0.5*(V_outlet[RHO_INDEX_PRIM] - V_domain[RHO_INDEX_PRIM]);
-        Vn_Exit = Vn - int_res;
-
-        /*--- Complete the fictious state at the outlet ---*/
-        diff_v = Vn_Exit - Vn;
-        Velocity2 = 0.0;
+        /*--- Compute the new fictitious state ---*/
+        V_outlet[P_INDEX_PRIM] = P_Exit;
+        V_outlet[RHO_INDEX_PRIM] = std::pow(P_Exit/Entropy, 1.0/Gamma);
+        SoundSpeed = std::sqrt(Gamma*P_Exit/V_outlet[RHO_INDEX_PRIM]);
+        Vn_Exit = Riemann + 2.0*SoundSpeed/Gamma_Minus_One;
+        Velocity2  = 0.0;
         for(iDim = 0; iDim < nDim; ++iDim) {
-          Velocity[iDim] += diff_v*UnitNormal[iDim];
+          Velocity[iDim] += (Vn_Exit-Vn)*UnitNormal[iDim];
           Velocity2 += Velocity[iDim]*Velocity[iDim];
+          V_outlet[VX_INDEX_PRIM + iDim] = Velocity[iDim];
         }
-        std::copy(Velocity, Velocity + nDim, V_outlet + VX_INDEX_PRIM);
+        V_outlet[T_INDEX_PRIM] = Temperature*std::pow(P_Exit/Pressure, Gamma_Minus_One/Gamma);
         Temperature = V_outlet[T_INDEX_PRIM];
         dim_temp = Temperature*config->GetTemperature_Ref();
         if(US_System)
           dim_temp *= 5.0/9.0;
         //V_outlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
         if(US_System)
-          V_outlet[H_INDEX_PRIM] *= 3.28084*3.28084;
+          V_outlet[H_INDEX_PRIM] *= 3.28084*3.28084*5.0/9.0;
         V_outlet[H_INDEX_PRIM] += 0.5*Velocity2;
-        //Gamma = library->ComputeFrozenGamma(dim_temp, Ys);
-        V_outlet[A_INDEX_PRIM] = std::sqrt(Gamma*Rgas*Temperature);
+        V_outlet[A_INDEX_PRIM] = SoundSpeed;
         std::copy(Ys.cbegin(), Ys.cend(), V_outlet + RHOS_INDEX_PRIM);
       } /*--- End subsonic outlet preliminary computations ---*/
 

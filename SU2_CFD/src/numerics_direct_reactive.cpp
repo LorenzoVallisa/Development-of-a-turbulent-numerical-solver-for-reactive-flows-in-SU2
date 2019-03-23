@@ -118,38 +118,31 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
     ProjVelocity_j -= ProjGridVel_j;
   }
 
-  /*--- Compute L/R Mach numbers for reference Mach ---*/
-  su2double mL = std::sqrt(sq_vel_i)/SoundSpeed_i;
-  su2double mR = std::sqrt(sq_vel_j)/SoundSpeed_j;
-
   /*--- Compute user defined Mach number ---*/
-  su2double mRef,mF;
-  if(mL >= 1.0 || mR >= 1.0)
-    mRef = 1.0;
-  else
-    mRef = std::min(1.0,std::max(1e-4,(0.25*(mL+mR)*(mL+mR))));
+  su2double mRef, mF;
+  mRef = config->GetMach();
 
   /*--- Compute Mean sound speed ---*/
   su2double MeanSoundSpeed = 0.5*(SoundSpeed_i + SoundSpeed_j);
 
   /*--- Compute Normal L/R Mach numbers ---*/
-  mL  = ProjVelocity_i/MeanSoundSpeed;
-  mR  = ProjVelocity_j/MeanSoundSpeed;
+  su2double mL  = ProjVelocity_i/MeanSoundSpeed;
+  su2double mR  = ProjVelocity_j/MeanSoundSpeed;
 
   /*--- Compute mean local Mach number and reference Mach number ---*/
   mF  = std::sqrt(0.5*(mL*mL + mR*mR));
-  mRef = std::min(1.0,std::max(mF,mRef));
+  mRef = std::min(1.0, std::max(mF,mRef));
 
   /*--- Set constants ---*/
   const su2double fa = mRef*(2.0 - mRef);
   const su2double alpha = 3.0/16.0*(5.0*fa*fa - 4.0);
   const su2double beta = 0.125;
 
-  su2double mLP,mRM,pLP,pRM;
+  su2double mLP, mRM, pLP, pRM;
 
   /*--- Compute adjusted polynomial function AUSM +-Up ---*/
   if(std::abs(mL) < 1.0) {
-    mLP = 0.25*(mL + 1.0)*(mL + 1.0)* + beta*(mL*mL - 1.0)*(mL*mL - 1.0);
+    mLP = 0.25*(mL + 1.0)*(mL + 1.0) + beta*(mL*mL - 1.0)*(mL*mL - 1.0);
     pLP = 0.25*(mL + 1.0)*(mL + 1.0)*(2.0 - mL) + alpha*mL*(mL*mL - 1.0);
   }
   else {
@@ -171,7 +164,7 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
   const su2double sigma = 1.0;
 
   su2double m12 = mLP + mRM;
-  m12 -= kP*std::max(1.0 - sigma*mF*mF, 0.0)*(Pressure_j - Pressure_i)/(0.5*(Density_i + Density_j)*MeanSoundSpeed*MeanSoundSpeed);
+  m12 -= kP/fa*std::max(1.0 - sigma*mF*mF, 0.0)*(Pressure_j - Pressure_i)/(0.5*(Density_i + Density_j)*MeanSoundSpeed*MeanSoundSpeed);
   su2double mLF = 0.5*(m12 + std::abs(m12));
   su2double mRF = 0.5*(m12 - std::abs(m12));
   m12 = MeanSoundSpeed*(mLF*Density_i + mRF*Density_j);
@@ -330,13 +323,13 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   T   = val_primvar[T_INDEX_PRIM];
 
   /*--- Compute partial enthalpies ---*/
-  bool US_System = (config->GetSystemMeasurements() == SI);
+  bool US_System = (config->GetSystemMeasurements() == US);
   su2double dim_temp = T*config->GetTemperature_Ref();
   if(US_System)
     dim_temp *= 5.0/9.0;
   //hs = library->ComputePartialEnthalpy(dim_temp);
   //for(auto& elem: hs)
-  //  elem *= config->GetEnergy_Ref();
+  //  elem /= config->GetEnergy_Ref();
   //if(US_System) {
   //  for(auto& elem: hs)
   //    elem *= 3.28084*3.28084;
@@ -428,23 +421,23 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
   rho = val_primvar[RHO_INDEX_PRIM];
   mu  = val_viscosity;
   ktr = val_thermal_conductivity;
-  T = val_primvar[T_INDEX_PRIM];
+  T   = val_primvar[T_INDEX_PRIM];
 
   /*--- Compute partial enthalpies ---*/
-  bool US_System = (config->GetSystemMeasurements() == SI);
+  bool US_System = (config->GetSystemMeasurements() == US);
   su2double dim_temp = T*config->GetTemperature_Ref();
   if(US_System)
     dim_temp *= 5.0/9.0;
+  //hs = library->ComputePartialEnthalpy(dim_temp);
   //for(auto& elem: hs)
-  //  elem *= config->GetEnergy_Ref();
+  //  elem /= config->GetEnergy_Ref();
   //if(US_System) {
   //  for(auto& elem: hs)
   //    elem *= 3.28084*3.28084;
   //}
 
   /*--- Extract molar fractions, their gradient and mass fractions ---*/
-  std::copy(val_primvar.data() + RHOS_INDEX_PRIM,
-            val_primvar.data() + (RHOS_INDEX_PRIM + nSpecies), Xs.begin());
+  std::copy(val_primvar.data() + RHOS_INDEX_PRIM, val_primvar.data() + (RHOS_INDEX_PRIM + nSpecies), Xs.begin());
   Grad_Xs = val_grad_primvar.block(RHOS_INDEX_AVGGRAD,0,nSpecies,nDim);
   //Ys = library->GetMassFromMolar(Xs);
 
@@ -685,7 +678,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
   temp = V_i[T_INDEX_PRIM];
   dim_temp = temp*config->GetTemperature_Ref();
   dim_rho = rho*config->GetDensity_Ref();
-  bool US_System = (config->GetSystemMeasurements() == SI);
+  bool US_System = (config->GetSystemMeasurements() == US);
   if(US_System) {
     dim_temp *= 5.0/9.0;
     dim_rho *= 3.28084*3.28084*3.28084/0.0685218;
@@ -706,7 +699,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
   if(implicit) {
     throw Common::NotImplemented("Implicit method for source chemistry residual not yet implemented. Setting explicit");
 
-    /*--- Check memory ---*/
+    /*--- Check memory allocation ---*/
     if(config->GetExtIter() == 0) {
       SU2_Assert(S_i != NULL,"The array of primitive variables derivatives has not been allocated");
       SU2_Assert(val_Jacobian_i != NULL,"The matrix for source term jacobian has not been allocated");
