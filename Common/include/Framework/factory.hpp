@@ -1,131 +1,175 @@
 #ifndef SU2_FACTORY
 #define SU2_FACTORY
 
-#include "abstract_factory.hpp"
+#include "../not_copyable.hpp"
+
+#include <string>
+#include <vector>
 
 #include <map>
 #include <stdexcept>
 #include <memory>
-#include <vector>
 #include <sstream>
 
-
 /*!
-  * This namespace provides a factory class to load run-time the library that
-  * will compute the physical and chemical properties of the considered mixture
+ * This namespace provides a factory class to load run-time the library that
+ * will compute the physical and chemical properties of the considered mixture
 */
 
 namespace Common {
 
-  template<class Base> class AbstractProvider; /*!< \brief Forward declaration of the abstract provider */
+  template<class Base> class Provider;
 
   /*!
     * \class Factory
     * \brief Class for loading libraries at run-time.
     * \author G. Orlando
-    */
-
+  */
   template<class Base>
-  class Factory: public Common::AbstractFactory {
+  class Factory: public Common::NotCopyable<Factory<Base>> {
   public:
 
     /*
-    * \brief Default destrcutor
+     * \brief Destrcutor
     */
-    ~Factory() = default;
-
+    virtual ~Factory() {}
 
     /*
-    * \brief Checks if a provider is registered
-    * \param[in] name - Name of the provider
+     * \brief Get the instance of this singleton
     */
-    bool Exists(const std::string& name);
+    static Common::Factory<Base>& GetInstance(void);
 
     /*
-    * \brief Registers a provider
-    * \param[in] provider - Pointer to the provider to be registered
+     * \brief Checks if a provider is registered
+     * \param[in] name - Name of the provider
     */
-    void Regist(std::unique_ptr<AbstractProvider<Base>> provider);
+    bool Exists(const std::string& name) const;
 
     /*
-    * \brief Removes a registered provider (throw exception if it doesn't exist)
-    * \param[in] provider_name - Name of the provider to be unregistered
+     * \brief Registers a provider
+     * \param[in] provider - Pointer to the provider to be registered
+    */
+    void Regist(Provider<Base>* provider);
+
+    /*
+     * \brief Removes a registered provider (throw exception if it doesn't exist)
+     * \param[in] provider_name - Name of the provider to be unregistered
     */
     void Unregist(const std::string& provider_name);
 
     /*
-    * \brief Get the name of the Base class
+     * \brief Get the name of the Base class
     */
     inline const std::string GetBaseName() const {
-      return Base::GetClassName();
+      return Base::GetBaseName();
     }
 
     /*
-    * \brief Get a desired provider (throw exception if it doesn't exist)
-    * \param[in] provider_name - Name of the provider to be unregistered
+     * \brief Get a desired provider (throw exception if it doesn't exist)
+     * \param[in] provider_name - Name of the provider to be unregistered
     */
-    std::unique_ptr<typename Base::Provider> GetProvider(const std::string& provider_name) const;
+    typename Base::Provider* GetProvider(const std::string& provider_name) const;
 
     /*
-    * \brief Returns all the providers in this factory
+     * \brief Returns all the providers in this factory
     */
-    std::vector<std::unique_ptr<AbstractProvider<Base>>> GetAllProviders(void) const;
-
+    std::vector<std::string> GetAllProviders(void) const;
 
   private:
 
-    typedef std::map<std::string,std::unique_ptr<AbstractProvider<Base>>> Container_type;
+    /*
+     * \brief Constructor is private because this is a singleton
+    */
+    Factory() {}
+
+  protected:
+
+    typedef std::map<std::string,std::unique_ptr<Provider<Base>>> Container_type;
 
     Container_type database; /*!< \brief Database to store providers */
 
-};
+  }; /*--- End of class Factory ---*/
 
-
-template<class Base>
-bool Factory<Base>::Exists(const std::string& name) {
-  return (database.count(name) > 0);
-}
-
-template<class Base>
-void Factory<Base>::Regist(std::unique_ptr<AbstractProvider<Base>> provider) {
-  if (Exists(provider->GetName())) {
-    std::ostringstream converter;
-    converter<<"In factory of [" << GetBaseName() <<
-    "] a provider with the name [" << provider->GetProviderName() <<
-    "] was found when trying to regist it\n";
-    throw std::invalid_argument(converter.str());
+  //
+  //
+  /*
+   * \brief Mayer's trick implementation
+  */
+  template<class Base>
+  Factory<Base>& Factory<Base>::GetInstance(void) {
+    static Common::Factory<Base> obj;
+    return obj;
   }
-  database.insert(std::make_pair(provider->GetName(), provider));
-}
 
-template<class Base>
-void Factory<Base>::Unregist(const std::string& provider_name) {
-  if (!Exists(provider_name)) {
-    std::string out="Provider " + provider_name + " is not stored in the factory";
-	  throw std::invalid_argument(out);
+  //
+  //
+  /*
+   * \brief Check if a provider already exists
+  */
+  template<class Base>
+  bool Factory<Base>::Exists(const std::string& name) const {
+    return (database.count(name) > 0);
   }
-  database.erase(provider_name);
-}
 
-
-template<class Base>
-std::unique_ptr<typename Base::Provider> Factory<Base>::GetProvider(const std::string& provider_name) const {
-  if (!Exists(provider_name)) {
-    std::string out="Provider " + provider_name + " is not stored in the factory";
-	  throw std::invalid_argument(out);
+  //
+  //
+  /*
+   * \brief Regist a provider
+  */
+  template<class Base>
+  void Factory<Base>::Regist(Provider<Base>* provider) {
+    if(Exists(provider->GetProviderName())) {
+      std::ostringstream converter;
+      converter<<"In the factory [" << GetBaseName() <<
+      "] a provider with the name [" << provider->GetProviderName() <<
+      "] was found when trying to regist it\n";
+      throw std::invalid_argument(converter.str());
+    }
+    database.emplace(provider->GetProviderName(), std::unique_ptr<Provider<Base>>(provider));
   }
-  return (database.find(provider_name)->second());
-}
 
-template<class Base>
-std::vector<std::unique_ptr<AbstractProvider<Base>>> Factory<Base>::GetAllProviders(void) const {
-  std::vector<std::unique_ptr<AbstractProvider<Base>>> res;
-  res.reserve(database.size());
-  for(auto i=database.begin(); i!=database.end();++i)
-    res.push_back(i->second());
-  return res;
-}
+  //
+  //
+  /*
+   * \brief Unregist a provider
+  */
+  template<class Base>
+  void Factory<Base>::Unregist(const std::string& provider_name) {
+    if (!Exists(provider_name)) {
+      std::string out="Provider " + provider_name + " is not stored in the factory";
+	    throw std::invalid_argument(out);
+    }
+    database.erase(provider_name);
+  }
 
-}
+  //
+  //
+  /*
+   * \brief Get a pointer to a deisred provider
+  */
+  template<class Base>
+  typename Base::Provider* Factory<Base>::GetProvider(const std::string& provider_name) const {
+    if (!Exists(provider_name)) {
+      std::string out="Provider " + provider_name + " is not stored in the factory";
+	    throw std::invalid_argument(out);
+    }
+    return dynamic_cast<typename Base::Provider*>(database.find(provider_name)->second.get());
+  }
+
+  //
+  //
+  /*
+   * \brief Get a list with all providers name
+  */
+  template<class Base>
+  std::vector<std::string> Factory<Base>::GetAllProviders(void) const {
+    std::vector<std::string> res;
+    res.reserve(database.size());
+    for(auto i = database.begin(); i != database.end(); ++i)
+      res.push_back(i->first);
+    return res;
+  }
+
+} /*--- End of namespace Common ---*/
 
 #endif

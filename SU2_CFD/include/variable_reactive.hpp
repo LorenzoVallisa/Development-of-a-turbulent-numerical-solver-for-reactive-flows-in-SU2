@@ -2,10 +2,10 @@
 #define SU2_VARIABLE_REACTIVE
 
 #include "variable_structure.hpp"
-#include "../../Common/include/physical_property_library.hpp"
+#include "../../Common/include/physical_chemical_library.hpp"
 #include "../../Common/include/su2_assert.hpp"
 
-#include <Eigen/Dense>
+#include "../../externals/Eigen/Dense"
 #include <numeric>
 
 /*! \class CReactiveEulerVariable
@@ -16,7 +16,10 @@ class CReactiveEulerVariable: public CVariable {
 public:
   typedef std::vector<su2double> RealVec;
   typedef su2double** SU2Matrix;
-  typedef std::shared_ptr<Framework::PhysicalPropertyLibrary> LibraryPtr;
+  typedef std::shared_ptr<Framework::PhysicalChemicalLibrary<RealVec,Eigen::MatrixXd>> LibraryPtr;
+
+  //template<class Vector, class Matrix>
+  //using LibraryPtr = std::shared_ptr<Framework::PhysicalChemicalLibrary<Vector,Matrix>>;
 
 protected:
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
@@ -29,7 +32,7 @@ protected:
   su2double Cp;                 /*!< \brief Specific heat at constant pressure. */
 
   /*--- Primitive variable definition ---*/
-  RealVec    Primitive; /*!< \brief Primitive variables (T,vx,vy,vz,P,rho,h,a,Y1,...YNs) in compressible flows. */
+  RealVec    Primitive; /*!< \brief Primitive variables (T, vx, vy, vz, P, rho, h, a, Y1,...YNs) in compressible flows. */
   SU2Matrix  Gradient_Primitive; /*!< \brief Gradient of the primitive variables (T, vx, vy, vz, P, rho). */
   RealVec    Limiter_Primitive;    /*!< \brief Limiter of the primitive variables (T, vx, vy, vz, P, rho). */
   RealVec    dPdU;                 /*!< \brief Partial derivative of pressure w.r.t. conserved variables. */
@@ -473,7 +476,7 @@ public:
 	 */
 	inline void SetEnthalpy(void) override {
     SU2_Assert(Solution != NULL,"The array of solution variables has not been allocated");
-    Primitive.at(H_INDEX_PRIM) = (Solution[RHOE_INDEX_SOL] + Primitive.at(P_INDEX_PRIM)) / Solution[RHO_INDEX_SOL];
+    Primitive.at(H_INDEX_PRIM) = (Solution[RHOE_INDEX_SOL] + Primitive.at(P_INDEX_PRIM))/Solution[RHO_INDEX_SOL];
   }
 
   /*!
@@ -595,7 +598,7 @@ public:
   }
 
   /*!
-   * \brief Get the projected velocity in a unitary vector direction (compressible solver).
+   * \brief Get the projected velocity in a unitary vector direction.
    * \param[in] val_vector - Direction of projection.
    * \return Value of the projected velocity.
    */

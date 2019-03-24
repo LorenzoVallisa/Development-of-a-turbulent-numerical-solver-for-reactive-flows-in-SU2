@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <limits>
 #include <cmath>
-#include <iterator>
 
 namespace {
   /*!
@@ -60,9 +59,11 @@ CReactiveEulerSolver::CReactiveEulerSolver(): CSolver(), nSpecies(), nPrimVarLim
 //
 //
 CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config, unsigned short iMesh): CSolver() {
+  /*--- Local variables ---*/
   unsigned long iPoint;
   unsigned short iVar,iDim;
 
+  /*--- Built-in types variables better to set since they are used frequently ---*/
   nSecondaryVar = 0;
   nSecondaryVarGrad = 0;
   nVarGrad = 0;
@@ -70,7 +71,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
 
   /*--- Load library ---*/
   library = LibraryPtr(new Framework::ReactingModelLibrary(config->GetConfigLibFile(), config->GetLibraryPath()));
-  //library->Setup();
+  library->Setup();
   nSpecies = library->GetNSpecies();
   //SU2_Assert(nSpecies == config->GetnSpecies(), "Wrong number of species in the configuration file")
 
@@ -111,10 +112,10 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   nPointDomain = geometry->GetnPointDomain();
   nDim = geometry->GetnDim();
 
-  nVar = nSpecies + nDim + 2; /*--- Conserved variables (rho,rho*vx,rho*vy,rho*vz,rho*E,rho1,...rhoNs)^T ---*/
-  nPrimVar = nSpecies + nDim + 5; /*--- Primitive variables (T,vx,vy,vz,P,rho,h,a,rho1,...rhoNs)^T ---*/
-  nPrimVarLim = nDim + 2; /*--- Gradient Primitive variables (T,vx,vy,vz,P)^T ---*/
-  nPrimVarGrad = nPrimVarLim; /*--- Primitive variables to limit (T,vx,vy,vz,P)^T ---*/
+  nVar = nSpecies + nDim + 2; /*--- Conserved variables (rho, rho*vx, rho*vy, rho*vz, rho*E, rho1,...rhoNs)^T ---*/
+  nPrimVar = nSpecies + nDim + 5; /*--- Primitive variables (T, vx, vy, vz, P, rho, h, a, Y1,...YNs)^T ---*/
+  nPrimVarLim = nDim + 2; /*--- Gradient Primitive variables (T, vx, vy, vz, P)^T ---*/
+  nPrimVarGrad = nPrimVarLim; /*--- Primitive variables to limit (T, vx, vy, vz, P)^T ---*/
 
   /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
   SetNondimensionalization(geometry, config, iMesh);
@@ -151,8 +152,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   Lower_Limit.resize(nPrimVar, 0.0);
   Upper_Limit.resize(nPrimVar, 1.0/EPS);
 
-  std::fill(Lower_Limit.begin() + RHOVX_INDEX_SOL,
-            Lower_Limit.begin() + RHOVX_INDEX_SOL + nDim, -1.0/EPS);
+  std::fill(Lower_Limit.begin() + RHOVX_INDEX_SOL, Lower_Limit.begin() + RHOVX_INDEX_SOL + nDim, -1.0/EPS);
   Lower_Limit[RHOE_INDEX_SOL] = -1.0/EPS;
 
   /*--- Allocate auxiliary vectors ---*/
@@ -209,8 +209,8 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   Pressure_Inf     = config->GetPressure_FreeStreamND();
 	Temperature_Inf  = config->GetTemperature_FreeStreamND();
 
-  Velocity_Inf     = RealVec(config->GetVelocity_FreeStreamND(),config->GetVelocity_FreeStreamND() + nDim);
-  MassFrac_Inf     = RealVec(config->GetMassFrac_FreeStream(),config->GetMassFrac_FreeStream() + nSpecies);
+  Velocity_Inf     = RealVec(config->GetVelocity_FreeStreamND(), config->GetVelocity_FreeStreamND() + nDim);
+  MassFrac_Inf     = RealVec(config->GetMassFrac_FreeStream(), config->GetMassFrac_FreeStream() + nSpecies);
 
   node_infty = new CReactiveEulerVariable(Pressure_Inf, MassFrac_Inf, Velocity_Inf, Temperature_Inf, nDim, nVar, nSpecies,
                                           nPrimVar, nPrimVarGrad, nPrimVarLim, library, config);
@@ -256,7 +256,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
 //
 //
 void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
-  int rank;
+  int rank = MASTER_NODE;
   #ifdef HAVE_MPI
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   #endif
@@ -272,7 +272,7 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
       su2double sqvel = std::inner_product(Velocity_Inf.cbegin(),Velocity_Inf.cend(),Velocity_Inf.cbegin(),0.0);
 
       /*--- Compute density from supplied quantities ---*/
-      //rho = library->ComputeDensity(Pressure_Inf,Temperature_Inf,MassFrac_Inf);
+      //rho = library->ComputeDensity(Pressure_Inf, Temperature_Inf, MassFrac_Inf);
       rho *= config->GetGas_Constant_Ref();
       Solution[RHO_INDEX_SOL] = rho;
       for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
@@ -300,15 +300,15 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
 
   /*--- Warning message about non-physical points ---*/
   if(config->GetConsole_Output_Verb() == VERB_HIGH) {
-  #ifdef HAVE_MPI
-    SU2_MPI::Reduce(&counter_local, &counter_global, 1, MPI_UNSIGNED_LONG, MPI_SUM, MASTER_NODE, MPI_COMM_WORLD);
-  #else
-    counter_global = counter_local;
-  #endif
+    #ifdef HAVE_MPI
+      SU2_MPI::Reduce(&counter_local, &counter_global, 1, MPI_UNSIGNED_LONG, MPI_SUM, MASTER_NODE, MPI_COMM_WORLD);
+    #else
+      counter_global = counter_local;
+    #endif
     if(rank == MASTER_NODE && counter_global != 0)
       std::cout << "Warning. The original solution contains "<< counter_global << " points that are not physical." << std::endl;
   }
-}
+} /*--- End of Check_FreeStream_Solution() function ---*/
 
 //
 //
@@ -358,7 +358,7 @@ void Read_SU2_Restart_Metadata(CGeometry* geometry, CConfig* config) {
     std::exit(EXIT_FAILURE);
   }
 
-  unsigned long iPoint_Global = 0;
+  unsigned long iPoint_Global;
   std::string text_line;
 
   /*--- The first line is the header (General description) ---*/
@@ -501,8 +501,8 @@ void CReactiveEulerSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
     Global2Local[geometry->node[iPoint]->GetGlobalIndex()] = iPoint;
 
   /*--- Read all lines in the restart file ---*/
-  unsigned long iPoint_Local;
-  unsigned long iPoint_Global_Local = 0, iPoint_Global = 0;
+  unsigned long iPoint_Local, iPoint_Global;
+  unsigned long iPoint_Global_Local = 0;
   unsigned short rbuf_NotMatching = 0, sbuf_NotMatching = 0;
   std::string text_line;
 
@@ -582,16 +582,13 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
   unsigned long iPoint, Point_Fine;
   unsigned short iMesh, iChildren, iVar, iDim;
   su2double Area_Children, Area_Parent, Solution[nVar];
-  su2double X0[3] = {0.0,0.0,0.0}, X1[3] = {0.0,0.0,0.0}, X2[3] = {0.0,0.0,0.0},
-  X1_X0[3] = {0.0,0.0,0.0}, X2_X0[3] = {0.0,0.0,0.0}, X2_X1[3] = {0.0,0.0,0.0},
-  CP[3] = {0.0,0.0,0.0}, Distance, DotCheck, Radius;
 
   unsigned short nDim = geometry[MESH_0]->GetnDim();
   bool restart = (config->GetRestart() || config->GetRestart_Flow());
   bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
 
   /*--- If restart solution, then interpolate the flow solution to
-   all the multigrid levels, this is important with the dual time strategy ---*/
+        all the multigrid levels, this is important with the dual time strategy ---*/
   if(restart && ExtIter == 0) {
     for(iMesh = 1; iMesh <= config->GetnMGLevels(); ++iMesh) {
       for (iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint) {
@@ -608,7 +605,7 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
       }
       solver_container[iMesh][FLOW_SOL]->Set_MPI_Solution(geometry[iMesh], config);
     }
-  }
+  } /*--- End of restart ---*/
 
   /*--- The value of the solution for the first iteration of the dual time ---*/
   if(dual_time && (ExtIter == 0 || (restart && ExtIter == config->GetUnst_RestartIter()))) {
@@ -656,7 +653,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    /*--- Check if the simulation is unsteady ---*/
    bool unsteady = config->GetUnsteady_Simulation();
 
-   int rank;
+   int rank = MASTER_NODE;
    #ifdef HAVE_MPI
       MPI_Comm_rank(MPI_COMM_WORLD, &rank);
    #endif

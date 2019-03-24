@@ -21,21 +21,21 @@ protected:
 
   unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
 
-  RealVec Phi_i,Phi_j;  /*!< \brief Vectors to describe the variables of the problem used in the AUSM scheme. */
+  RealVec Phi_i, Phi_j;  /*!< \brief Vectors to describe the variables of the problem used in the AUSM scheme. */
 
 private:
-  unsigned short T_INDEX_PRIM,VX_INDEX_PRIM,
-                 P_INDEX_PRIM,RHO_INDEX_PRIM,
-                 H_INDEX_PRIM,A_INDEX_PRIM,
+  unsigned short T_INDEX_PRIM, VX_INDEX_PRIM,
+                 P_INDEX_PRIM, RHO_INDEX_PRIM,
+                 H_INDEX_PRIM, A_INDEX_PRIM,
                  RHOS_INDEX_PRIM;               /*!< \brief Mapping for position in primitives array. */
 
-  unsigned short RHO_INDEX_SOL,RHOVX_INDEX_SOL,
-                 RHOE_INDEX_SOL,RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
+  unsigned short RHO_INDEX_SOL, RHOVX_INDEX_SOL,
+                 RHOE_INDEX_SOL, RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
 
-  unsigned short T_INDEX_GRAD,VX_INDEX_GRAD,
+  unsigned short T_INDEX_GRAD, VX_INDEX_GRAD,
                  P_INDEX_GRAD;                 /*!< \brief Mapping for position in primitives gradient. */
 
-  unsigned short T_INDEX_LIM,VX_INDEX_LIM,
+  unsigned short T_INDEX_LIM, VX_INDEX_LIM,
                  P_INDEX_LIM;                 /*!< \brief Mapping for position for limited variables. */
 
 public:
@@ -88,7 +88,6 @@ public:
   using RealMatrix = CReactiveNSVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
   using Vec = Eigen::VectorXd;
-  typedef std::unique_ptr<su2double[]> SmartArr;
 
 protected:
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
@@ -114,18 +113,18 @@ protected:
   RealMatrix Grad_Xs;         /*!< \brief Auxiliary matrix for mean gradient of mole fractions. */
 
 private:
-  unsigned short T_INDEX_PRIM,VX_INDEX_PRIM,
-                 P_INDEX_PRIM,RHO_INDEX_PRIM,
-                 H_INDEX_PRIM,A_INDEX_PRIM,
+  unsigned short T_INDEX_PRIM, VX_INDEX_PRIM,
+                 P_INDEX_PRIM, RHO_INDEX_PRIM,
+                 H_INDEX_PRIM, A_INDEX_PRIM,
                  RHOS_INDEX_PRIM;               /*!< \brief Mapping for position in primitives array. */
 
-  unsigned short RHO_INDEX_SOL,RHOVX_INDEX_SOL,
-                 RHOE_INDEX_SOL,RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
+  unsigned short RHO_INDEX_SOL, RHOVX_INDEX_SOL,
+                 RHOE_INDEX_SOL, RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
 
-  unsigned short T_INDEX_GRAD,VX_INDEX_GRAD,
-                 P_INDEX_GRAD,RHOS_INDEX_GRAD;  /*!< \brief Mapping for position in primitives gradient. */
+  unsigned short T_INDEX_GRAD, VX_INDEX_GRAD,
+                 P_INDEX_GRAD, RHOS_INDEX_GRAD;  /*!< \brief Mapping for position in primitives gradient. */
 
-  unsigned short T_INDEX_LIM,VX_INDEX_LIM,
+  unsigned short T_INDEX_LIM, VX_INDEX_LIM,
                  P_INDEX_LIM;                 /*!< \brief Mapping for position for limited variables. */
 
 private:
@@ -138,11 +137,11 @@ private:
 
   Vec Jd;                       /*!< \brief Auxiliary vectors to store S-M solution. */
 
-  unsigned short T_INDEX_AVGGRAD,VX_INDEX_AVGGRAD,
-                 RHOS_INDEX_AVGGRAD;                /*!< \brief Mapping between the primitive variable gradient name
-                                                                for average computations and its position in the physical data. */
+  unsigned short T_INDEX_AVGGRAD,
+                 VX_INDEX_AVGGRAD,
+                 RHOS_INDEX_AVGGRAD;  /*!< \brief Mapping between the primitive variable gradient name
+                                                  for average computations and its position in the physical data. */
 public:
-
   /*!
    * \brief Default constructor of the class.
    */
@@ -219,7 +218,7 @@ protected:
    * \param[in] val_diffusioncoeff - Effective diffusion coefficients for each species in the mixture.
    * \param[in] config - Definition of the particular problem
    */
-  void GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+  void GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, su2double* val_normal,
                           const su2double val_viscosity, const su2double val_therm_conductivity,
                           const RealVec& val_diffusioncoeff, CConfig* config);
 
@@ -233,7 +232,7 @@ protected:
    * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.
    * \param[in] config - Definition of the particular problem
    */
-  void GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, SmartArr val_normal,
+  void GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, su2double* val_normal,
                           const su2double val_viscosity, const su2double val_therm_conductivity,
                           const RealMatrix& val_Dij, CConfig* config);
 
@@ -254,7 +253,7 @@ protected:
   */
   void GetViscousProjJacs(const Vec& val_Mean_PrimVar, const RealMatrix& val_Mean_GradPrimVar,
                           const RealVec& val_diffusion_coeff, const su2double val_laminar_viscosity,
-                          const su2double val_thermal_conductivity, const su2double val_dist_ij, SmartArr val_normal,
+                          const su2double val_thermal_conductivity, const su2double val_dist_ij, su2double* val_normal,
                           const su2double val_dS, su2double* val_Proj_Visc_Flux, su2double** val_Proj_Jac_Tensor_i,
                           su2double** val_Proj_Jac_Tensor_j, CConfig* config);
 
@@ -293,18 +292,18 @@ protected:
   RealVec Ys; /*!< \brief Auxiliary vector for mass fractions in the mixture. */
 
 private:
-  unsigned short T_INDEX_PRIM,VX_INDEX_PRIM,
-                 P_INDEX_PRIM,RHO_INDEX_PRIM,
-                 H_INDEX_PRIM,A_INDEX_PRIM,
+  unsigned short T_INDEX_PRIM, VX_INDEX_PRIM,
+                 P_INDEX_PRIM, RHO_INDEX_PRIM,
+                 H_INDEX_PRIM, A_INDEX_PRIM,
                  RHOS_INDEX_PRIM;               /*!< \brief Mapping for position in primitives array. */
 
-  unsigned short RHO_INDEX_SOL,RHOVX_INDEX_SOL,
-                 RHOE_INDEX_SOL,RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
+  unsigned short RHO_INDEX_SOL, RHOVX_INDEX_SOL,
+                 RHOE_INDEX_SOL, RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
 
-  unsigned short T_INDEX_GRAD,VX_INDEX_GRAD,
+  unsigned short T_INDEX_GRAD, VX_INDEX_GRAD,
                  P_INDEX_GRAD;                 /*!< \brief Mapping for position in primitives gradient. */
 
-  unsigned short T_INDEX_LIM,VX_INDEX_LIM,
+  unsigned short T_INDEX_LIM, VX_INDEX_LIM,
                  P_INDEX_LIM;                 /*!< \brief Mapping for position for limited variables. */
 
 private:

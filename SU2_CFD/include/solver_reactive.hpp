@@ -50,22 +50,22 @@ protected:
   RealVec   Buffer_Receive_U, /*!< \brief Auxiliary vector to receive information in case of parallel simulation. */
             Buffer_Send_U;    /*!< \brief Auxiliary vector to send information in case of parallel simulation. */
 
-  RealVec Ys_i,Ys_j;  /*!< \brief Auxiliary vectors to store mass fractions at node i and j. */
+  RealVec Ys_i, Ys_j;  /*!< \brief Auxiliary vectors to store mass fractions at node i and j. */
   RealVec Ys;         /*!< \brief Auxiliary vector to store mass fractions. */
 
 protected:
-  unsigned short T_INDEX_PRIM,VX_INDEX_PRIM,
-                 P_INDEX_PRIM,RHO_INDEX_PRIM,
-                 H_INDEX_PRIM,A_INDEX_PRIM,
+  unsigned short T_INDEX_PRIM, VX_INDEX_PRIM,
+                 P_INDEX_PRIM, RHO_INDEX_PRIM,
+                 H_INDEX_PRIM, A_INDEX_PRIM,
                  RHOS_INDEX_PRIM;               /*!< \brief Mapping for position in primitives array. */
 
-  unsigned short RHO_INDEX_SOL,RHOVX_INDEX_SOL,
-                 RHOE_INDEX_SOL,RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
+  unsigned short RHO_INDEX_SOL, RHOVX_INDEX_SOL,
+                 RHOE_INDEX_SOL, RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
 
-  unsigned short T_INDEX_GRAD,VX_INDEX_GRAD,
+  unsigned short T_INDEX_GRAD, VX_INDEX_GRAD,
                  P_INDEX_GRAD;                 /*!< \brief Mapping for position in primitives gradient. */
 
-  unsigned short T_INDEX_LIM,VX_INDEX_LIM,
+  unsigned short T_INDEX_LIM, VX_INDEX_LIM,
                  P_INDEX_LIM;                 /*!< \brief Mapping for position for limited variables. */
 
 public:
@@ -251,7 +251,7 @@ public:
     * \brief Set the free-stream solution all over the domain.
     * \param[in] config - Definition of the particular problem.
     */
-    void SetFreeStream_Solution(CConfig* config) override;
+   void SetFreeStream_Solution(CConfig* config) override;
 
    /*!
     * \brief Impose via the residual the Euler wall boundary condition.
@@ -368,7 +368,7 @@ class CReactiveNSSolver:public CReactiveEulerSolver {
 protected:
   su2double Viscosity_Inf;	/*!< \brief Viscosity at the infinity. */
 
-  RealVec Xs_i,Xs_j;  /*!< \brief Auxiliary vectors to store mole fractions at node i and j. */
+  RealVec Xs_i, Xs_j;  /*!< \brief Auxiliary vectors to store mole fractions at node i and j. */
   RealVec Xs;         /*!< \brief Auxiliary vector to store mole fractions. */
 
 protected:
