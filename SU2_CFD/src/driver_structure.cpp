@@ -998,7 +998,7 @@ void CDriver::Integration_Preprocessing(CIntegration **integration_container,
   bool euler, adj_euler, ns, adj_ns, turbulent, adj_turb, poisson, wave, fem,
       heat, template_solver, transition, disc_adj;
 
-  bool reactive_euler,reactive_ns;
+  bool reactive_euler, reactive_ns;
 
   /*--- Initialize some useful booleans ---*/
   euler            = false; adj_euler        = false;
@@ -1163,7 +1163,7 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
   transition,
   template_solver;
 
-  bool reactive_euler,reactive_ns;
+  bool reactive_euler, reactive_ns;
 
   bool compressible = (config->GetKind_Regime() == COMPRESSIBLE);
   bool incompressible = (config->GetKind_Regime() == INCOMPRESSIBLE);
@@ -1939,7 +1939,7 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
   transition,
   template_solver;
 
-  bool reactive_euler,reactive_ns;
+  bool reactive_euler, reactive_ns;
 
   bool compressible = (config->GetKind_Regime() == COMPRESSIBLE);
   bool incompressible = (config->GetKind_Regime() == INCOMPRESSIBLE);
@@ -2100,19 +2100,16 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
   /*--- Solver definition for the Potential, Euler, Navier-Stokes problems ---*/
   if(reactive_euler || reactive_ns) {
     /*--- Definition of the convective scheme for each equation and mesh level ---*/
-    if (compressible) {
-      /*--- Compressible flow ---*/
-      for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
-        //Convective part
-        delete numerics_container[iMGlevel][REACTIVE_SOL][CONV_TERM];
-        delete numerics_container[iMGlevel][REACTIVE_SOL][CONV_BOUND_TERM];
-        //Viscous part
-        delete numerics_container[iMGlevel][REACTIVE_SOL][VISC_TERM];
-        delete numerics_container[iMGlevel][REACTIVE_SOL][VISC_BOUND_TERM];
-        //Source part
-        delete numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_FIRST_TERM];
-        delete numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_SECOND_TERM];
-      }
+    for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
+      //Convective part
+      delete numerics_container[iMGlevel][REACTIVE_SOL][CONV_TERM];
+      delete numerics_container[iMGlevel][REACTIVE_SOL][CONV_BOUND_TERM];
+      //Viscous part
+      delete numerics_container[iMGlevel][REACTIVE_SOL][VISC_TERM];
+      delete numerics_container[iMGlevel][REACTIVE_SOL][VISC_BOUND_TERM];
+      //Source part
+      delete numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_FIRST_TERM];
+      delete numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_SECOND_TERM];
     }
   }
 
@@ -2740,11 +2737,13 @@ void CDriver::PreprocessExtIter(unsigned long ExtIter) {
     }
   }
 
-  //if(!fsi && config_container[ZONE_0]->GetKind_Solver() == REACTIVE_EULER || config_container[ZONE_0]->GetKind_Solver() == REACTIVE_NAVIER_STOKES) {
-  //  for (iZone = 0; iZone < nZone; ++iZone)
-  //    solver_container[iZone][MESH_0][REACTIVE_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
-  //                                                                       config_container[iZone], ExtIter);
-  //}
+  if(!fsi &&
+      (config_container[ZONE_0]->GetKind_Solver() == REACTIVE_EULER ||
+       config_container[ZONE_0]->GetKind_Solver() == REACTIVE_NAVIER_STOKES)) {
+  for (iZone = 0; iZone < nZone; ++iZone)
+    solver_container[iZone][MESH_0][REACTIVE_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
+                                                                       config_container[iZone], ExtIter);
+  }
 
 #ifdef HAVE_MPI
   MPI_Barrier(MPI_COMM_WORLD);

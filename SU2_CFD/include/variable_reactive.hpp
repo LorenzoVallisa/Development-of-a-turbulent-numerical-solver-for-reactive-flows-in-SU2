@@ -129,6 +129,22 @@ public:
                          unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
+	 * \overload Class constructor
+	 * \param[in] val_solution - Array with the flow value (initialization value).
+	 * \param[in] val_nDim - Number of dimensions of the problem.
+	 * \param[in] val_nvar - Number of variables of the problem.
+   * \param[in] val_nSpecies - Number of species in the mixture
+   * \param[in] val_nprimvar - Number of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
+   * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
+   * \param[in] config - Definition of the particular problem.
+	 */
+	CReactiveEulerVariable(su2double* val_solution, unsigned short val_nDim, unsigned short val_nvar,
+                         unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
+                         unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
+
+  /*!
 	 * \brief Destructor of the class.
 	 */
 	virtual ~CReactiveEulerVariable();
@@ -680,7 +696,7 @@ public:
 
   /*!
 	 * \overload Class constructor
-	 * \param[in] val_solution - Pointer to the flow value (initialization value).
+	 * \param[in] val_solution - Vector with the flow value (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of conserved variables.
    * \param[in] val_nSpecies - Number of species in the mixture
@@ -691,6 +707,22 @@ public:
    * \param[in] config - Definition of the particular problem.
 	 */
 	CReactiveNSVariable(const RealVec& val_solution, unsigned short val_nDim, unsigned short val_nvar,
+                      unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
+                      unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
+
+  /*!
+	 * \overload Class constructor
+	 * \param[in] val_solution - Pointer to the flow value (initialization value).
+	 * \param[in] val_nDim - Number of dimensions of the problem.
+	 * \param[in] val_nvar - Number of conserved variables.
+   * \param[in] val_nSpecies - Number of species in the mixture
+   * \param[in] val_nprimvar - Number of primitive variables of the problem.
+   * \param[in] val_nprimvargrad - Number of gradient of primitive variables of the problem.
+   * \param[in] val_nprimvarlim - Number of primitive variables to limit in the problem.
+   * \param[in] lib_ptr - Pointer to the external library for physical-chemical properties
+   * \param[in] config - Definition of the particular problem.
+	 */
+	CReactiveNSVariable(su2double* val_solution, unsigned short val_nDim, unsigned short val_nvar,
                       unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
                       unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 

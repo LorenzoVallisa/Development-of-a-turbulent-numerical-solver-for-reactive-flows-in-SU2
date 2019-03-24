@@ -122,12 +122,36 @@ CReactiveEulerVariable::CReactiveEulerVariable(const RealVec& val_solution, unsi
   SU2_Assert(Solution != NULL,"The array Solution has not been allocated");
   SU2_Assert(Solution_Old != NULL,"The array Solution_Old has not been allocated");
 
-  std::copy(val_solution.cbegin(),val_solution.cend(),Solution);
-  std::copy(val_solution.cbegin(),val_solution.cend(),Solution_Old);
+  std::copy(val_solution.cbegin(), val_solution.cend(), Solution);
+  std::copy(val_solution.cbegin(), val_solution.cend(), Solution_Old);
 
   /*--- Initialize T to the free stream for the secant method ---*/
   Primitive.at(T_INDEX_PRIM) = config->GetTemperature_FreeStream();
 }
+
+//
+//
+/*!
+ *\brief Class overloaded constructor (initialization vector)
+ */
+//
+//
+CReactiveEulerVariable::CReactiveEulerVariable(su2double* val_solution, unsigned short val_nDim, unsigned short val_nvar,
+                                               unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
+                                               unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config):
+                                               CReactiveEulerVariable(val_nDim, val_nvar, val_nSpecies, val_nprimvar, val_nprimvargrad,
+                                                                      val_nprimvarlim, lib_ptr, config) {
+  /*--- Initialize Solution and Solution_Old vectors ---*/
+  SU2_Assert(Solution != NULL,"The array Solution has not been allocated");
+  SU2_Assert(Solution_Old != NULL,"The array Solution_Old has not been allocated");
+
+  std::copy(val_solution, val_solution + val_nvar, Solution);
+  std::copy(val_solution, val_solution + val_nvar, Solution_Old);
+
+  /*--- Initialize T to the free stream for the secant method ---*/
+  Primitive.at(T_INDEX_PRIM) = config->GetTemperature_FreeStream();
+}
+
 
 //
 //
@@ -577,6 +601,23 @@ CReactiveNSVariable::CReactiveNSVariable(const RealVec& val_solution, unsigned s
                                                                 Laminar_Viscosity(), Thermal_Conductivity() {
   Diffusion_Coeffs.resize(nSpecies,nSpecies);
 }
+
+//
+//
+/*!
+ *\brief Class overloaded constructor (initialization vector)
+ */
+//
+//
+CReactiveNSVariable::CReactiveNSVariable(su2double* val_solution, unsigned short val_nDim, unsigned short val_nvar,
+                                         unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
+                                         unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config):
+                                         CReactiveEulerVariable(val_solution, val_nDim, val_nvar, val_nSpecies, val_nprimvar,
+                                                                val_nprimvargrad, val_nprimvarlim, lib_ptr, config),
+                                                                Laminar_Viscosity(), Thermal_Conductivity() {
+  Diffusion_Coeffs.resize(nSpecies,nSpecies);
+}
+
 
 //
 //

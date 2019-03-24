@@ -98,20 +98,12 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
 
   /*--- Set other variables ---*/
   bool restart = (config->GetRestart() || config->GetRestart_Flow());
-  bool time_stepping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
-  std::string file_name = config->GetSolution_FlowFileName();
 
-  if(!(!restart || iMesh != MESH_0)) {
-    /*--- Modify file name for a time stepping unsteady restart ---*/
-    if(time_stepping) {
-      auto Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter());
-      file_name = config->GetUnsteady_FileName(file_name, Unst_RestartIter);
-    }
+  /*--- Read and store the restart metadata. ---*/
+  if(!(!restart || iMesh != MESH_0))
+    Read_SU2_Restart_Metadata(geometry, config);
 
-    /*--- Read and store the restart metadata. ---*/
-    //Read_SU2_Restart_Metadata(geometry, config, false, file_name);
-  }
-
+  /*--- Continue setting other variables ---*/
   Max_Delta_Time = 0.0;
   Min_Delta_Time = 1.E6;
 
@@ -239,10 +231,14 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
     break;
   }
 
-  /*--- Initialize the solution to the far-field state everywhere. ---*/
-  for(iPoint = 0; iPoint < nPoint; ++iPoint)
-    node[iPoint] = new CReactiveEulerVariable(Pressure_Inf, MassFrac_Inf, Velocity_Inf, Temperature_Inf,
-                                              nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, library, config);
+  if(!restart || iMesh != MESH_0) {
+    /*--- Initialize the solution to the far-field state everywhere. ---*/
+    for(iPoint = 0; iPoint < nPoint; ++iPoint)
+      node[iPoint] = new CReactiveEulerVariable(Pressure_Inf, MassFrac_Inf, Velocity_Inf, Temperature_Inf,
+                                                nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, library, config);
+  }
+  else
+    Load_Restart(geometry, config);
 
   /*--- Use a function to check that the initial solution is physical ---*/
   Check_FreeStream_Solution(config);
@@ -255,7 +251,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
 //
 //
 /*!
- * \brief Check whether there is any non physical point in the initialization
+ * \brief Check whether there is any non physical point in the initialization.
  */
 //
 //
@@ -314,6 +310,329 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
   }
 }
 
+//
+//
+/*!
+ * \brief Read basic infos in case of restart simulation.
+ */
+//
+//
+void Read_SU2_Restart_Metadata(CGeometry* geometry, CConfig* config) {
+  /*--- Local variables ---*/
+  unsigned short iZone = config->GetiZone();
+  unsigned short nZone = geometry->GetnZone();
+  std::string filename = config->GetSolution_FlowFileName();
+  int Unst_RestartIter;
+
+  /*--- Multizone problems require the number of the zone to be appended. ---*/
+  if(nZone > 1)
+    filename = config->GetMultizone_FileName(filename, iZone);
+
+  /*--- Modify file name for a dual-time unsteady restart ---*/
+  bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
+  if(dual_time) {
+    if(config->GetUnsteady_Simulation() == DT_STEPPING_1ST)
+      Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter()) - 1;
+    else
+      Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter()) - 2;
+    filename = config->GetUnsteady_FileName(filename, Unst_RestartIter);
+  }
+
+  /*--- Modify file name for a simple unsteady restart ---*/
+  bool time_stepping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
+  if(time_stepping) {
+    Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter()) - 1;
+    filename = config->GetUnsteady_FileName(filename, Unst_RestartIter);
+  }
+
+  /*--- Open the restart file, throw an error if this fails. ---*/
+  int rank = MASTER_NODE;
+  std::ifstream restart_file;
+  #ifdef HAVE_MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  #endif
+  restart_file.open(filename.data(), std::ios::in);
+  if(restart_file.fail()) {
+    if(rank == MASTER_NODE)
+      std::cout<<"There is no flow restart file!! "<<filename.data()<<"."<< endl;
+    std::exit(EXIT_FAILURE);
+  }
+
+  unsigned long iPoint_Global = 0;
+  std::string text_line;
+
+  /*--- The first line is the header (General description) ---*/
+  std::getline(restart_file, text_line);
+
+  /*--- Space for the solution ---*/
+  for(iPoint_Global = 0; iPoint_Global < geometry->GetGlobal_nPointDomain(); ++iPoint_Global)
+    std::getline(restart_file, text_line);
+
+  /*--- Space for extra info (if any) ---*/
+  std::string::size_type position;
+  while(std::getline(restart_file, text_line)) {
+    /*--- Angle of attack ---*/
+    position = text_line.find ("AOA=",0);
+    if(position != std::string::npos) {
+      text_line.erase(0,4);
+      su2double AoA_ = std::stod(text_line);
+      if(config->GetDiscard_InFiles() == false) {
+        if(config->GetAoA() != AoA_ &&  rank == MASTER_NODE) {
+          std::cout.precision(6);
+          std::cout << std::fixed <<"WARNING: AoA in the solution file (" << AoA_ << " deg.) +" << std::endl;
+          std::cout << "         AoA offset in mesh file (" << config->GetAoA_Offset() << " deg.) = " <<
+                       AoA_ + config->GetAoA_Offset() << " deg." << std::endl;
+        }
+        config->SetAoA(AoA_ + config->GetAoA_Offset());
+      }
+      else {
+        if(config->GetAoA() != AoA_ &&  rank == MASTER_NODE)
+          std::cout <<"WARNING: Discarding the AoA in the solution file." << std::endl;
+      }
+    } /*--- End AoA ---*/
+
+    /*--- Sideslip angle ---*/
+    position = text_line.find ("SIDESLIP_ANGLE=",0);
+    if(position != std::string::npos) {
+      text_line.erase(0,15);
+      su2double AoS_ = std::stod(text_line);
+      if(config->GetDiscard_InFiles() == false) {
+        if(config->GetAoS() != AoS_ &&  rank == MASTER_NODE) {
+          std::cout.precision(6);
+          std::cout << std::fixed <<"WARNING: AoS in the solution file (" << AoS_ << " deg.) +" << std::endl;
+          std::cout << "         AoS offset in mesh file (" << config->GetAoS_Offset() << " deg.) = " <<
+                       AoS_ + config->GetAoS_Offset() << " deg." << std::endl;
+        }
+        config->SetAoS(AoS_ + config->GetAoS_Offset());
+      }
+      else {
+        if(config->GetAoS() != AoS_ &&  rank == MASTER_NODE)
+          std::cout <<"WARNING: Discarding the AoS in the solution file." << std::endl;
+      }
+    } /*--- End sideslip angle ---*/
+
+    /*--- BCThrust angle ---*/
+    position = text_line.find("INITIAL_BCTHRUST=",0);
+    if(position != std::string::npos) {
+      text_line.erase(0,17);
+      su2double BCThrust_ = std::stod(text_line);
+      if(config->GetDiscard_InFiles() == false) {
+        if(config->GetInitial_BCThrust() != BCThrust_ &&  rank == MASTER_NODE)
+          std::cout <<"WARNING: ACDC will use the initial BC Thrust provided in the solution file: " << BCThrust_ << " lbs." << std::endl;
+        config->SetInitial_BCThrust(BCThrust_);
+      }
+      else {
+        if(config->GetInitial_BCThrust() != BCThrust_ &&  rank == MASTER_NODE)
+          std::cout <<"WARNING: Discarding the BC Thrust in the solution file." << std::endl;
+      }
+    } /*--- End of BCThrust angle ---*/
+
+    /*--- External iteration ---*/
+    position = text_line.find("EXT_ITER=",0);
+    if(position != std::string::npos) {
+      text_line.erase(0,9);
+      unsigned long ExtIter_ = std::stoi(text_line);
+      if(!config->GetContinuous_Adjoint() && !config->GetDiscrete_Adjoint())
+        config->SetExtIter_OffSet(ExtIter_);
+    }
+
+  } /*--- End of extra infos reading ---*/
+
+  /*--- Close the restart file... we will open this file again... ---*/
+  restart_file.close();
+}
+
+//
+//
+/*!
+ * \brief Read the file to restart
+ */
+//
+//
+void CReactiveEulerSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
+  /*--- Local variables ---*/
+  unsigned short iZone = config->GetiZone();
+  unsigned short nZone = geometry->GetnZone();
+  std::string filename = config->GetSolution_FlowFileName();
+  int Unst_RestartIter;
+
+  /*--- Multizone problems require the number of the zone to be appended. ---*/
+  if(nZone > 1)
+    filename = config->GetMultizone_FileName(filename, iZone);
+
+  /*--- Modify file name for a dual-time unsteady restart ---*/
+  bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
+  if(dual_time) {
+    if(config->GetUnsteady_Simulation() == DT_STEPPING_1ST)
+      Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter()) - 1;
+    else
+      Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter())-2;
+    filename = config->GetUnsteady_FileName(filename, Unst_RestartIter);
+  }
+
+  /*--- Modify file name for a simple unsteady restart ---*/
+  bool time_stepping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
+  if (time_stepping) {
+    Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter()) - 1;
+    filename = config->GetUnsteady_FileName(filename, Unst_RestartIter);
+  }
+
+  /*--- Open the restart file, throw an error if this fails. ---*/
+  int rank = MASTER_NODE;
+  std::ifstream restart_file;
+  #ifdef HAVE_MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  #endif
+  restart_file.open(filename.data(), std::ios::in);
+  if(restart_file.fail()) {
+    if(rank == MASTER_NODE)
+      std::cout<<"There is no flow restart file!! "<<filename.data()<<"."<<std::endl;
+    std::exit(EXIT_FAILURE);
+  }
+
+  /*--- In case this is a parallel simulation, we need to perform the
+        Global2Local index transformation first. ---*/
+  std::map<unsigned long, unsigned long> Global2Local;
+  std::map<unsigned long, unsigned long>::const_iterator MI;
+
+  /*--- Now fill array with the transform values only for local points ---*/
+  unsigned long iPoint;
+  for(iPoint = 0; iPoint < nPointDomain; ++iPoint)
+    Global2Local[geometry->node[iPoint]->GetGlobalIndex()] = iPoint;
+
+  /*--- Read all lines in the restart file ---*/
+  unsigned long iPoint_Local;
+  unsigned long iPoint_Global_Local = 0, iPoint_Global = 0;
+  unsigned short rbuf_NotMatching = 0, sbuf_NotMatching = 0;
+  std::string text_line;
+
+  /*--- The first line is the header ---*/
+  std::getline(restart_file, text_line);
+  unsigned long index;
+  su2double dull_val;
+  for(iPoint_Global = 0; iPoint_Global < geometry->GetGlobal_nPointDomain(); ++iPoint_Global) {
+    std::getline (restart_file, text_line);
+    std::istringstream point_line(text_line);
+    if(iPoint_Global >= geometry->GetGlobal_nPointDomain()) {
+      sbuf_NotMatching = 1;
+      break;
+    }
+
+    /*--- Retrieve local index. If this node from the restart file lives
+          on the current processor, we will load and instantiate the vars. ---*/
+    MI = Global2Local.find(iPoint_Global);
+    if(MI != Global2Local.end()) {
+      iPoint_Local = Global2Local[iPoint_Global];
+      if(nDim == 2)
+        point_line >> index >> dull_val >> dull_val >> Solution[RHO_INDEX_SOL] >> Solution[RHOVX_INDEX_SOL] >>
+                      Solution[RHOVX_INDEX_SOL + 1] >> Solution[RHOE_INDEX_SOL];
+      else if(nDim == 3)
+        point_line >> index >> dull_val >> dull_val >> dull_val >> Solution[RHO_INDEX_SOL] >> Solution[RHOVX_INDEX_SOL] >>
+                      Solution[RHOVX_INDEX_SOL + 1] >> Solution[RHOVX_INDEX_SOL + 2] >> Solution[RHOE_INDEX_SOL];
+      for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+        point_line >> Solution[RHOS_INDEX_SOL + iSpecies];
+
+      node[iPoint_Local] = new CReactiveEulerVariable(Solution, nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, library, config);
+      iPoint_Global_Local++;
+    }
+  }
+
+  /*--- Detect a wrong solution file ---*/
+  if(iPoint_Global_Local < nPointDomain)
+    sbuf_NotMatching = 1;
+
+  #ifndef HAVE_MPI
+    rbuf_NotMatching = sbuf_NotMatching;
+  #else
+    SU2_MPI::Allreduce(&sbuf_NotMatching, &rbuf_NotMatching, 1, MPI_UNSIGNED_SHORT, MPI_SUM, MPI_COMM_WORLD);
+  #endif
+  if(rbuf_NotMatching != 0) {
+    if(rank == MASTER_NODE) {
+      std::cout<<std::endl << "The solution file " << filename.data() << " doesn't match with the mesh file!" << endl;
+      cout << "It could be empty lines at the end of the file." << endl << endl;
+    }
+
+    #ifndef HAVE_MPI
+      std::exit(EXIT_FAILURE);
+    #else
+      MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Abort(MPI_COMM_WORLD,1);
+      MPI_Finalize();
+    #endif
+  }
+
+  /*--- Instantiate the variable class with an arbitrary solution
+        at any halo/periodic nodes. The initial solution can be arbitrary,
+        because a send/recv is performed immediately in the solver. ---*/
+  for(iPoint = nPointDomain; iPoint < nPoint; ++iPoint)
+    node[iPoint] = new CReactiveEulerVariable(Solution, nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, library, config);
+
+  /*--- Close the restart file ---*/
+  restart_file.close();
+}
+
+//
+//
+/*!
+ * \brief Set the initial solution in case of restart
+ */
+//
+//
+void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** solver_container, CConfig *config, unsigned long ExtIter) {
+  unsigned long iPoint, Point_Fine;
+  unsigned short iMesh, iChildren, iVar, iDim;
+  su2double Area_Children, Area_Parent, Solution[nVar];
+  su2double X0[3] = {0.0,0.0,0.0}, X1[3] = {0.0,0.0,0.0}, X2[3] = {0.0,0.0,0.0},
+  X1_X0[3] = {0.0,0.0,0.0}, X2_X0[3] = {0.0,0.0,0.0}, X2_X1[3] = {0.0,0.0,0.0},
+  CP[3] = {0.0,0.0,0.0}, Distance, DotCheck, Radius;
+
+  unsigned short nDim = geometry[MESH_0]->GetnDim();
+  bool restart = (config->GetRestart() || config->GetRestart_Flow());
+  bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
+
+  /*--- If restart solution, then interpolate the flow solution to
+   all the multigrid levels, this is important with the dual time strategy ---*/
+  if(restart && ExtIter == 0) {
+    for(iMesh = 1; iMesh <= config->GetnMGLevels(); ++iMesh) {
+      for (iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint) {
+        Area_Parent = geometry[iMesh]->node[iPoint]->GetVolume();
+        for(iChildren = 0; iChildren < geometry[iMesh]->node[iPoint]->GetnChildren_CV(); ++iChildren) {
+          Point_Fine = geometry[iMesh]->node[iPoint]->GetChildren_CV(iChildren);
+          Area_Children = geometry[iMesh-1]->node[Point_Fine]->GetVolume();
+          auto Solution_Fine = solver_container[iMesh-1][FLOW_SOL]->node[Point_Fine]->GetSolution();
+          for(iVar = 0; iVar < nVar; ++iVar) {
+            Solution[iVar] = Solution_Fine[iVar]*Area_Children/Area_Parent;
+          }
+        }
+        solver_container[iMesh][FLOW_SOL]->node[iPoint]->SetSolution(Solution);
+      }
+      solver_container[iMesh][FLOW_SOL]->Set_MPI_Solution(geometry[iMesh], config);
+    }
+  }
+
+  /*--- The value of the solution for the first iteration of the dual time ---*/
+  if(dual_time && (ExtIter == 0 || (restart && ExtIter == config->GetUnst_RestartIter()))) {
+    /*--- Push back the initial condition to previous solution containers
+          for a 1st-order restart or when simply intitializing to freestream. ---*/
+    for(iMesh = 0; iMesh <= config->GetnMGLevels(); ++iMesh) {
+      for(iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint) {
+        solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n();
+        solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n1();
+      }
+    }
+
+    if(restart && ExtIter == config->GetUnst_RestartIter() && config->GetUnsteady_Simulation() == DT_STEPPING_2ND) {
+      /*--- Load an additional restart file for a 2nd-order restart ---*/
+      solver_container[MESH_0][FLOW_SOL]->LoadRestart(geometry, solver_container, config, SU2_TYPE::Int(config->GetUnst_RestartIter() - 1));
+
+      /*--- Push back this new solution to time level N. ---*/
+      for(iMesh = 0; iMesh <= config->GetnMGLevels(); ++iMesh) {
+        for(iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint)
+          solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n();
+      }
+    }
+  }
+}
 
 //
 //
@@ -2330,7 +2649,8 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
 	Temperature /= config->GetTemperature_Ref();
 	Pressure /= config->GetPressure_Ref();
 	Density /= config->GetDensity_Ref();
-  Velocity /= config->GetVelocity_Ref();
+  for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+    Velocity[iDim] /= config->GetVelocity_Ref();
   //Enthalpy /= config->GetEnergy_Ref();
   //SoundSpeed /= config->GetVelocity_Ref();
 
@@ -2442,7 +2762,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
   su2double V_inlet[nPrimVar];
 
   unsigned short Kind_Inlet = config->GetKind_Inlet();
-  string Marker_Tag         = config->GetMarker_All_TagBound(val_marker);
+  std::string Marker_Tag         = config->GetMarker_All_TagBound(val_marker);
   bool viscous              = config->GetViscous();
   bool gravity              = config->GetGravityForce();
 
@@ -2998,21 +3318,12 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config,unsign
 
   /*--- Set other variables ---*/
   bool restart = (config->GetRestart() || config->GetRestart_Flow());
-  bool time_stepping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
-  std::string file_name = config->GetSolution_FlowFileName();
 
-  if(!(!restart || iMesh != MESH_0)) {
+  /*--- Read and store the restart metadata. ---*/
+  if(!(!restart || iMesh != MESH_0))
+    Read_SU2_Restart_Metadata(geometry, config);
 
-    /*--- Modify file name for a time stepping unsteady restart ---*/
-    if(time_stepping) {
-      auto Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter());
-      file_name = config->GetUnsteady_FileName(file_name, Unst_RestartIter);
-    }
-
-    /*--- Read and store the restart metadata. ---*/
-    //Read_SU2_Restart_Metadata(geometry, config, false, file_name);
-  }
-
+  /*--- Continue setting other variables ---*/
   Max_Delta_Time = 0.0;
   Min_Delta_Time = 1.E6;
 
@@ -3144,16 +3455,149 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config,unsign
     break;
   }
 
-  /*--- Initialize the solution to the far-field state everywhere. ---*/
-  for(iPoint = 0; iPoint < nPoint; ++iPoint)
-    node[iPoint] = new CReactiveNSVariable(Pressure_Inf, MassFrac_Inf, Velocity_Inf, Temperature_Inf,
-                                           nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, library, config);
+  if(!restart || iMesh != MESH_0) {
+    /*--- Initialize the solution to the far-field state everywhere. ---*/
+    for(iPoint = 0; iPoint < nPoint; ++iPoint)
+      node[iPoint] = new CReactiveNSVariable(Pressure_Inf, MassFrac_Inf, Velocity_Inf, Temperature_Inf,
+                                             nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, library, config);
+  }
+  else
+    Load_Restart(geometry, config);
 
   /*--- Use a function to check that the initial solution is physical ---*/
   Check_FreeStream_Solution(config);
 
   /*--- MPI solution ---*/
 	Set_MPI_Solution(geometry, config);
+}
+
+//
+//
+/*!
+ * \brief Read the file to restart
+ */
+//
+//
+void CReactiveNSSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
+  /*--- Local variables ---*/
+  unsigned short iZone = config->GetiZone();
+  unsigned short nZone = geometry->GetnZone();
+  std::string filename = config->GetSolution_FlowFileName();
+  int Unst_RestartIter;
+
+  /*--- Multizone problems require the number of the zone to be appended. ---*/
+  if(nZone > 1)
+    filename = config->GetMultizone_FileName(filename, iZone);
+
+  /*--- Modify file name for a dual-time unsteady restart ---*/
+  bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
+  if(dual_time) {
+    if(config->GetUnsteady_Simulation() == DT_STEPPING_1ST)
+      Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter()) - 1;
+    else
+      Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter())-2;
+    filename = config->GetUnsteady_FileName(filename, Unst_RestartIter);
+  }
+
+  /*--- Modify file name for a simple unsteady restart ---*/
+  bool time_stepping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
+  if (time_stepping) {
+    Unst_RestartIter = SU2_TYPE::Int(config->GetUnst_RestartIter()) - 1;
+    filename = config->GetUnsteady_FileName(filename, Unst_RestartIter);
+  }
+
+  /*--- Open the restart file, throw an error if this fails. ---*/
+  int rank = MASTER_NODE;
+  std::ifstream restart_file;
+  #ifdef HAVE_MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  #endif
+  restart_file.open(filename.data(), std::ios::in);
+  if(restart_file.fail()) {
+    if(rank == MASTER_NODE)
+      std::cout<<"There is no flow restart file!! "<<filename.data()<<"."<<std::endl;
+    std::exit(EXIT_FAILURE);
+  }
+
+  /*--- In case this is a parallel simulation, we need to perform the
+        Global2Local index transformation first. ---*/
+  std::map<unsigned long, unsigned long> Global2Local;
+  std::map<unsigned long, unsigned long>::const_iterator MI;
+
+  /*--- Now fill array with the transform values only for local points ---*/
+  unsigned long iPoint;
+  for(iPoint = 0; iPoint < nPointDomain; ++iPoint)
+    Global2Local[geometry->node[iPoint]->GetGlobalIndex()] = iPoint;
+
+  /*--- Read all lines in the restart file ---*/
+  unsigned long iPoint_Local;
+  unsigned long iPoint_Global_Local = 0, iPoint_Global = 0;
+  unsigned short rbuf_NotMatching = 0, sbuf_NotMatching = 0;
+  std::string text_line;
+
+  /*--- The first line is the header ---*/
+  std::getline(restart_file, text_line);
+  unsigned long index;
+  su2double dull_val;
+  for(iPoint_Global = 0; iPoint_Global < geometry->GetGlobal_nPointDomain(); ++iPoint_Global) {
+    std::getline (restart_file, text_line);
+    std::istringstream point_line(text_line);
+    if(iPoint_Global >= geometry->GetGlobal_nPointDomain()) {
+      sbuf_NotMatching = 1;
+      break;
+    }
+
+    /*--- Retrieve local index. If this node from the restart file lives
+          on the current processor, we will load and instantiate the vars. ---*/
+    MI = Global2Local.find(iPoint_Global);
+    if(MI != Global2Local.end()) {
+      iPoint_Local = Global2Local[iPoint_Global];
+      if(nDim == 2)
+        point_line >> index >> dull_val >> dull_val >> Solution[RHO_INDEX_SOL] >> Solution[RHOVX_INDEX_SOL] >>
+                      Solution[RHOVX_INDEX_SOL + 1] >> Solution[RHOE_INDEX_SOL];
+      else if(nDim == 3)
+        point_line >> index >> dull_val >> dull_val >> dull_val >> Solution[RHO_INDEX_SOL] >> Solution[RHOVX_INDEX_SOL] >>
+                      Solution[RHOVX_INDEX_SOL + 1] >> Solution[RHOVX_INDEX_SOL + 2] >> Solution[RHOE_INDEX_SOL];
+      for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+        point_line >> Solution[RHOS_INDEX_SOL + iSpecies];
+
+      node[iPoint_Local] = new CReactiveNSVariable(Solution, nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, library, config);
+      iPoint_Global_Local++;
+    }
+  }
+
+  /*--- Detect a wrong solution file ---*/
+  if(iPoint_Global_Local < nPointDomain)
+    sbuf_NotMatching = 1;
+
+  #ifndef HAVE_MPI
+    rbuf_NotMatching = sbuf_NotMatching;
+  #else
+    SU2_MPI::Allreduce(&sbuf_NotMatching, &rbuf_NotMatching, 1, MPI_UNSIGNED_SHORT, MPI_SUM, MPI_COMM_WORLD);
+  #endif
+  if(rbuf_NotMatching != 0) {
+    if(rank == MASTER_NODE) {
+      std::cout<<std::endl << "The solution file " << filename.data() << " doesn't match with the mesh file!" << endl;
+      cout << "It could be empty lines at the end of the file." << endl << endl;
+    }
+
+    #ifndef HAVE_MPI
+      std::exit(EXIT_FAILURE);
+    #else
+      MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Abort(MPI_COMM_WORLD,1);
+      MPI_Finalize();
+    #endif
+  }
+
+  /*--- Instantiate the variable class with an arbitrary solution
+        at any halo/periodic nodes. The initial solution can be arbitrary,
+        because a send/recv is performed immediately in the solver. ---*/
+  for(iPoint = nPointDomain; iPoint < nPoint; ++iPoint)
+    node[iPoint] = new CReactiveNSVariable(Solution, nDim, nVar, nSpecies, nPrimVar, nPrimVarGrad, nPrimVarLim, library, config);
+
+  /*--- Close the restart file ---*/
+  restart_file.close();
 }
 
 //

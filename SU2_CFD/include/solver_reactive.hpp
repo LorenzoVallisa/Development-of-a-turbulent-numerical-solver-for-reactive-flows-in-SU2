@@ -110,9 +110,15 @@ public:
 	 * \brief Reading files in case of restart
 	 * \param[in] geometry - Geometrical definition of the problem.
 	 * \param[in] config - Definition of the particular problem.
-   * \param[in] val_filename - Name of the file for the restart
 	 */
-  void Load_Restart(CGeometry* geometry, CConfig* config, std::string val_filename);
+  virtual void Load_Restart(CGeometry* geometry, CConfig* config);
+
+  /*!
+	 * \brief Reading files in case of restart
+	 * \param[in] geometry - Geometrical definition of the problem.
+	 * \param[in] config - Definition of the particular problem.
+	 */
+  void Read_SU2_Restart_Metadata(CGeometry* geometry, CConfig* config);
 
   /*!
    * \brief Set primitive variables in each point reporting non physical data
@@ -408,6 +414,13 @@ public:
     * \param[in] config - Definition of the particular problem.
     */
    void SetNondimensionalization(CGeometry* geometry, CConfig* config, unsigned short iMesh) override;
+
+  /*!
+ 	 * \brief Reading files in case of restart
+ 	 * \param[in] geometry - Geometrical definition of the problem.
+ 	 * \param[in] config - Definition of the particular problem.
+ 	 */
+   void Load_Restart(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Preprocessing.
