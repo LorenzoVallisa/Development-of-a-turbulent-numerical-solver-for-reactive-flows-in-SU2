@@ -58,7 +58,7 @@ public:
   /*!
 	 * \brief Destructor of the class.
 	 */
-	virtual ~CUpwReactiveAUSM() {}
+	virtual ~CUpwReactiveAUSM() = default;
 
   /*!
 	 * \brief Compute the residual associated to convective flux between two nodes i and j.
@@ -163,7 +163,7 @@ public:
   /*!
    * \brief Destructor of the class.
    */
-  virtual ~CAvgGradReactive_Flow() {}
+  virtual ~CAvgGradReactive_Flow() = default;
 
   /*!
    * \brief Compute the viscous flow residual using average gradient method.
@@ -331,7 +331,7 @@ public:
   /*!
    * \brief Destructor of the class.
    */
-  virtual ~CSourceReactive() {}
+  virtual ~CSourceReactive() = default;
 
   /*!
    * \brief Calculation of the residual of chemistry source term

@@ -183,7 +183,7 @@ namespace Framework {
   //
   //
   /*--- This function computes density at given temperature and pressure. ---*/
-  inline double ReactingModelLibrary::ComputeDensity(const double pressure, const double temp, const RealVec& ys) {
+  inline double ReactingModelLibrary::ComputeDensity(const double temp, const double pressure, const RealVec& ys) {
     SetRgas(ys);
     return pressure/(temp*Rgas);
   }
@@ -208,7 +208,7 @@ namespace Framework {
   //
   /*--- This function computes the mixture internal energy at given temperature and pressure. ---*/
   inline double ReactingModelLibrary::ComputeEnergy(const double temp, const RealVec& ys) {
-    double enthalpy = ComputeEnthalpy(temp,ys);
+    double enthalpy = ComputeEnthalpy(temp, ys);
     SetRgas(ys);
     return enthalpy - temp*Rgas;
   }
@@ -218,8 +218,8 @@ namespace Framework {
   /*--- This function computes density,internal energy and static enthalpy at given temperature and pressure. ---*/
   inline void ReactingModelLibrary::Density_Enthalpy_Energy(const double temp, const double pressure, const RealVec& ys, RealVec& dhe) {
     dhe.resize(3);
-    dhe[0] = ComputeDensity(pressure,temp,ys);
-    dhe[1] = ComputeEnthalpy(temp,ys);
+    dhe[0] = ComputeDensity(temp, pressure, ys);
+    dhe[1] = ComputeEnthalpy(temp, ys);
     dhe[2] = dhe[1] - pressure/dhe[0];
   }
 
@@ -661,7 +661,7 @@ namespace Framework {
             SU2_Assert(!curr_line.fail(),std::string("The diffusion of species " + curr_species + " is missing"));
             Diff_Volumes.push_back(curr_vol);
             /*--- Insert in the map ---*/
-            auto res = Species_Names.insert(std::make_pair(curr_species,n_line - 1));
+            auto res = Species_Names.insert(std::make_pair(curr_species, n_line - 1));
             SU2_Assert(res.second == true,std::string("The species " + curr_species + " has already been declared"));
             n_line++;
           }
@@ -987,7 +987,8 @@ namespace Framework {
       if(Lib_Path == "") {
         std::cout<<"Library path set to default"<<std::endl;
         auto base_dir = std::experimental::filesystem::current_path().string();
-        Lib_Path = base_dir + "/../../Common/include";
+        Lib_Path = base_dir;
+        std::cout<<Lib_Path<<std::endl;
       }
 
       std::vector<std::string> list_file;

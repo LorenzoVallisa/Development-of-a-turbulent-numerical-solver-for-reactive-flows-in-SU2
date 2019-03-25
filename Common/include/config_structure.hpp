@@ -67,15 +67,16 @@ using namespace std;
 
 class CConfig {
 private:
-  /*--- New information to be read from config ---*/
-  string Library_Name;        /*!< \brief Name of library for physical-chemical options.*/
-  string Config_File_Lib;     /*!< \brief Name of the file to configure the library.*/
-  string Library_Path;        /*!< \brief Name of the library to llok for files to configure the library.*/
+  /*--- NOTE: New information to be read from config ---*/
+  std::string  Library_Name;           /*!< \brief Name of library for physical-chemical options.*/
+  std::string  Config_File_Lib;        /*!< \brief Name of the file to configure the library.*/
+  std::string  Library_Path;           /*!< \brief Name of the library to look for files to configure the library.*/
+  std::string* Species_Order;          /*!< \brief String list to check the coherence in species order declaration.*/
+  std::string* Marker_Inlet_MassFrac;  /*!< \brief String list with name of inlet boundary for mass fractions.*/
   su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
-  su2double* tmp1;
-  su2double* tmp2;
   unsigned short nSpecies;    /*!< \brief Number of species in the mixture.*/
 
+  /*--- NOTE: Already present information to be read from config ---*/
   SU2_Comm SU2_Communicator; /*!< \brief MPI communicator of SU2.*/
   int rank;
   unsigned short Kind_SU2; /*!< \brief Kind of SU2 software component.*/
@@ -858,6 +859,17 @@ private:
   // List and Array options should also be able to be specified with the string "NONE" indicating that there
   // are no elements. This allows the option to be present in a config file but left blank.
 
+  /*--- NOTE: New otpnio for inlet mass fraction ---*/
+  void addInlet_MassFracOption(const std::string& name, unsigned short& nMarker_Inlet, std::string*& Marker_Inlet_MassFrac,
+                               su2double**& MassFractions) {
+    /*--- Check if this filed already exists in the configuration file ---*/
+    assert(option_map.find(name) == option_map.end());
+    all_options.insert(std::pair<std::string, bool>(name, true));
+    COptionBase* val = new COptionInlet_MassFrac(name, nMarker_Inlet, Marker_Inlet_MassFrac, MassFractions);
+    option_map.insert(pair<std::string, COptionBase*>(name, val));
+  }
+
+  //NOTE: Already present functions ---*/
   /*!<\brief addDoubleOption creates a config file parser for an option with the given name whose
    value can be represented by a su2double.*/
 
@@ -1189,7 +1201,7 @@ public:
    * \brief Get library name for physical-chemical properties.
    * \return Name of library.
   */
-  string GetLibraryName(void) const {
+  inline std::string GetLibraryName(void) const {
     return Library_Name;
   }
 
@@ -1197,7 +1209,7 @@ public:
    * \brief Get library's configuration file name for physical-chemical properties.
    * \return Name of library's configuration file.
   */
-  string GetConfigLibFile(void) const {
+  inline std::string GetConfigLibFile(void) const {
     return Config_File_Lib;
   }
 
@@ -1205,24 +1217,32 @@ public:
    * \brief Get library path for physical-chemical properties.
    * \return Name of library path.
   */
-  string GetLibraryPath(void) const {
+  inline std::string GetLibraryPath(void) const {
     return Library_Path;
   }
 
   /*!
-   * \brief Get number of species involved
+   * \brief Get number of species involved,
    * \return Name of library.
   */
-  unsigned short GetnSpecies(void) const {
+  inline unsigned short GetnSpecies(void) const {
     return nSpecies;
   }
 
   /*!
-   * \brief Get mass fraction for a deisred inlet boundary
+   * \brief Get the order of species involved,
+   * \return Pointer to list with all species in mixture.
+  */
+  inline std::string* GetSpeciesOrder(void) const {
+    return Species_Order;
+  }
+
+  /*!
+   * \brief Get mass fraction for a desired inlet boundary
    * \param[in] val_index - Index corresponding to the inlet boundary.
    * \return Inlet mass fractions.
   */
-  su2double* GetInlet_MassFrac(string val_index) const;
+  su2double* GetInlet_MassFrac(std::string val_index) const;
 
 
 

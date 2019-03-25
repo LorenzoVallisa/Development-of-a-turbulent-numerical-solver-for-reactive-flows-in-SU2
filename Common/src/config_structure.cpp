@@ -543,8 +543,11 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\brief FREESTREAM_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
   addDoubleListOption("FREESTREAM_MASS_FRAC", nSpecies, MassFrac_FreeStream);
 
+  /*!\brief SPECIES_ORDER\n DESCRIPTION: Free-stream mass fractions */
+  addStringListOption("SPECIES_ORDER", nSpecies, Species_Order);
+
   /*!\brief INLET_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
-  addInletOption("INLET_MASS_FRAC", nMarker_Inlet, Marker_Inlet, tmp1, tmp2, Inlet_MassFrac);
+  addInlet_MassFracOption("INLET_MASS_FRAC", nMarker_Inlet, Marker_Inlet_MassFrac, Inlet_MassFrac);
 
 
   /*--- NOTE: Already present options ---*/
@@ -5441,6 +5444,20 @@ CConfig::~CConfig(void) {
     delete [] Inlet_Velocity;
   }
 
+  /*--- NOTE: new deletions ---*/
+  if(Species_Order != NULL)
+    delete[] Species_Order;
+
+  if(Marker_Inlet_MassFrac != NULL)
+    delete[] Marker_Inlet_MassFrac;
+
+  if(Inlet_MassFrac != NULL) {
+    for(iMarker = 0; iMarker < nMarker_Inlet; ++iMarker)
+      delete[] Inlet_MassFrac[iMarker];
+    delete[] Inlet_MassFrac;
+  }
+
+  /*--- NOTE: already present ---*/
   if (Riemann_FlowDir != NULL) {
     for (iMarker = 0; iMarker < nMarker_Riemann; iMarker++)
       delete [] Riemann_FlowDir[iMarker];
@@ -5844,6 +5861,7 @@ su2double* CConfig::GetInlet_MassFrac(string val_marker) const {
   return Inlet_MassFrac[iMarker_Inlet];
 }
 
+/*--- NOTE: Old functions ---*/
 su2double* CConfig::GetPeriodicRotCenter(string val_marker) {
   unsigned short iMarker_PerBound;
   for (iMarker_PerBound = 0; iMarker_PerBound < nMarker_PerBound; iMarker_PerBound++)

@@ -218,8 +218,8 @@ static const map<string, ENUM_SOLVER> Solver_Map = CCreateMap<string, ENUM_SOLVE
 
 ("TEMPLATE_SOLVER", TEMPLATE_SOLVER)
 // Reactive simulation addition
-("REACTIVE_EULER",REACTIVE_EULER)
-("REACTIVE_NAVIER_STOKES",REACTIVE_NAVIER_STOKES);
+("REACTIVE_EULER", REACTIVE_EULER)
+("REACTIVE_NAVIER_STOKES", REACTIVE_NAVIER_STOKES);
 
 
 
@@ -3359,4 +3359,103 @@ public:
     this->temp_jump = NULL;
     this->omega = NULL;
   }
+};
+
+//NOTE: Added new option for inlet mass fractions
+/*!
+ * \brief New option for inlet mass fractions.
+ */
+class COptionInlet_MassFrac: public COptionBase {
+private:
+  std::string name; /*!< \brief Name of the field identifier. */
+  unsigned short& size;  /*!< \brief Number of inlet markers. */
+  std::string*& marker;  /*!< \brief Name of the boundary identifier. */
+  su2double**& mass_fractions;  /*!< \brief Mass fractions. */
+
+public:
+  /*!
+	 * \brief Constructor of the class.
+   * \param[in] option_field_name - Name of the option in the configuration file
+   * \param[in] nMarker_Inlet - Number of inlet markers
+   * \param[in] Marker_Inlet - Name of inlet boundary
+   * \param[in] MassFrac_Inlet - Mass fractions at inlet
+	 */
+  COptionInlet_MassFrac(std::string option_field_name, unsigned short& nMarker_Inlet, std::string* & Marker_Inlet,
+                        su2double**& MassFrac_Inlet): name(option_field_name), size(nMarker_Inlet), marker(Marker_Inlet),
+                                                      mass_fractions(MassFrac_Inlet) {}
+
+  /*!
+	 * \brief Class destructor.
+   */
+  ~COptionInlet_MassFrac() {}
+
+  /*!
+	 * \brief Get string with all data.
+   * \param[in] option_value - Data to be stored
+   */
+  std::string SetValue(std::vector<std::string> option_value) {
+    /*--- Get the total number of data ---*/
+    unsigned short totalVals = option_value.size();
+    if(totalVals == 1 && (option_value[0].compare("NONE") == 0)) {
+      this->size = 0;
+      this->marker = NULL;
+      this->mass_fractions = NULL;
+      return "";
+    }
+
+    /*--- Use semicolon to determine the correct size:
+          this can work because semicolon is not one of the delimiters in tokenize string ---*/
+    /*--- Cannot have ; at the beginning or the end ---*/
+    if(option_value[0].compare(";") == 0) {
+      std::string newstring;
+      newstring.append(this->name);
+      newstring.append(": may not have beginning semicolon");
+      return newstring;
+    }
+    if(option_value[option_value.size()-1].compare(";") == 0) {
+      std::string newstring;
+      newstring.append(this->name);
+      newstring.append(": may not have ending semicolon");
+      return newstring;
+    }
+
+    /*--- Start parsing the string ---*/
+    this->size = 0;
+    for(unsigned int i = 0; i < static_cast<unsigned int>(totalVals); ++i) {
+      if(option_value[i].compare(";") == 0)
+        this->size++;
+    }
+
+    /*--- One more than ; ---*/
+    this->size++;
+
+    this->marker = new string[this->size];
+    this->mass_fractions = new su2double*[this->size];
+    unsigned long i;
+    unsigned short nVals = totalVals/this->size;
+    unsigned short nSpecies = nVals - 1;
+    for(i = 0; i < this->size; ++i)
+      this->mass_fractions[i] = new su2double[nSpecies];
+
+    for(i = 0; i < this->size; ++i) {
+      this->marker[i].assign(option_value[nVals*i]);
+      for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+        std::istringstream ss_massfrac(option_value[nVals*i + iSpecies + 1]);
+        if(!(ss_massfrac >> this->mass_fractions[i][iSpecies]))
+          return badValue(option_value, "inlet", this->name);
+      }
+    }
+
+    return "";
+  }
+
+  /*!
+	 * \brief Set default values.
+   */
+  void SetDefault(void) {
+    this->marker = NULL;
+    this->mass_fractions = NULL;
+    this->size = 0; // There is no default value for list
+  }
+
 };

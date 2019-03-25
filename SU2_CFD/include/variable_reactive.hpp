@@ -662,7 +662,7 @@ public:
   /*!
 	 * \brief Default constructor of the class.
 	 */
-  CReactiveNSVariable(): CReactiveEulerVariable(),Laminar_Viscosity(),Thermal_Conductivity() {}
+  CReactiveNSVariable(): CReactiveEulerVariable(), Laminar_Viscosity(), Thermal_Conductivity() {}
 
   /*!
    * \overloaded Class constructor
@@ -732,7 +732,7 @@ public:
   /*!
 	 * \brief Destructor of the class.
 	 */
-	virtual ~CReactiveNSVariable() {}
+	virtual ~CReactiveNSVariable() = default;
 
   /*!
    * \brief Get the index of mole fractions in primitive gradient

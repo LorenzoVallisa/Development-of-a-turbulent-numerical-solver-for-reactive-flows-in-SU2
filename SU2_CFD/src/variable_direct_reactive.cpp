@@ -25,8 +25,8 @@ CReactiveEulerVariable::CReactiveEulerVariable(): CVariable(), nSpecies(), nPrim
 //
 CReactiveEulerVariable::CReactiveEulerVariable(unsigned short val_nDim, unsigned short val_nvar, unsigned short val_nSpecies,
                                                unsigned short val_nprimvar, unsigned short val_nprimvargrad, unsigned short val_nprimvarlim,
-                                               LibraryPtr lib_ptr, CConfig* config): CVariable(val_nDim, val_nvar, config), Cp(),
-                                                                                     library(lib_ptr) {
+                                               LibraryPtr lib_ptr, CConfig* config): CVariable(val_nDim, val_nvar, config),
+                                                                                     library(lib_ptr), Cp() {
   nSpecies = val_nSpecies;
   nPrimVar = val_nprimvar;
   nPrimVarGrad = val_nprimvargrad;
@@ -434,7 +434,6 @@ void CReactiveEulerVariable::CalcdPdU(su2double* V, CConfig* config, su2double* 
 
   /*--- Rename for convenience ---*/
   su2double T = V[T_INDEX_PRIM];
-  su2double rho = V[RHO_INDEX_PRIM];
 
   /*--- Set pressure derivatives ---*/
   dPdU[RHO_INDEX_SOL] = (Gamma - 1.0)*0.5*sq_vel;

@@ -54,21 +54,21 @@ namespace Framework  {
     /*!
      * Get the number of species in the mixture
      */
-    inline const unsigned short GetNSpecies(void) const {
+    inline unsigned short GetnSpecies(void) const {
       return nSpecies;
     }
 
     /*!
      * Set the number of species in the mixture
     */
-    inline void SetNSpecies(const unsigned short ns) {
+    inline void SetnSpecies(const unsigned short ns) {
       nSpecies = ns;
     }
 
     /*!
      * Get the number of reactions in the mixture
     */
-    inline const unsigned short GetNReactions(void) const {
+    inline unsigned short GetnReactions(void) const {
       return nReactions;
     }
 
@@ -88,6 +88,12 @@ namespace Framework  {
      * \brief Unsetups the data of the library.
      */
     virtual void Unsetup(void) = 0;
+
+    /*!
+     * \brief Get the index of a species.
+     * \param[in] name_species - Name of the desired species
+     */
+    virtual unsigned short GetIndexSpecies(const std::string& name_species) const = 0;
 
     /*!
      * Set the gas constant for each species [J/(Kg*K)]

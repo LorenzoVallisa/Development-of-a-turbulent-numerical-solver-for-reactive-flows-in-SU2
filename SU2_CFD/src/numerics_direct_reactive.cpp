@@ -11,12 +11,12 @@ namespace {
   /*!
    * \brief Compute unit normal for the current cell interface
    */
-  void Compute_Outward_UnitNormal(unsigned short nDim, su2double* Normal, su2double* UnitNormal) {
+  void Compute_Outward_UnitNormal(unsigned short nDim, su2double* Normal, su2double*& UnitNormal) {
     SU2_Assert(Normal != NULL,"The array for Normal has not been allocated");
     SU2_Assert(UnitNormal != NULL,"The array for Unit Normal has not been allocated");
 
     /*--- Face area (norm of the normal vector) ---*/
-    su2double Area = std::inner_product(Normal,Normal + nDim, Normal, 0.0);
+    su2double Area = std::inner_product(Normal, Normal + nDim, Normal, 0.0);
     Area = std::sqrt(Area);
 
     for(unsigned short iDim = 0; iDim < nDim; ++iDim)
@@ -30,7 +30,7 @@ namespace {
  * \brief Constructor of the class CUpwReactiveAUSM
  */
 CUpwReactiveAUSM::CUpwReactiveAUSM(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr):
-                  CNumerics(val_nDim, val_nVar, config), library(lib_ptr), nSpecies(library->GetNSpecies()) {
+                  CNumerics(val_nDim, val_nVar, config), library(lib_ptr), nSpecies(library->GetnSpecies()) {
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
   /*--- Set local variables to access indices in proper arrays ---*/
@@ -79,29 +79,26 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
   }
 
   unsigned short iDim, iVar, iSpecies; /*!< \brief Indexes for iterations. */
-  su2double sq_vel_i, sq_vel_j,  /*!< \brief squared velocity. */
-            Temperature_i, Temperature_j, /*!< \brief Temperature at node i and at node j. */
-            Sound_Speed_i, Sound_Speed_j, /*!< \brief Sound speed at node i and at node j. */
-	          ProjVelocity_i, ProjVelocity_j, /*!< \brief Projected velocities at node i and at node j. */
+  //su2double sq_vel_i, sq_vel_j,  /*!< \brief squared velocity. */
+  //          Sound_Speed_i, Sound_Speed_j, /*!< \brief Sound speed at node i and at node j. */
+	su2double ProjVelocity_i, ProjVelocity_j, /*!< \brief Projected velocities at node i and at node j. */
             ProjGridVel_i = 0.0, ProjGridVel_j = 0.0; /*!< \brief Grid velocities at node i and at node j. */
 
   ::Compute_Outward_UnitNormal(nDim,Normal,UnitNormal);
 
   /*--- Point i: compute energy,pressure,sound speed and enthalpy  ---*/
-	sq_vel_i = std::inner_product(V_i + VX_INDEX_PRIM, V_i + (VX_INDEX_PRIM + nDim), V_i + VX_INDEX_PRIM, 0.0);
+	//sq_vel_i = std::inner_product(V_i + VX_INDEX_PRIM, V_i + (VX_INDEX_PRIM + nDim), V_i + VX_INDEX_PRIM, 0.0);
   Density_i = V_i[RHO_INDEX_PRIM];
   Pressure_i = V_i[P_INDEX_PRIM];
   Enthalpy_i = V_i[H_INDEX_PRIM];
-  Temperature_i = V_i[T_INDEX_PRIM];
-  Sound_Speed_i = V_i[A_INDEX_PRIM];
+  //Sound_Speed_i = V_i[A_INDEX_PRIM];
 
   /*--- Point j: compute squared velocity,energy,pressure,sound speed and ethalpy  ---*/
-  sq_vel_j = std::inner_product(V_j + VX_INDEX_PRIM, V_j + (VX_INDEX_PRIM + nDim), V_j + VX_INDEX_PRIM, 0.0);
+  //sq_vel_j = std::inner_product(V_j + VX_INDEX_PRIM, V_j + (VX_INDEX_PRIM + nDim), V_j + VX_INDEX_PRIM, 0.0);
   Density_j = V_j[RHO_INDEX_PRIM];
   Pressure_j = V_j[P_INDEX_PRIM];
   Enthalpy_j = V_j[H_INDEX_PRIM];
-  Temperature_j = V_j[T_INDEX_PRIM];
-  Sound_Speed_j = V_j[A_INDEX_PRIM];
+  //Sound_Speed_j = V_j[A_INDEX_PRIM];
 
   /*--- Projected velocities ---*/
   ProjVelocity_i = std::inner_product(V_i + VX_INDEX_PRIM, V_i + (VX_INDEX_PRIM + nDim), UnitNormal, 0.0);
@@ -208,7 +205,7 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
 //
 //
 CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr):
-                       CNumerics(val_nDim, val_nVar, config), library(lib_ptr), nSpecies(library->GetNSpecies()) {
+                       CNumerics(val_nDim, val_nVar, config), library(lib_ptr), nSpecies(library->GetnSpecies()) {
   /*--- Set local variables ---*/
   Laminar_Viscosity_i = Laminar_Viscosity_j = 0.0;
   Thermal_Conductivity_i = Thermal_Conductivity_j = 0.0;
@@ -528,7 +525,7 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
     SU2_Assert(Mean_GradPrimVar.cols() == nDim, "The number of columns in the mean gradient is not correct");
   }
 
-  unsigned short iVar, iDim, jDim, iSpecies; /*!< \brief Indexes for iterations. */
+  unsigned short iDim, jDim, iSpecies; /*!< \brief Indexes for iterations. */
 
   su2double Mean_Laminar_Viscosity; /*!< \brief Mean value of laminar viscosity. */
   su2double Mean_Thermal_Conductivity;  /*!< \brief Mean value of thermal conductivity. */
@@ -623,7 +620,7 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
 //
 //
 CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr):
-                 CNumerics(val_nDim, val_nVar, config), library(lib_ptr), nSpecies(library->GetNSpecies()) {
+                 CNumerics(val_nDim, val_nVar, config), library(lib_ptr), nSpecies(library->GetnSpecies()) {
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
   /*--- Set local variables to access indices in proper arrays ---*/

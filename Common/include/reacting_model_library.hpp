@@ -58,6 +58,16 @@ namespace Framework {
     void Unsetup(void) override;
 
     /*!
+     * \brief Get the index of a species.
+     * \param[in] name_species - Name of the desired species
+     */
+    inline unsigned short GetIndexSpecies(const std::string& name_species) const {
+      auto it = Species_Names.find(name_species);
+      SU2_Assert(it != Species_Names.end(), "The species " + name_species + " which you want the index is not present in the mixture");
+      return it->second;
+    }
+
+    /*!
      * \brief Set the gas constant for each species [J/(Kg*K)]
      */
     void SetRiGas(void) override;
@@ -202,11 +212,11 @@ namespace Framework {
 
     /*!
      * \brief Computes the density at given temperature and pressure.
-     * \param[in] pressure - pressure
      * \param[in] temp - temperature
+     * \param[in] pressure - pressure
      * \param[in] ys - mass fractions
     */
-    double ComputeDensity(const double pressure, const double temp, const RealVec& ys) override;
+    double ComputeDensity(const double temp, const double pressure, const RealVec& ys) override;
 
     /*!
      * \brief Compute the temperature given density and pressure.

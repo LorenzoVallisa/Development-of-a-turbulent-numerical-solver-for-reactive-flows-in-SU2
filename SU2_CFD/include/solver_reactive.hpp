@@ -84,7 +84,7 @@ public:
 	/*!
 	 * \brief Destructor of the class.
 	 */
-	virtual ~CReactiveEulerSolver() {}
+	virtual ~CReactiveEulerSolver() = default;
 
   /*!
    * \brief Set the simulation to explicit
@@ -99,26 +99,6 @@ public:
   inline static LibraryPtr GetLibrary(void) {
     return library;
   }
-
-  /*!
- 	 * \brief Looking for non physical points in the initial solution
- 	 * \param[in] config - Definition of the particular problem.
- 	 */
- 	void Check_FreeStream_Solution(CConfig* config);
-
-  /*!
-	 * \brief Reading files in case of restart
-	 * \param[in] geometry - Geometrical definition of the problem.
-	 * \param[in] config - Definition of the particular problem.
-	 */
-  virtual void Load_Restart(CGeometry* geometry, CConfig* config);
-
-  /*!
-	 * \brief Reading files in case of restart
-	 * \param[in] geometry - Geometrical definition of the problem.
-	 * \param[in] config - Definition of the particular problem.
-	 */
-  void Read_SU2_Restart_Metadata(CGeometry* geometry, CConfig* config);
 
   /*!
    * \brief Set primitive variables in each point reporting non physical data
@@ -358,6 +338,34 @@ public:
     * \param[in] config - Definition of the particular problem.
     */
    void ImplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) override;
+
+ protected:
+   /*!
+  	* \brief Looking for non physical points in the initial solution.
+  	* \param[in] config - Definition of the particular problem.
+  	*/
+   void Check_FreeStream_Solution(CConfig* config);
+
+   /*!
+    * \brief Looking for coherence in species order definition.
+    * \param[in] config - Definition of the particular problem.
+    */
+   void Check_FreeStream_Species_Order(CConfig* config);
+
+   /*!
+ 	  * \brief Reading files in case of restart
+ 	  * \param[in] geometry - Geometrical definition of the problem.
+ 	  * \param[in] config - Definition of the particular problem.
+ 	  */
+   virtual void Load_Restart(CGeometry* geometry, CConfig* config);
+
+   /*!
+ 	  * \brief Reading files in case of restart
+ 	  * \param[in] geometry - Geometrical definition of the problem.
+ 	  * \param[in] config - Definition of the particular problem.
+ 	  */
+   void Read_SU2_Restart_Metadata(CGeometry* geometry, CConfig* config);
+
 };
 
 /*! \class CReactiveNSSolver
@@ -416,13 +424,6 @@ public:
    void SetNondimensionalization(CGeometry* geometry, CConfig* config, unsigned short iMesh) override;
 
   /*!
- 	 * \brief Reading files in case of restart
- 	 * \param[in] geometry - Geometrical definition of the problem.
- 	 * \param[in] config - Definition of the particular problem.
- 	 */
-   void Load_Restart(CGeometry* geometry, CConfig* config) override;
-
-  /*!
    * \brief Preprocessing.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solver_container - Container vector with all the solutions.
@@ -468,6 +469,15 @@ public:
    */
   void BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
                           CNumerics* visc_numerics, CConfig* config,unsigned short val_marker) override;
+
+protected:
+  /*!
+ 	 * \brief Reading files in case of restart
+ 	 * \param[in] geometry - Geometrical definition of the problem.
+ 	 * \param[in] config - Definition of the particular problem.
+ 	 */
+  void Load_Restart(CGeometry* geometry, CConfig* config) override;
+
 };
 
 #endif
