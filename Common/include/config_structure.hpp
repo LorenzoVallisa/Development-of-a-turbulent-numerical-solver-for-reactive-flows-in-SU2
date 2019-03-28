@@ -71,9 +71,9 @@ private:
   std::string  Library_Name;           /*!< \brief Name of library for physical-chemical options.*/
   std::string  Config_File_Lib;        /*!< \brief Name of the file to configure the library.*/
   std::string  Library_Path;           /*!< \brief Name of the library to look for files to configure the library.*/
-  std::string* Species_Order;          /*!< \brief String list to check the coherence in species order declaration.*/
-  std::string* Marker_Inlet_MassFrac;  /*!< \brief String list with name of inlet boundary for mass fractions.*/
-  su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
+  //std::string* Species_Order;          /*!< \brief String list to check the coherence in species order declaration.*/
+  //std::string* Marker_Inlet_MassFrac;  /*!< \brief String list with name of inlet boundary for mass fractions.*/
+  //su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
   unsigned short nSpecies;    /*!< \brief Number of species in the mixture.*/
 
   /*--- NOTE: Already present information to be read from config ---*/
@@ -859,7 +859,7 @@ private:
   // List and Array options should also be able to be specified with the string "NONE" indicating that there
   // are no elements. This allows the option to be present in a config file but left blank.
 
-  /*--- NOTE: New otpnio for inlet mass fraction ---*/
+  /*--- NOTE: New option for inlet mass fraction ---*/
   void addInlet_MassFracOption(const std::string& name, unsigned short& nMarker_Inlet, std::string*& Marker_Inlet_MassFrac,
                                su2double**& MassFractions) {
     /*--- Check if this filed already exists in the configuration file ---*/
@@ -1233,9 +1233,9 @@ public:
    * \brief Get the order of species involved,
    * \return Pointer to list with all species in mixture.
   */
-  inline std::string* GetSpeciesOrder(void) const {
-    return Species_Order;
-  }
+  //inline std::string* GetSpeciesOrder(void) const {
+  //  return Species_Order;
+  //}
 
   /*!
    * \brief Get mass fraction for a desired inlet boundary
@@ -1243,8 +1243,6 @@ public:
    * \return Inlet mass fractions.
   */
   su2double* GetInlet_MassFrac(std::string val_index) const;
-
-
 
   /*--- NOTE: ALready present functions ---*/
   /*!

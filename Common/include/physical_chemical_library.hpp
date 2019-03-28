@@ -233,11 +233,11 @@ namespace Framework  {
 
     /*!
      * \brief Compute the density given temperature and pressure.
-     * \param[in] pressure - pressure
      * \param[in] temp - temperature
+     * \param[in] pressure - pressure
      * \param[in] ys - mass fractions
     */
-    virtual double ComputeDensity(const double pressure, const double temp, const Vector& ys) = 0;
+    virtual double ComputeDensity(const double temp, const double pressure, const Vector& ys) = 0;
 
     /*!
      * \brief Compute the temperature given density and pressure.

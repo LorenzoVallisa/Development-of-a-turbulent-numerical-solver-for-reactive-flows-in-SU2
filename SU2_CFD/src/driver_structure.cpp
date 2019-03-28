@@ -34,6 +34,9 @@
 #include "../include/driver_structure.hpp"
 #include "../include/definition_structure.hpp"
 
+#include "../include/solver_reactive.hpp"
+#include "../include/numerics_reactive.hpp"
+
 CDriver::CDriver(char* confFile,
                  unsigned short val_nZone,
                  unsigned short val_nDim,
@@ -1474,14 +1477,6 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
 
   /*--- Solver definition for the Reactive Euler and Navier-Stokes problems ---*/
   if(reactive_euler || reactive_ns) {
-
-    /*--- Defining Source Terms --*/
-    for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
-      numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_FIRST_TERM] = new CSourceReactive(nDim, nVar_Reactive, config,
-                                                                                          CReactiveEulerSolver::GetLibrary());
-      numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_SECOND_TERM] = new CSourceNothing(nDim, nVar_Flow, config);
-    }
-
     /*--- Definition of the convective scheme for each equation and mesh level ---*/
     switch (config->GetKind_ConvNumScheme_Flow()) {
       case NO_CONVECTIVE:
@@ -1490,45 +1485,38 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
         break;
 
       case SPACE_CENTERED:
-        if (compressible) {
-          /*--- Compressible flow ---*/
-          switch (config->GetKind_Centered_Flow()) {
-            case NO_CENTERED:
-              std::cout << "No centered scheme." << std::endl;
-              break;
-            default:
-              std::cout<<"Centered scheme not implemented."<<std::endl;
-              std::exit(EXIT_FAILURE);
-              break;
-          }
+        switch (config->GetKind_Centered_Flow()) {
+          case NO_CENTERED:
+            std::cout<<"No centered scheme."<<std::endl;
+            break;
+          default:
+            std::cout<<"Centered scheme not implemented."<<std::endl;
+            std::exit(EXIT_FAILURE);
+            break;
         }
         break;
 
       case SPACE_UPWIND:
-        if (compressible) {
-          /*--- Compressible flow ---*/
-          switch (config->GetKind_Upwind_Flow()) {
-            case NO_UPWIND:
-              std::cout << "No upwind scheme." << endl;
-              break;
+        switch (config->GetKind_Upwind_Flow()) {
+          case NO_UPWIND:
+            std::cout<<"No upwind scheme."<<std::endl;
+            break;
 
-            case AUSM:
-              for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
-                numerics_container[iMGlevel][REACTIVE_SOL][CONV_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
-                                                                                             CReactiveEulerSolver::GetLibrary());
-                numerics_container[iMGlevel][REACTIVE_SOL][CONV_BOUND_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
-                                                                                                   CReactiveEulerSolver::GetLibrary());
-              }
-              break;
+          case AUSM:
+            for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
+              numerics_container[iMGlevel][REACTIVE_SOL][CONV_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
+                                                                                           CReactiveEulerSolver::GetLibrary());
+              numerics_container[iMGlevel][REACTIVE_SOL][CONV_BOUND_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
+                                                                                                 CReactiveEulerSolver::GetLibrary());
+            }
+            break;
 
-            default:
-              std::cout<<"Upwind scheme not implemented."<<std::endl;
-              std::exit(EXIT_FAILURE);
-              break;
-          }
-
-      }
-      break;
+          default:
+            std::cout<<"Upwind scheme not implemented."<<std::endl;
+            std::exit(EXIT_FAILURE);
+            break;
+        }
+        break;
 
     default:
       std::cout<<"Convective scheme not implemented (Reactive Euler and Navier-Stokes)."<<std::endl;
@@ -1537,16 +1525,20 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
     }
 
     /*--- Definition of the viscous scheme for each equation and mesh level ---*/
-    if (compressible) {
-      /*--- Compressible flow ---*/
-      for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel)
-        numerics_container[iMGlevel][REACTIVE_SOL][VISC_TERM] = new CAvgGradReactive_Flow(nDim, nVar_Reactive, config,
-                                                                                          CReactiveNSSolver::GetLibrary());
+    for(iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel)
+      numerics_container[iMGlevel][REACTIVE_SOL][VISC_TERM] = new CAvgGradReactive_Flow(nDim, nVar_Reactive, config,
+                                                                                        CReactiveNSSolver::GetLibrary());
 
-      /*--- Definition of the boundary condition method ---*/
-      for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel)
-        numerics_container[iMGlevel][REACTIVE_SOL][VISC_BOUND_TERM] = new CAvgGradReactive_Flow(nDim, nVar_Reactive, config,
-                                                                                                CReactiveNSSolver::GetLibrary());
+    /*--- Definition of the boundary condition method ---*/
+    for(iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel)
+      numerics_container[iMGlevel][REACTIVE_SOL][VISC_BOUND_TERM] = new CAvgGradReactive_Flow(nDim, nVar_Reactive, config,
+                                                                                              CReactiveNSSolver::GetLibrary());
+
+    /*--- Defining Source Terms --*/
+    for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
+      numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_FIRST_TERM] = new CSourceReactive(nDim, nVar_Reactive, config,
+                                                                                          CReactiveEulerSolver::GetLibrary());
+      numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_SECOND_TERM] = new CSourceNothing(nDim, nVar_Reactive, config);
     }
 
   }

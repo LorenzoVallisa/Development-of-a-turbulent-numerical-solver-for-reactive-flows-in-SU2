@@ -67,7 +67,7 @@ namespace Utility {
         stoich_coeff_exp_prod(n_reac - 1,idx_species) = exp_coefficient;
      }
      else {
-       if(is_reac)
+       if(is_reac) {
          stoich_coeff_exp_reac(n_reac - 1,idx_species) = stoich_coeff(idx_species,n_reac - 1);
        if(is_rev && !is_reac)
          stoich_coeff_exp_prod(n_reac - 1,idx_species) = stoich_coeff(idx_species,n_reac - 1);

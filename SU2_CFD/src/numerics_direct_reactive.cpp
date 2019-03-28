@@ -80,7 +80,6 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
 
   unsigned short iDim, iVar, iSpecies; /*!< \brief Indexes for iterations. */
   //su2double sq_vel_i, sq_vel_j,  /*!< \brief squared velocity. */
-  //          Sound_Speed_i, Sound_Speed_j, /*!< \brief Sound speed at node i and at node j. */
 	su2double ProjVelocity_i, ProjVelocity_j, /*!< \brief Projected velocities at node i and at node j. */
             ProjGridVel_i = 0.0, ProjGridVel_j = 0.0; /*!< \brief Grid velocities at node i and at node j. */
 
@@ -91,14 +90,14 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
   Density_i = V_i[RHO_INDEX_PRIM];
   Pressure_i = V_i[P_INDEX_PRIM];
   Enthalpy_i = V_i[H_INDEX_PRIM];
-  //Sound_Speed_i = V_i[A_INDEX_PRIM];
+  SoundSpeed_i = V_i[A_INDEX_PRIM];
 
   /*--- Point j: compute squared velocity,energy,pressure,sound speed and ethalpy  ---*/
   //sq_vel_j = std::inner_product(V_j + VX_INDEX_PRIM, V_j + (VX_INDEX_PRIM + nDim), V_j + VX_INDEX_PRIM, 0.0);
   Density_j = V_j[RHO_INDEX_PRIM];
   Pressure_j = V_j[P_INDEX_PRIM];
   Enthalpy_j = V_j[H_INDEX_PRIM];
-  //Sound_Speed_j = V_j[A_INDEX_PRIM];
+  SoundSpeed_j = V_j[A_INDEX_PRIM];
 
   /*--- Projected velocities ---*/
   ProjVelocity_i = std::inner_product(V_i + VX_INDEX_PRIM, V_i + (VX_INDEX_PRIM + nDim), UnitNormal, 0.0);
@@ -683,7 +682,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
   omega = library->GetMassProductionTerm(dim_temp, dim_rho, Ys);
 
   /*--- Assign to the residual. NOTE: We need to invert the sign since it is a residual that will be ADDED to the total one ---*/
-  std::copy(omega.cbegin(), omega.cend(), val_residual);
+  std::copy(omega.cbegin(), omega.cend(), val_residual + RHOS_INDEX_SOL);
   for(iVar = 0; iVar < nVar; ++iVar)
     val_residual[iVar] *= -Volume/(config->GetDensity_Ref()/config->GetTime_Ref());
   if(US_System) {
@@ -704,7 +703,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
                    std::string("The row " + std::to_string(iVar) + " of source chemistry jacobian has not been allocated"));
     }
 
-    unsigned short iDim;
+    unsigned short iDim, iSpecies, jSpecies;
     /*--- No source from density,momentum and total energy ---*/
     for(iVar = 0; iVar < nVar; ++iVar) {
       val_Jacobian_i[RHO_INDEX_SOL][iVar] = 0.0;
@@ -716,7 +715,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
     /*--- Jacobian from partial densities equations ---*/
     source_jac = library->GetSourceJacobian(dim_temp, dim_rho);
     su2double fixed;
-    for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
       fixed = source_jac(iSpecies,0)*config->GetTime_Ref()*config->GetTemperature_Ref()/config->GetDensity_Ref();
       if(US_System)
         fixed *= (5.0/9.0)*(0.0685218/(3.28084*3.28084*3.28084));
@@ -724,7 +723,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
       for(iDim = 0; iDim < nDim; ++iDim)
         val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOVX_INDEX_SOL + iDim] = fixed*S_i[RHOVX_INDEX_SOL + iDim]*Volume;
       val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOE_INDEX_SOL] = fixed*S_i[RHOE_INDEX_SOL]*Volume;
-      for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
+      for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
         val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies] =
         fixed*S_i[RHOS_INDEX_SOL + jSpecies]*Volume + source_jac(iSpecies,jSpecies + 1)*config->GetTime_Ref()*Volume;
     }

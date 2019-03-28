@@ -388,6 +388,11 @@ void CConfig::SetPointersNull(void) {
   Aeroelastic_plunge  = NULL;
   Aeroelastic_pitch   = NULL;
   MassFrac_FreeStream = NULL;
+  /*---NOTE: New additions ---*/
+  //Species_Order = NULL;
+  //Marker_Inlet_MassFrac = NULL;
+  //Inlet_MassFrac = NULL;
+  /*---NOTE: Already present ---*/
   Velocity_FreeStream = NULL;
 
   RefOriginMoment     = NULL;
@@ -544,25 +549,22 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   addDoubleListOption("FREESTREAM_MASS_FRAC", nSpecies, MassFrac_FreeStream);
 
   /*!\brief SPECIES_ORDER\n DESCRIPTION: Free-stream mass fractions */
-  addStringListOption("SPECIES_ORDER", nSpecies, Species_Order);
+  //addStringListOption("SPECIES_ORDER", nSpecies, Species_Order);
 
   /*!\brief INLET_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
-  addInlet_MassFracOption("INLET_MASS_FRAC", nMarker_Inlet, Marker_Inlet_MassFrac, Inlet_MassFrac);
+  //addInlet_MassFracOption("INLET_MASS_FRAC", nMarker_Inlet, Marker_Inlet_MassFrac, Inlet_MassFrac);
+
+  /*!\brief REF_DENSITY\n DESCRIPTION: Reference density for adimensionalitazion (1.0 kg/m3 by default) \ingroup Config*/
+  addDoubleOption("REF_DENSITY", Density_Ref, 1.0);
+
+  /*!\brief REF_TEMPERATURE\n DESCRIPTION: Reference temperature for adimensionalitazion (298.15 K by default) \ingroup Config*/
+  addDoubleOption("REF_TEMPERATURE", Temperature_Ref, 298.15);
+
+  /*!\brief REF_PRESSURE\n DESCRIPTION: Reference pressure for adimensionalitazion (101325.0 Pa by default) \ingroup Config*/
+  addDoubleOption("REF_PRESSURE", Pressure_Ref, 101325.0);
 
 
   /*--- NOTE: Already present options ---*/
-  /*!\brief REF_AREA\n DESCRIPTION: Reference density for adimensionalitazion (1.0 kg/m3 by default) \ingroup Config*/
-  addDoubleOption("REF_DENSITY", Density_Ref, 1.0);
-
-  /*!\brief REF_AREA\n DESCRIPTION: Reference temperature for adimensionalitazion (298.15 K by default) \ingroup Config*/
-  addDoubleOption("REF_TEMPERATURE", Temperature_Ref, 298.15);
-
-  /*!\brief REF_AREA\n DESCRIPTION: Reference pressure for adimensionalitazion (101325.0 Pa by default) \ingroup Config*/
-  addDoubleOption("REF_PRESSURE", Pressure_Ref, 101325.0);
-
-  //Opzione Mass Fractions inlet dopo mail di domani
-
-
   /*!\brief REGIME_TYPE \n  DESCRIPTION: Regime type \n OPTIONS: see \link Regime_Map \endlink \ingroup Config*/
   addEnumOption("REGIME_TYPE", Kind_Regime, Regime_Map, COMPRESSIBLE);
 
@@ -5445,17 +5447,20 @@ CConfig::~CConfig(void) {
   }
 
   /*--- NOTE: new deletions ---*/
-  if(Species_Order != NULL)
-    delete[] Species_Order;
+  if(MassFrac_FreeStream != NULL)
+    delete[] MassFrac_FreeStream;
 
-  if(Marker_Inlet_MassFrac != NULL)
-    delete[] Marker_Inlet_MassFrac;
+  //if(Species_Order != NULL)
+  //  delete[] Species_Order;
 
-  if(Inlet_MassFrac != NULL) {
-    for(iMarker = 0; iMarker < nMarker_Inlet; ++iMarker)
-      delete[] Inlet_MassFrac[iMarker];
-    delete[] Inlet_MassFrac;
-  }
+  //if(Marker_Inlet_MassFrac != NULL)
+  //  delete[] Marker_Inlet_MassFrac;
+
+  //if(Inlet_MassFrac != NULL) {
+  //  for(iMarker = 0; iMarker < nMarker_Inlet; ++iMarker)
+  //    delete[] Inlet_MassFrac[iMarker];
+  //  delete[] Inlet_MassFrac;
+  //}
 
   /*--- NOTE: already present ---*/
   if (Riemann_FlowDir != NULL) {
@@ -5853,13 +5858,13 @@ void CConfig::SetGlobalParam(unsigned short val_solver,
 }
 
 /*--- NOTE: New function to compute inlet mass fractions ---*/
-su2double* CConfig::GetInlet_MassFrac(string val_marker) const {
-  unsigned short iMarker_Inlet;
-  for(iMarker_Inlet = 0; iMarker_Inlet < nMarker_Inlet; ++iMarker_Inlet)
-    if(Marker_Inlet[iMarker_Inlet] == val_marker)
-      break;
-  return Inlet_MassFrac[iMarker_Inlet];
-}
+//su2double* CConfig::GetInlet_MassFrac(string val_marker) const {
+//  unsigned short iMarker_Inlet;
+//  for(iMarker_Inlet = 0; iMarker_Inlet < nMarker_Inlet; ++iMarker_Inlet)
+//    if(Marker_Inlet_MassFrac[iMarker_Inlet] == val_marker)
+//      break;
+//  return Inlet_MassFrac[iMarker_Inlet];
+//}
 
 /*--- NOTE: Old functions ---*/
 su2double* CConfig::GetPeriodicRotCenter(string val_marker) {

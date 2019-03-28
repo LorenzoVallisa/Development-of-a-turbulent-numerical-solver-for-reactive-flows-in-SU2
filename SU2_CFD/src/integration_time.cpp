@@ -33,6 +33,8 @@
 
 #include "../include/integration_structure.hpp"
 
+#include "../include/variable_reactive.hpp"
+
 CMultiGridIntegration::CMultiGridIntegration(CConfig *config) : CIntegration(config) {}
 
 CMultiGridIntegration::~CMultiGridIntegration(void) { }

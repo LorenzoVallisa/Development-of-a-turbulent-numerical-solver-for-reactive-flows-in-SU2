@@ -47,26 +47,26 @@ protected:
    */
   static constexpr unsigned short T_INDEX_PRIM = 0;
   static constexpr unsigned short VX_INDEX_PRIM = 1;
-  static const unsigned short P_INDEX_PRIM;
-  static const unsigned short RHO_INDEX_PRIM;
-  static const unsigned short H_INDEX_PRIM;
-  static const unsigned short A_INDEX_PRIM;
-  static const unsigned short RHOS_INDEX_PRIM;
+  static unsigned short P_INDEX_PRIM;
+  static unsigned short RHO_INDEX_PRIM;
+  static unsigned short H_INDEX_PRIM;
+  static unsigned short A_INDEX_PRIM;
+  static unsigned short RHOS_INDEX_PRIM;
 
   /**
    * Mapping between the solution variable name and its position in the physical data
    */
   static constexpr unsigned short RHO_INDEX_SOL = 0;
   static constexpr unsigned short RHOVX_INDEX_SOL = 1;
-  static const unsigned short RHOE_INDEX_SOL;
-  static const unsigned short RHOS_INDEX_SOL;
+  static unsigned short RHOE_INDEX_SOL;
+  static unsigned short RHOS_INDEX_SOL;
 
   /**
    * Mapping between the primitive variable gradient name and its position in the physical data
    */
   static constexpr unsigned short T_INDEX_GRAD = 0;
   static constexpr unsigned short VX_INDEX_GRAD = 1;
-  static const unsigned short P_INDEX_GRAD;
+  static unsigned short P_INDEX_GRAD;
 
   /**
    * Mapping between the primitivelimited variable name and its position in the physical data
@@ -630,18 +630,6 @@ public:
    */
   void SetVelocity_Old(su2double* val_velocity) override;
 };
-const unsigned short CReactiveEulerVariable::P_INDEX_PRIM = CReactiveEulerVariable::VX_INDEX_PRIM + CReactiveEulerVariable::nDim;
-const unsigned short CReactiveEulerVariable::RHO_INDEX_PRIM = CReactiveEulerVariable::P_INDEX_PRIM + 1;
-const unsigned short CReactiveEulerVariable::H_INDEX_PRIM = CReactiveEulerVariable::RHO_INDEX_PRIM + 1;
-const unsigned short CReactiveEulerVariable::A_INDEX_PRIM = CReactiveEulerVariable::H_INDEX_PRIM + 1;
-const unsigned short CReactiveEulerVariable::RHOS_INDEX_PRIM = CReactiveEulerVariable::A_INDEX_PRIM + 1;
-
-const unsigned short CReactiveEulerVariable::RHOE_INDEX_SOL = CReactiveEulerVariable::RHOVX_INDEX_SOL + CReactiveEulerVariable::nDim;
-const unsigned short CReactiveEulerVariable::RHOS_INDEX_SOL = CReactiveEulerVariable::RHOE_INDEX_SOL + 1;
-
-const unsigned short CReactiveEulerVariable::P_INDEX_GRAD = CReactiveEulerVariable::VX_INDEX_GRAD + CReactiveEulerVariable::nDim;
-
-const unsigned short CReactiveEulerVariable::P_INDEX_LIM = CReactiveEulerVariable::VX_INDEX_LIM + CReactiveEulerVariable::nDim;
 
 /*! \class CReactiveNSVariable
  *  \brief Main class for defining a variable for chemically reacting viscous flows.
@@ -657,7 +645,7 @@ protected:
   RealMatrix Diffusion_Coeffs;    /*!< \brief Binary diffusion coefficients of the mixture. */
 
 public:
-  static const unsigned short RHOS_INDEX_GRAD; /*!< \brief Index for position of mole fractions in primitives gradient. */
+  static unsigned short RHOS_INDEX_GRAD; /*!< \brief Index for position of mole fractions in primitives gradient. */
 
   /*!
 	 * \brief Default constructor of the class.
@@ -799,6 +787,5 @@ public:
   }
 
 };
-const unsigned short CReactiveNSVariable::RHOS_INDEX_GRAD = CReactiveNSVariable::P_INDEX_GRAD + 1;
 
 #endif

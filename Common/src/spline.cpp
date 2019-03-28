@@ -7,7 +7,7 @@
 namespace MathTools {
   //
   /*--- Sets the second derivative coefficients for natural spline ---*/
-  void SetSpline(const RealVec& x, const RealVec& y, const su2double yp1, const su2double ypn, RealVec& y2) {
+  void SetSpline(const RealVec& x, const RealVec& y, const double yp1, const double ypn, RealVec& y2) {
     auto n = x.size();
     SU2_Assert(n > 1,"You have only one datum: cannot generate spline");
     SU2_Assert(y.size() == n,"The dimension of vectors x and y from data are not the same");
@@ -59,14 +59,14 @@ namespace MathTools {
 
   //
   /*--- Gets the value from natural spline ---*/
-  su2double GetSpline(const RealVec& x, const RealVec& y, const RealVec& y2, const su2double value) {
+  double GetSpline(const RealVec& x, const RealVec& y, const RealVec& y2, const double value) {
     if(value < x[0] || value > x.back())
       throw std::out_of_range("The required temperature is out of data range");
 
     unsigned long klo;
     double h, b, a, result;
     h = x[1] - x[0];
-    klo = (value - x[0])/step + 1;
+    klo = (value - x[0])/h + 1;
     a = (x[klo] - value)/h;
     b = (value - x[klo-1])/h;
     // Cubic spline polynomial is now evaluated.

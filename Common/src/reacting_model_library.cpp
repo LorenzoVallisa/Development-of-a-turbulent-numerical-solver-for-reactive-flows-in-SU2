@@ -109,7 +109,7 @@ namespace Framework {
       Ys[iSpecies] = Xs[iSpecies]*mMasses[iSpecies];
 
     double massTot = std::accumulate(Xs.cbegin(), Xs.cend(), 0.0)/std::accumulate(Ys.cbegin(), Ys.cend(), 0.0);
-    std::transform(Ys.begin(),Ys.end(),Ys.begin(),std::bind1st(std::multiplies<double>(),massTot));
+    std::transform(Ys.begin(), Ys.end(), Ys.begin(), std::bind1st(std::multiplies<double>(),massTot));
   }
 
   //
@@ -272,7 +272,7 @@ namespace Framework {
                                            std::get<Y_DATA_SPLINE>(Cp_Spline[iSpecies]),temp)/mMasses[iSpecies];
 
     SetMassFractions(ys);
-    return std::inner_product(Ys.cbegin(),Ys.cend(),CPs.cbegin(),0.0);
+    return std::inner_product(Ys.cbegin(), Ys.cend(), CPs.cbegin(), 0.0);
   }
 
   //
@@ -365,7 +365,7 @@ namespace Framework {
   //
   /* This function computes the mixture concetration. */
   inline double ReactingModelLibrary::ComputeConcentration(const double rho, const RealVec& ys) {
-    SetConcentration(rho, ys);
+    SetConcentration(rho,ys);
     return std::accumulate(Cs.cbegin(), Cs.cend(), 0.0);
   }
 
@@ -384,7 +384,7 @@ namespace Framework {
   /* This function computes the effective diffusion coefficients for each species. */
   RealVec ReactingModelLibrary::GetDiffCoeffs(const double temp, const double pressure, const RealVec& ys) {
     /*--- Compute binary diffusion coefficients and mole fractions ---*/
-    Dij = GetDij_SM(temp, pressure);
+    Dij = GetDij_SM(temp,pressure);
     SetMolarFromMass(ys);
 
     /*--- Compute mean effective diffusion coefficients ---*/
@@ -551,7 +551,7 @@ namespace Framework {
         Omega[iSpecies] += mMasses[iSpecies]*(Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac))*
                                              (Forward_Rates[iReac] - Backward_Rates[iReac]);
     }
-    std::transform(Omega.begin(), Omega.end(), Omega.begin(), std::bind1st(std::multiplies<double>(),1.0e3));
+    std::transform(Omega.begin(), Omega.end(), Omega.begin(), std::bind1st(std::multiplies<double>(), 1.0e3));
     return Omega;
   }
 
@@ -581,7 +581,7 @@ namespace Framework {
           dnu += dcoeff;
         }
       }
-      const double Kc_pert = std::exp(-dG/RT)*std::pow(RT, -dnu);
+      double Kc_pert = std::exp(-dG/RT)*std::pow(RT, -dnu);
       Kc_Derivatives[iReac] = (Kc_pert - Kc[iReac])/(epsilon*temp);
     }
 
@@ -592,7 +592,7 @@ namespace Framework {
       double back_contr = Backward_Rates[iReac]*(tmp - Kc_Derivatives[iReac]/Kc[iReac]);
       for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
         /*--- Derivatives with respect to density ---*/
-        double fixed_contr =  mMasses[iSpecies]*
+        double fixed_contr =  1.0e3*mMasses[iSpecies]*
                               (Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac));
         Source_Jacobian(iSpecies,0) += fixed_contr*(for_contr - back_contr);
 
@@ -666,35 +666,38 @@ namespace Framework {
             n_line++;
           }
         }
-        mixfile.close();
-        SU2_Assert(Species_Names.size() == nSpecies,"The number of species detected doesn't match nSpecies");
-
-        /*--- Resize vector that wil be often used ---*/
-        Ys.resize(nSpecies);
-        Xs.resize(nSpecies);
-        Cs.resize(nSpecies);
-
-        Mu_Spline.resize(nSpecies);
-        Kappa_Spline.resize(nSpecies);
-        Entr_Spline.resize(nSpecies);
-        Cp_Spline.resize(nSpecies);
-        Enth_Spline.resize(nSpecies);
-
-        Viscosities.resize(nSpecies);
-        Enthalpies.resize(nSpecies);
-        Internal_Energies.resize(nSpecies);
-        CPs.resize(nSpecies);
-        Thermal_Conductivities.resize(nSpecies);
-
-        ys_over_mm.resize(nSpecies);
-        rhoUdiff.resize(nSpecies);
-        Dm_coeffs.resize(nSpecies);
-        Omega.resize(nSpecies);
-        Dij.resize(nSpecies,nSpecies);
-        Gamma.resize(nSpecies,nSpecies);
-        Source_Jacobian.resize(nSpecies, nSpecies + 1);
       }
       mixfile.close();
+      SU2_Assert(nSpecies > 0,"The number of species read is equal to zero: impossible");
+      SU2_Assert(Species_Names.size() == nSpecies,"The number of species detected doesn't match nSpecies");
+
+      /*--- Resize vector that wil be often used ---*/
+      Ys.resize(nSpecies);
+      Xs.resize(nSpecies);
+      Cs.resize(nSpecies);
+
+      Mu_Spline.resize(nSpecies);
+      Kappa_Spline.resize(nSpecies);
+      Entr_Spline.resize(nSpecies);
+      Cp_Spline.resize(nSpecies);
+      Enth_Spline.resize(nSpecies);
+
+      Viscosities.resize(nSpecies);
+      Enthalpies.resize(nSpecies);
+      Internal_Energies.resize(nSpecies);
+      CPs.resize(nSpecies);
+      Thermal_Conductivities.resize(nSpecies);
+
+      ys_over_mm.resize(nSpecies);
+      rhoUdiff.resize(nSpecies);
+      Dm_coeffs.resize(nSpecies);
+      Omega.resize(nSpecies, 0.0);
+      Dij.resize(nSpecies,nSpecies);
+      Dij.setZero();
+      Gamma.resize(nSpecies,nSpecies);
+      Gamma.setZero();
+      Source_Jacobian.resize(nSpecies, nSpecies + 1);
+      Source_Jacobian.setZero();
     }
     else {
       std::cerr<<"Unable to open the mixture file: "<<f_name<<std::endl;
@@ -736,9 +739,13 @@ namespace Framework {
 
             /*--- Resize and reserve space for vectors ---*/
             Stoich_Coeffs_Reactants.resize(nSpecies,nReactions);
+            Stoich_Coeffs_Reactants.setZero();
             Stoich_Coeffs_Products.resize(nSpecies,nReactions);
+            Stoich_Coeffs_Products.setZero();
             Stoich_Coeffs_Reactants_Exp.resize(nReactions,nSpecies);
+            Stoich_Coeffs_Reactants_Exp.setZero();
             Stoich_Coeffs_Products_Exp.resize(nReactions,nSpecies);
+            Stoich_Coeffs_Products_Exp.setZero();
 
             Forward_Rates.resize(nReactions);
             Backward_Rates.resize(nReactions);
@@ -787,7 +794,7 @@ namespace Framework {
     SU2_Assert(major_pos != std::string::npos,"No reaction in this line");
     SU2_Assert(line.find('>',major_pos+1),"Already detected > symbol for reactions");
 
-    std::string reactants_side,products_side;
+    std::string reactants_side, products_side;
 
     if(is_rev) {
       SU2_Assert(minor_pos + 2 == major_pos,"Incorrect symbol to detect reactions");
@@ -886,10 +893,10 @@ namespace Framework {
       RealVec y2_mu, y2_kappa;
 
       MathTools::SetSpline(temp_data, mu_data, 0.0, 0.0, y2_mu);
-      Mu_Spline[iSpecies] = std::make_tuple(temp_data,std::move_if_noexcept(mu_data),std::move_if_noexcept(y2_mu));
+      Mu_Spline[iSpecies] = std::make_tuple(temp_data, std::move_if_noexcept(mu_data), std::move_if_noexcept(y2_mu));
 
       MathTools::SetSpline(temp_data, kappa_data, 0.0, 0.0, y2_kappa);
-      Kappa_Spline[iSpecies] = std::make_tuple(temp_data,std::move_if_noexcept(kappa_data),std::move_if_noexcept(y2_kappa));
+      Kappa_Spline[iSpecies] = std::make_tuple(temp_data, std::move_if_noexcept(kappa_data), std::move_if_noexcept(y2_kappa));
 
       transpfile.close();
     }
@@ -961,10 +968,10 @@ namespace Framework {
       RealVec y2_cp, y2_enth, y2_entr;
 
       MathTools::SetSpline(temp_data, cp_data, 0.0, 0.0, y2_cp);
-      Cp_Spline[iSpecies] = std::make_tuple(temp_data,std::move_if_noexcept(cp_data),std::move_if_noexcept(y2_cp));
+      Cp_Spline[iSpecies] = std::make_tuple(temp_data, std::move_if_noexcept(cp_data), std::move_if_noexcept(y2_cp));
 
       MathTools::SetSpline(temp_data, enth_data, 0.0, 0.0, y2_enth);
-      Enth_Spline[iSpecies] = std::make_tuple(temp_data,std::move_if_noexcept(enth_data),std::move_if_noexcept(y2_enth));
+      Enth_Spline[iSpecies] = std::make_tuple(temp_data, std::move_if_noexcept(enth_data), std::move_if_noexcept(y2_enth));
 
       MathTools::SetSpline(temp_data, entr_data, 0.0, 0.0, y2_entr);
       Entr_Spline[iSpecies] = std::make_tuple(temp_data,std::move_if_noexcept(entr_data),std::move_if_noexcept(y2_entr));
@@ -986,9 +993,9 @@ namespace Framework {
       /*--- If nobody has configured the library path, we try to do it here with a default value ---*/
       if(Lib_Path == "") {
         std::cout<<"Library path set to default"<<std::endl;
-        auto base_dir = std::experimental::filesystem::current_path().string();
-        Lib_Path = base_dir;
-        std::cout<<Lib_Path<<std::endl;
+        //auto base_dir = std::experimental::filesystem::current_path().string();
+        //Lib_Path = base_dir;
+        //std::cout<<Lib_Path<<std::endl;
       }
 
       std::vector<std::string> list_file;
@@ -1043,6 +1050,7 @@ namespace Framework {
       }
       Lib_Setup = true;
       std::cout<<"Library set."<<std::endl;
+      std::cout<<std::endl;
    }
    else
       throw Common::NotSetup("Trying to setup again without calling unsetup first.");
