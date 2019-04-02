@@ -2528,7 +2528,7 @@ void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver
       throw Common::NotImplemented("Implicit computation for upwind residual not implemented");
 
       if(!err) {
-        for(iVar = 0; iVar < nVar; ++iVar) {
+        for(unsigned short iVar = 0; iVar < nVar; ++iVar) {
           err = !std::none_of(Jacobian_i[iVar], Jacobian_i[iVar] + nVar, [](su2double elem){return std::isnan(elem);});
           if(err)
             break;
@@ -2646,9 +2646,9 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
       if(implicit) {
         throw Common::NotImplemented("Implicit computation for solid wall boundary conditions for Euler not implemented");
 
-        unsigned short iSpecies;
+        unsigned short jDim, iSpecies, jSpecies;
 
-        /*--- Contribution of global continuity equation ---*/ 
+        /*--- Contribution of global continuity equation ---*/
         Jacobian_i[RHO_INDEX_SOL][RHO_INDEX_SOL] = 0.0;
         for(iDim = 0; iDim < nDim; ++iDim)
           Jacobian_i[RHO_INDEX_SOL][RHOVX_INDEX_SOL + iDim] = UnitNormal[iDim];
@@ -2656,6 +2656,7 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
         for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
           Jacobian_i[RHO_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] = 0.0;
 
+        /*--- Contribution of momentum equation ---*/
         su2double Velocity[nDim];
         su2double sq_vel = 0.0, proj_vel = 0.0;
         for(iDim = 0; iDim < nDim; ++iDim) {
@@ -2669,18 +2670,30 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
         su2double a2 = Gamma - 1.0;
 
         for(iDim = 0; iDim < nDim; ++iDim) {
-          Jacobian_i[RHOVX_INDEX_SOL][RHO_INDEX_SOL] = UnitNormal[iDim]*phi - Velocity[iDim]*proj_vel;
-          for(unsigned short jDim = 0; jDim < nDim; ++jDim)
-            Jacobian_i[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + jDim] =
-            UnitNormal[jDim]*Velocity[iDim] - a2*UnitNormal[iDim]*Velocity[jDim];
+          Jacobian_i[RHOVX_INDEX_SOL + iDim][RHO_INDEX_SOL] = UnitNormal[iDim]*node[iPoint]->GetdPdU()[RHO_INDEX_SOL] +
+                                                              Velocity[iDim]*proj_vel;
+          for(jDim = 0; jDim < nDim; ++jDim)
+            Jacobian_i[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + jDim] = UnitNormal[jDim]*Velocity[iDim] -
+                                                                         a2*UnitNormal[iDim]*Velocity[jDim];
           Jacobian_i[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + iDim] += proj_vel;
           Jacobian_i[RHOVX_INDEX_SOL + iDim][RHOE_INDEX_SOL] = a2*UnitNormal[iDim];
         }
 
+        /*--- Contribution of energy equation ---*/
         Jacobian_i[RHOE_INDEX_SOL][RHO_INDEX_SOL] = proj_vel*(phi - a1);
         for(iDim = 0; iDim < nDim; ++iDim)
-          Jacobian_i[RHO_INDEX_SOL][RHOVX_INDEX_SOL + iDim] = UnitNormal[iDim]*a1 - a2*Velocity[iDim]*proj_vel;
-        Jacobian_i[RHO_INDEX_SOL][RHO_INDEX_SOL] = Gamma*proj_vel;
+          Jacobian_i[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] = UnitNormal[iDim]*a1 - a2*Velocity[iDim]*proj_vel;
+        Jacobian_i[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = Gamma*proj_vel;
+
+        /*--- Contribution of species continuity equation ---*/
+        for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+          Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] = -node[iPoint]->GetMassFraction(iSpecies)*proj_vel;
+          for(iDim = 0; iDim < nDim; ++iDim)
+            Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOVX_INDEX_SOL + iDim] = node[iPoint]->GetMassFraction(iSpecies)*UnitNormal[iDim];
+          Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOE_INDEX_SOL] = 0.0;
+          for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
+            Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies] = proj_vel*(iSpecies == jSpecies);
+        }
 
         if(grid_movement) {
           for(unsigned short iVar = 0; iVar < nVar; ++iVar)
@@ -4094,7 +4107,7 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
       throw Common::NotImplemented("Implicit computation for upwind residual not implemented");
 
       if(!err) {
-        for(iVar = 0; iVar < nVar; ++iVar) {
+        for(unsigned short iVar = 0; iVar < nVar; ++iVar) {
           err = !std::none_of(Jacobian_i[iVar], Jacobian_i[iVar] + nVar, [](su2double elem){return std::isnan(elem);});
           err = err  || !std::none_of(Jacobian_j[iVar], Jacobian_j[iVar] + nVar, [](su2double elem){return std::isnan(elem);});
           if(err)
