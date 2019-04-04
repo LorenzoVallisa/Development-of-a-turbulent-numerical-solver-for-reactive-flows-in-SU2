@@ -2379,50 +2379,81 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
       }
 
       /*--- Compute other primitive variables accordingly to the reconstruction ---*/
+      su2double dim_temp_i, Gamma_i, sq_vel_i;
       if(!non_phys_i) {
         std::copy(Primitive_i + RHOS_INDEX_PRIM, Primitive_i + (RHOS_INDEX_PRIM + nSpecies), Ys_i.begin());
         su2double rho_recon_i = library->ComputeDensity(Primitive_i[T_INDEX_PRIM], Primitive_i[P_INDEX_PRIM], Ys_i);
         rho_recon_i *= config->GetGas_Constant_Ref();
         Primitive_i[RHO_INDEX_PRIM] = rho_recon_i;
-        su2double dim_temp_i;
         dim_temp_i = Primitive_i[T_INDEX_PRIM]*config->GetTemperature_Ref();
         if(US_System)
           dim_temp_i *= 5.0/9.0;
         Primitive_i[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp_i, Ys_i)/config->GetEnergy_Ref();
         if(US_System)
           Primitive_i[H_INDEX_PRIM] *= 3.28084*3.28084;
-        su2double sq_vel_i = std::inner_product(Primitive_i + VX_INDEX_PRIM, Primitive_i + (VX_INDEX_PRIM + nDim),
-                                                Primitive_i + VX_INDEX_PRIM, 0.0);
+        sq_vel_i = std::inner_product(Primitive_i + VX_INDEX_PRIM, Primitive_i + (VX_INDEX_PRIM + nDim), Primitive_i + VX_INDEX_PRIM, 0.0);
         Primitive_i[H_INDEX_PRIM] += 0.5*sq_vel_i;
-        su2double Gamma_i = library->ComputeFrozenGamma(dim_temp_i, Ys_i);
+        Gamma_i = library->ComputeFrozenGamma(dim_temp_i, Ys_i);
         Primitive_i[A_INDEX_PRIM] = std::sqrt(Gamma_i*Primitive_i[P_INDEX_PRIM]/rho_recon_i);
       }
 
+      su2double dim_temp_j, Gamma_j, sq_vel_j;
       if(!non_phys_j) {
         std::copy(Primitive_j + RHOS_INDEX_PRIM, Primitive_j + (RHOS_INDEX_PRIM + nSpecies), Ys_j.begin());
         su2double rho_recon_j = library->ComputeDensity(Primitive_j[T_INDEX_PRIM], Primitive_j[P_INDEX_PRIM], Ys_j);
         rho_recon_j *= config->GetGas_Constant_Ref();
         Primitive_j[RHO_INDEX_PRIM] = rho_recon_j;
-        su2double dim_temp_j;
         dim_temp_j = Primitive_j[T_INDEX_PRIM]*config->GetTemperature_Ref();
         if(US_System)
           dim_temp_j *= 5.0/9.0;
         Primitive_j[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp_j,Ys_j)/config->GetEnergy_Ref();
         if(US_System)
           Primitive_j[H_INDEX_PRIM] *= 3.28084*3.28084;
-        su2double sq_vel_j = std::inner_product(Primitive_j + VX_INDEX_PRIM, Primitive_j + (VX_INDEX_PRIM + nDim),
-                                                Primitive_j + VX_INDEX_PRIM, 0.0);
+        sq_vel_j = std::inner_product(Primitive_j + VX_INDEX_PRIM, Primitive_j + (VX_INDEX_PRIM + nDim), Primitive_j + VX_INDEX_PRIM, 0.0);
         Primitive_j[H_INDEX_PRIM] += 0.5*sq_vel_j;
-        su2double Gamma_j = library->ComputeFrozenGamma(dim_temp_j, Ys_j);
+        Gamma_j = library->ComputeFrozenGamma(dim_temp_j, Ys_j);
         Primitive_j[A_INDEX_PRIM] = std::sqrt(Gamma_j*Primitive_j[P_INDEX_PRIM]/rho_recon_j);
       }
 
       numerics->SetPrimitive(Primitive_i, Primitive_j);
+      if(implicit) {
+        su2double Secondary_i[nVar], Secondary_j[nVar];
+
+        /*--- Derivatves with respect to density ---*/
+        Secondary_i[RHO_INDEX_SOL] = (Gamma_i - 1.0)*0.5*sq_vel_i;
+        Secondary_j[RHO_INDEX_SOL] = (Gamma_j - 1.0)*0.5*sq_vel_j;
+
+        /*--- Derivatives with respect to momentum ---*/
+        for(iDim = 0; iDim < nDim; ++iDim) {
+          Secondary_i[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma_i)*Primitive_i[VX_INDEX_PRIM + iDim];
+          Secondary_j[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma_j)*Primitive_j[VX_INDEX_PRIM + iDim];
+        }
+
+        /*--- Derivatives with respect to energy ---*/
+        Secondary_i[RHOE_INDEX_SOL] = Gamma_i - 1.0;
+        Secondary_j[RHOE_INDEX_SOL] = Gamma_j - 1.0;
+
+        /*--- Derivatives with respect to partial densities ---*/
+        auto Ri = library->GetRiGas();
+        auto Int_Energies_i = library->ComputePartialEnergy(dim_temp_i);
+        auto Int_Energies_j = library->ComputePartialEnergy(dim_temp_j);
+        for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+          Ri[iSpecies] /= config->GetGas_Constant_Ref();
+          Int_Energies_i[iSpecies] /= config->GetEnergy_Ref();
+          Int_Energies_j[iSpecies] /= config->GetEnergy_Ref();
+          Secondary_i[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*Primitive_i[T_INDEX_PRIM] - (Gamma_i - 1.0)*Int_Energies_i[iSpecies];
+          Secondary_j[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*Primitive_j[T_INDEX_PRIM] - (Gamma_j - 1.0)*Int_Energies_j[iSpecies];
+        }
+
+        numerics->SetSecondary(Secondary_i, Secondary_j);
+      }
     } /*--- End second order reconstruction ---*/
 
     else {
       /*--- Set primitive variables without reconstruction ---*/
       numerics->SetPrimitive(Primitive_i, Primitive_j);
+      if(implicit)
+        numerics->SetSecondary(node[iPoint]->GetdPdU(), node[jPoint]->GetdPdU());
     }
 
     /*--- Set grid velocity ---*/
@@ -2658,32 +2689,37 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
 
         /*--- Contribution of momentum equation ---*/
         su2double Velocity[nDim];
-        su2double sq_vel = 0.0, proj_vel = 0.0;
+        su2double proj_vel = 0.0;
         for(iDim = 0; iDim < nDim; ++iDim) {
           Velocity[iDim] = node[iPoint]->GetVelocity(iDim);
-          sq_vel += Velocity[iDim]*Velocity[iDim];
           proj_vel += Velocity[iDim]*UnitNormal[iDim];
         }
         su2double Gamma = node[iPoint]->GetdPdU()[RHOE_INDEX_SOL] + 1.0;
-        su2double phi = 0.5*(Gamma - 1.0)*sq_vel;
-        su2double a1 = Gamma*node[iPoint]->GetEnergy() - phi;
+        su2double a1 = node[iPoint]->GetEnergy();
         su2double a2 = Gamma - 1.0;
+        su2double phi = node[iPoint]->GetdPdU()[RHO_INDEX_SOL];
 
         for(iDim = 0; iDim < nDim; ++iDim) {
-          Jacobian_i[RHOVX_INDEX_SOL + iDim][RHO_INDEX_SOL] = UnitNormal[iDim]*node[iPoint]->GetdPdU()[RHO_INDEX_SOL] +
-                                                              Velocity[iDim]*proj_vel;
+          Jacobian_i[RHOVX_INDEX_SOL + iDim][RHO_INDEX_SOL] = phi*UnitNormal[iDim] - Velocity[iDim]*proj_vel;
           for(jDim = 0; jDim < nDim; ++jDim)
-            Jacobian_i[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + jDim] = UnitNormal[jDim]*Velocity[iDim] -
-                                                                         a2*UnitNormal[iDim]*Velocity[jDim];
+            Jacobian_i[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + jDim] = UnitNormal[jDim]*Velocity[iDim] +
+                                                                         node[iPoint]->GetdPdU()[RHOVX_INDEX_SOL + jDim]*UnitNormal[iDim];
           Jacobian_i[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + iDim] += proj_vel;
           Jacobian_i[RHOVX_INDEX_SOL + iDim][RHOE_INDEX_SOL] = a2*UnitNormal[iDim];
+          for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+            Jacobian_i[RHOVX_INDEX_SOL + iDim][RHOS_INDEX_SOL + iSpecies] =
+            node[iPoint]->GetdPdU()[RHOS_INDEX_SOL + iSpecies]*UnitNormal[iDim];
         }
 
         /*--- Contribution of energy equation ---*/
-        Jacobian_i[RHOE_INDEX_SOL][RHO_INDEX_SOL] = proj_vel*(phi - a1);
+        su2double Density = node[iPoint]->GetDensity();
+        Jacobian_i[RHOE_INDEX_SOL][RHO_INDEX_SOL] = proj_vel*(phi - Pressure/Density - a1);
         for(iDim = 0; iDim < nDim; ++iDim)
-          Jacobian_i[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] = UnitNormal[iDim]*a1 - a2*Velocity[iDim]*proj_vel;
+          Jacobian_i[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] = UnitNormal[iDim]*(a1 + Pressure/Density) +
+                                                               node[iPoint]->GetdPdU()[RHOVX_INDEX_SOL + iDim]*proj_vel;
         Jacobian_i[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = Gamma*proj_vel;
+        for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+        Jacobian_i[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] = node[iPoint]->GetdPdU()[RHOS_INDEX_SOL + iSpecies]*proj_vel;
 
         /*--- Contribution of species continuity equation ---*/
         for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
@@ -2785,6 +2821,33 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
       conv_numerics->SetPrimitive(V_domain, V_inlet);
       if(grid_movement)
         conv_numerics->SetGridVel(geometry->node[iPoint]->GetGridVel(), geometry->node[iPoint]->GetGridVel());
+
+      if(implicit) {
+        su2double Secondary[nVar];
+
+        /*--- Derivatves with respect to density ---*/
+        su2double Gamma = library->ComputeFrozenGamma_FromSoundSpeed(V_inlet[T_INDEX_PRIM], V_inlet[A_INDEX_PRIM], Ys);
+        Gamma *= config->GetGas_Constant_Ref();
+        Secondary[RHO_INDEX_SOL] = (Gamma - 1.0)*0.5*Velocity2;
+
+        /*--- Derivatives with respect to momentum ---*/
+        for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+          Secondary[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma)*V_inlet[VX_INDEX_PRIM + iDim];
+
+        /*--- Derivatives with respect to energy ---*/
+        Secondary[RHOE_INDEX_SOL] = Gamma - 1.0;
+
+        /*--- Derivatives with respect to partial densities ---*/
+        auto Ri = library->GetRiGas();
+        auto Int_Energies = library->ComputePartialEnergy(dim_temp);
+        for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+          Ri[iSpecies] /= config->GetGas_Constant_Ref();
+          Int_Energies[iSpecies] /= config->GetEnergy_Ref();
+          Secondary[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*V_inlet[T_INDEX_PRIM] - (Gamma - 1.0)*Int_Energies[iSpecies];
+        }
+
+        conv_numerics->SetSecondary(node[iPoint]->GetdPdU(), Secondary);
+      }
 
       /*--- Compute the residual using an upwind scheme ---*/
       try {
@@ -3022,6 +3085,35 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
       if(grid_movement)
         conv_numerics->SetGridVel(geometry->node[iPoint]->GetGridVel(), geometry->node[iPoint]->GetGridVel());
 
+      if(implicit) {
+        su2double Secondary[nVar];
+
+        /*--- Derivatives with respect to density ---*/
+        Velocity2 = Vel_Mag*Vel_Mag;
+        Secondary[RHO_INDEX_SOL] = (Gamma - 1.0)*0.5*Velocity2;
+
+        /*--- Derivatives with respect to momentum ---*/
+        for(iDim = 0; iDim < nDim; ++iDim)
+          Secondary[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma)*V_inlet[VX_INDEX_PRIM + iDim];
+
+        /*--- Derivatives with respect to energy ---*/
+        Secondary[RHOE_INDEX_SOL] = Gamma - 1.0;
+
+        /*--- Derivatives with respect to partial densities ---*/
+        dim_temp = V_inlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
+        if(US_System)
+          dim_temp *= 5.0/9.0;
+        auto Ri = library->GetRiGas();
+        auto Int_Energies = library->ComputePartialEnergy(dim_temp);
+        for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+          Ri[iSpecies] /= config->GetGas_Constant_Ref();
+          Int_Energies[iSpecies] /= config->GetEnergy_Ref();
+          Secondary[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*V_inlet[T_INDEX_PRIM] - (Gamma - 1.0)*Int_Energies[iSpecies];
+        }
+
+        conv_numerics->SetSecondary(node[iPoint]->GetdPdU(), Secondary);
+      }
+
       /*--- Compute the residual using an upwind scheme ---*/
       try {
         conv_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
@@ -3123,6 +3215,8 @@ void CReactiveEulerSolver::BC_Supersonic_Outlet(CGeometry* geometry, CSolver** s
       conv_numerics->SetPrimitive(V_domain, V_outlet);
       if(grid_movement)
         conv_numerics->SetGridVel(geometry->node[iPoint]->GetGridVel(), geometry->node[iPoint]->GetGridVel());
+      if(implicit)
+        conv_numerics->SetSecondary(node[iPoint]->GetdPdU(), node[iPoint]->GetdPdU());
 
       /*--- Compute the residual using an upwind scheme ---*/
       try {
@@ -3300,6 +3394,37 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
       conv_numerics->SetPrimitive(V_domain, V_outlet);
       if(grid_movement)
         conv_numerics->SetGridVel(geometry->node[iPoint]->GetGridVel(), geometry->node[iPoint]->GetGridVel());
+
+      if(implicit) {
+        if(Mach_Exit >= 1.0)
+          conv_numerics->SetSecondary(node[iPoint]->GetdPdU(), node[iPoint]->GetdPdU());
+        else {
+          su2double Secondary[nVar];
+
+          /*--- Derivatves with respect to density ---*/
+          Secondary[RHO_INDEX_SOL] = (Gamma - 1.0)*0.5*Velocity2;
+
+          /*--- Derivatives with respect to momentum ---*/
+          for(iDim = 0; iDim < nDim; ++iDim)
+            Secondary[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma)*V_outlet[VX_INDEX_PRIM + iDim];
+
+          /*--- Derivatives with respect to energy ---*/
+          Secondary[RHOE_INDEX_SOL] = Gamma - 1.0;
+
+          /*--- Derivatives with respect to partial densities ---*/
+          auto Ri = library->GetRiGas();
+          su2double dim_temp = V_outlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
+          if(US_System)
+            dim_temp *= 5.0/9.0;
+          auto Int_Energies = library->ComputePartialEnergy(dim_temp);
+          for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+            Ri[iSpecies] /= config->GetGas_Constant_Ref();
+            Int_Energies[iSpecies] /= config->GetEnergy_Ref();
+            Secondary[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*V_outlet[T_INDEX_PRIM] - (Gamma - 1.0)*Int_Energies[iSpecies];
+          }
+          conv_numerics->SetSecondary(node[iPoint]->GetdPdU(), Secondary);
+        }
+      }
 
       /*--- Compute the residual using an upwind scheme ---*/
       try {
@@ -3817,20 +3942,8 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
     Mean_Density = 0.5*(node[iPoint]->GetDensity() + node[jPoint]->GetDensity());
     Mean_ThermalCond = 0.5*(node[iPoint]->GetThermalConductivity() + node[jPoint]->GetThermalConductivity());
     Mean_LaminarVisc = 0.5*(node[iPoint]->GetLaminarViscosity() + node[jPoint]->GetLaminarViscosity());
-    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      Ys_i[iSpecies] = node[iPoint]->GetMassFraction(iSpecies);
-      Ys_j[iSpecies] = node[jPoint]->GetMassFraction(iSpecies);
-    }
-    su2double dim_cp_i = node[iPoint]->GetSpecificHeatCp()*config->GetGas_Constant_Ref();
-    su2double dim_cp_j = node[jPoint]->GetSpecificHeatCp()*config->GetGas_Constant_Ref();
-    if(US_System) {
-      dim_cp_i /= 3.28084*3.28084*5.0/9.0;
-      dim_cp_j /= 3.28084*3.28084*5.0/9.0;
-    }
-    Mean_CV = 0.5*(library->ComputeCV_FromCP(dim_cp_i, Ys_i) +  library->ComputeCV_FromCP(dim_cp_j, Ys_j));
-    Mean_CV /= config->GetGas_Constant_Ref();
-    if(US_System)
-      Mean_CV *= 3.28084*3.28084*5.0/9.0;
+    Mean_CV = 0.5*(node[iPoint]->GetSpecificHeatCp()/(node[iPoint]->GetdPdU()[RHOE_INDEX_SOL] + 1.0) +
+                   node[jPoint]->GetSpecificHeatCp()/(node[jPoint]->GetdPdU()[RHOE_INDEX_SOL] + 1.0));
 
     /*--- Inviscid contribution ---*/
     Lambda = (std::abs(Mean_ProjVel) + Mean_SoundSpeed)*Area;
@@ -3872,15 +3985,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
         Mean_Density = node[iPoint]->GetDensity();
         Mean_ThermalCond = node[iPoint]->GetThermalConductivity();
         Mean_LaminarVisc = node[iPoint]->GetLaminarViscosity();
-        for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-          Ys[iSpecies] = node[iPoint]->GetMassFraction(iSpecies);
-        su2double dim_cp = node[iPoint]->GetSpecificHeatCp()*config->GetGas_Constant_Ref();
-        if(US_System)
-          dim_cp /= 3.28084*3.28084*5.0/9.0;
-        Mean_CV = library->ComputeCV_FromCP(dim_cp, Ys);
-        Mean_CV /= config->GetGas_Constant_Ref();
-        if(US_System)
-          Mean_CV *= 3.28084*3.28084*5.0/9.0;
+        Mean_CV = node[iPoint]->GetSpecificHeatCp()/(node[iPoint]->GetdPdU()[RHOE_INDEX_SOL] + 1.0);
 
         /*--- Inviscid contribution ---*/
         Lambda = (std::abs(Mean_ProjVel) + Mean_SoundSpeed)*Area;

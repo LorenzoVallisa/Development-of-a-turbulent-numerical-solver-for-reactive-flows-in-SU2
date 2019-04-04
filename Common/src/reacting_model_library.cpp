@@ -158,6 +158,14 @@ namespace Framework {
 
   //
   //
+  /*--- This function computes the frozen sound speed when we already computed gamma. ---*/
+  inline double ReactingModelLibrary::ComputeFrozenGamma_FromSoundSpeed(const double temp, const double sound_speed, const RealVec& ys) {
+    return sound_speed*sound_speed/(Rgas*temp);
+  }
+
+
+  //
+  //
   /*--- This function computes the frozen sound speed with pressure and density. ---*/
   inline double ReactingModelLibrary::ComputeFrozenSoundSpeed(const double temp, const RealVec& ys, const double press, const double rho) {
     double gamma = ComputeFrozenGamma(temp,ys);

@@ -704,6 +704,10 @@ CReactiveNSVariable::CReactiveNSVariable(su2double* val_solution, unsigned short
                                          CReactiveEulerVariable(val_solution, val_nDim, val_nvar, val_nSpecies, val_nprimvar,
                                                                 val_nprimvargrad, val_nprimvarlim, lib_ptr, config),
                                                                 Laminar_Viscosity(), Thermal_Conductivity() {
+  /*--- Update index ---*/
+  RHOS_INDEX_GRAD = CReactiveNSVariable::P_INDEX_GRAD + 1;
+
+  /*--- Resize matrix ---*/
   Diffusion_Coeffs.resize(nSpecies,nSpecies);
 }
 

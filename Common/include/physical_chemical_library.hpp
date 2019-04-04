@@ -199,6 +199,14 @@ namespace Framework  {
     /*!
      * \brief Computes the frozen speed of sound.
      * \param[in] temp - temperature
+     * \param[in] sound_speed - frozen speed of sound
+     * \param[in] ys - The vector of the mass fractions of species
+    */
+    virtual double ComputeFrozenGamma_FromSoundSpeed(const double temp, const double sound_speed, const Vector& ys) = 0;
+
+    /*!
+     * \brief Computes the frozen speed of sound.
+     * \param[in] temp - temperature
      * \param[in] ys - The vector of the mass fractions of species
      * \param[in] press - pressure
      * \param[in] rho - density

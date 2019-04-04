@@ -189,8 +189,178 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
     val_residual[VX_INDEX_PRIM + iDim] += pLF*UnitNormal[iDim]*Area;
   }
 
-  if(implicit)
+  if(implicit) {
     throw Common::NotImplemented("Implicit method for convective flux still not implemented. Setting explicit");
+
+    /*--- Check memory allocation ---*/
+    if(config->GetExtIter() == 0) {
+      SU2_Assert(val_Jacobian_i != NULL,"The matrix for convective term Jacobian at node i has not been allocated");
+      SU2_Assert(val_Jacobian_j != NULL,"The matrix for convective term Jacobian at node j has not been allocated");
+      for(iVar = 0; iVar < nVar; ++iVar) {
+        SU2_Assert(val_Jacobian_i[iVar] != NULL,
+                   std::string("The row " + std::to_string(iVar) + " of convective term Jacobian at node i has not been allocated"));
+        SU2_Assert(val_Jacobian_j[iVar] != NULL,
+                   std::string("The row " + std::to_string(iVar) + " of convective term Jacobian at node i has not been allocated"));
+      }
+    }
+
+    unsigned short jVar;
+
+    /*--- Set Jacobian to zero ---*/
+    for(iVar = 0; iVar < nVar; ++iVar) {
+      for(jVar = 0; jVar < nVar; ++jVar) {
+        val_Jacobian_i[iVar][jVar] = 0.0;
+        val_Jacobian_j[iVar][jVar] = 0.0;
+      }
+    }
+
+    /*--- Set derivatives of Mach number ---*/
+    su2double Mach_Left_Der[nVar], Mach_Right_Der[nVar];
+
+    std::fill(Mach_Left_Der, Mach_Left_Der + nVar, 0.0);
+    std::fill(Mach_Right_Der, Mach_Right_Der + nVar, 0.0);
+    Mach_Left_Der[RHO_INDEX_SOL] = -mL/Density_i;
+    Mach_Right_Der[RHO_INDEX_SOL] = -mR/Density_j;
+    for(iDim = 0; iDim < nDim; ++iDim) {
+      Mach_Left_Der[RHOVX_INDEX_SOL + iDim] = UnitNormal[iDim]/(Density_i*MeanSoundSpeed);
+      Mach_Right_Der[RHOVX_INDEX_SOL + iDim] = UnitNormal[iDim]/(Density_j*MeanSoundSpeed);
+    }
+
+    /*---Set Polynomials Mach derivatives ---*/
+    su2double MachPol_Left_Der[nVar], MachPol_Right_Der[nVar];
+
+    std::copy(Mach_Left_Der, Mach_Left_Der + nVar, MachPol_Left_Der);
+    std::copy(Mach_Right_Der, Mach_Right_Der + nVar, MachPol_Right_Der);
+
+    if(std::abs(mL) < 1.0) {
+      for(iVar = 0; iVar < nVar; ++iVar)
+        MachPol_Left_Der[iVar] *= (0.5*(mL + 1.0) + 4.0*beta*mL*(mL*mL - 1.0));
+    }
+    else {
+      for(iVar = 0; iVar < nVar; ++iVar)
+        MachPol_Left_Der[iVar] *= (0.5*(1.0 + std::abs(mL)/mL));
+    }
+
+    if(std::abs(mL) < 1.0) {
+      for(iVar = 0; iVar < nVar; ++iVar)
+        MachPol_Right_Der[iVar] *= (0.5*(1.0 - mR) + 4.0*beta*mR*(1.0 - mR*mR));
+    }
+    else {
+      for(iVar = 0; iVar < nVar; ++iVar)
+        MachPol_Right_Der[iVar] *= (0.5*(1.0 - std::abs(mR)/mR));
+    }
+
+    /*---Set scaling factor derivatives ---*/
+    su2double Scaling_Left_Der[nVar], Scaling_Right_Der[nVar];
+    std::fill(Scaling_Left_Der, Scaling_Left_Der + nVar, 0.0);
+    std::fill(Scaling_Right_Der, Scaling_Right_Der + nVar, 0.0);
+    if(mF == mRef) {
+      for(iVar = 0; iVar < nVar; ++iVar) {
+        Scaling_Left_Der[iVar]  = Mach_Left_Der[iVar]*mL*(1.0 - mF)/mF;
+        Scaling_Right_Der[iVar] = Mach_Right_Der[iVar]*mR*(1.0 - mF)/mF;
+      }
+    }
+
+    /*--- Set convective extra term derivatives ---*/
+    su2double MachExtra_Left_Der[nVar], MachExtra_Right_Der[nVar];
+    su2double MeanDensity = 0.5*(Density_i + Density_j);
+    su2double factor = std::max(1.0 - sigma*mF*mF, 0.0);
+    for(iVar = 0; iVar < nVar; ++iVar) {
+      MachExtra_Left_Der[iVar]  = kP/(MeanSoundSpeed*MeanSoundSpeed*fa*fa*MeanDensity*MeanDensity)*
+                                  ((sigma*factor*mL*Mach_Left_Der[iVar]*(Pressure_i - Pressure_j)*fa*MeanDensity) -
+                                   (factor*S_i[iVar]*fa*MeanDensity) + (factor*(Pressure_j - Pressure_i)*MeanDensity*Scaling_Left_Der[iVar]));
+      MachExtra_Right_Der[iVar] = kP/(MeanSoundSpeed*MeanSoundSpeed*fa*fa*MeanDensity*MeanDensity)*
+                                 ((sigma*factor*mR*Mach_Right_Der[iVar]*(Pressure_i - Pressure_j)*fa*MeanDensity) +
+                                  (factor*S_j[iVar]*fa*MeanDensity) + (factor*(Pressure_j - Pressure_i)*MeanDensity*Scaling_Right_Der[iVar]));
+    }
+    MachExtra_Left_Der[RHO_INDEX_SOL]  += kP/(MeanSoundSpeed*MeanSoundSpeed*fa*fa*MeanDensity*MeanDensity)*
+                                          0.5*factor*(Pressure_j - Pressure_i)*fa;
+    MachExtra_Right_Der[RHO_INDEX_SOL] += kP/(MeanSoundSpeed*MeanSoundSpeed*fa*fa*MeanDensity*MeanDensity)*
+                                          0.5*factor*(Pressure_j - Pressure_i)*fa;
+
+    /*---Set mass fluxes derivatives ---*/
+    su2double MassPlus_Left_Der[nVar],  MassPlus_Right_Der[nVar],
+              MassMinus_Left_Der[nVar], MassMinus_Right_Der[nVar];
+
+    su2double sign_m12 = std::abs(m12)/m12;
+    for(iVar = 0; iVar < nVar; ++iVar) {
+      MassPlus_Left_Der[iVar]    = 0.5*(MachPol_Left_Der[iVar]  - MachExtra_Left_Der[iVar])*(1.0 + sign_m12);
+      MassMinus_Left_Der[iVar]   = 0.5*(MachPol_Left_Der[iVar]  - MachExtra_Left_Der[iVar])*(1.0 - sign_m12);
+      MassPlus_Right_Der[iVar]   = 0.5*(MachPol_Right_Der[iVar] - MachExtra_Right_Der[iVar])*(1.0 + sign_m12);
+      MassMinus_Right_Der[iVar]  = 0.5*(MachPol_Right_Der[iVar] - MachExtra_Right_Der[iVar])*(1.0 - sign_m12);
+    }
+
+    /*--- Set Jacobian for the convective part---*/
+    for(iVar = 0; iVar < nVar; ++iVar) {
+      for(jVar = 0; jVar < nVar; ++jVar)
+        val_Jacobian_i[iVar][jVar] += MeanSoundSpeed*((MassPlus_Left_Der[jVar]*Density_i*Phi_i[iVar]) +
+                                                      (MassMinus_Left_Der[jVar]*Density_j*Phi_j[iVar]));
+        val_Jacobian_j[iVar][jVar] += MeanSoundSpeed*((MassPlus_Right_Der[jVar]*Density_i*Phi_i[iVar]) +
+                                                      (MassMinus_Right_Der[jVar]*Density_j*Phi_j[iVar]));
+    }
+
+    /*--- Add pressure contribution to energy term ---*/
+    su2double m12_P = 0.5*(m12 + std::abs(m12));
+    su2double m12_M = 0.5*(m12 - std::abs(m12));
+    for(iVar = 0; iVar < nVar; ++iVar) {
+      val_Jacobian_i[RHOE_INDEX_SOL][iVar] += MeanSoundSpeed*m12_P*S_i[iVar]);
+      val_Jacobian_j[RHOE_INDEX_SOL][iVar] += MeanSoundSpeed*m12_M*S_j[iVar]);
+    }
+
+    /*--- Add contribution to the diagonal term ---*/
+    for(iVar = 0; iVar < nVar; ++iVar) {
+      val_Jacobian_i[iVar][iVar] += MeanSoundSpeed*m12_P;
+      val_Jacobian_j[iVar][iVar] += MeanSoundSpeed*m12_M;
+    }
+
+    /*--- Set polynomial pressure derivatives ---*/
+    su2double PressPol_Left_Der[nVar], PressPol_Right_Der[nVar];
+    std::fill(PressPol_Left_Der, PressPol_Left_Der + nVar, 0.0);
+    std::fill(PressPol_Right_Der, PressPol_Right_Der + nVar, 0.0);
+    if(std::abs(mL) < 1.0) {
+      for(iVar = 0; iVar < nVar; ++iVar)
+        PressPol_Left_Der[iVar] = 0.25*(mL + 1.0)*(3.0*(1.0 - mL) + 4.0*alpha*(5.0*mL*mL - 1.0)*(mL - 1.0))*Mach_Left_Der[iVar];
+    }
+    if(std::abs(mR) < 1.0) {
+      for(iVar = 0; iVar < nVar; ++iVar)
+        PressPol_Right_Der[iVar] = 0.25*(mL - 1.0)*(3.0*(1.0 + mL) + 4.0*alpha*(1.0 - 5.0*mL*mL)*(mL + 1.0))*Mach_Right_Der[iVar];
+    }
+
+    /*--- Set pressure extra term derivatives ---*/
+    su2double PressExtra_Left_Der[nVar], PressExtra_Right_Der[nVar];
+    for(iVar = 0; iVar < nVar; ++iVar) {
+      PressExtra_Left_Der[iVar]  = Ku*pRM*MeanSoundSpeed*
+                                   ((PressPol_Left_Der[iVar]*(Density_i + Density_j)*fa*(ProjVelocity_j - ProjVelocity_i)) +
+                                    (pLP*(Density_i + Density_j)*(ProjVelocity_j - ProjVelocity_i)*Scaling_Left_Der[iVar]));
+      PressExtra_Right_Der[iVar] = Ku*pLP*MeanSoundSpeed*
+                                   ((PressPol_Right_Der[iVar]*(Density_i + Density_j)*fa*(ProjVelocity_j - ProjVelocity_i)) +
+                                    (pRM*(Density_i + Density_j)*(ProjVelocity_j - ProjVelocity_i)*Scaling_Right_Der[iVar]));
+    }
+    PressExtra_Left_Der[RHO_INDEX_SOL]  += Ku*pRM*MeanSoundSpeed*pLP*fa*
+                                           ((ProjVelocity_j - ProjVelocity_i) - (Density_i + Density_j)*ProjVelocity_i/Density_i);
+    PressExtra_Right_Der[RHO_INDEX_SOL] += Ku*pLP*MeanSoundSpeed*pRM*fa*
+                                           ((ProjVelocity_j - ProjVelocity_i) + (Density_i + Density_j)*ProjVelocity_j/Density_j);
+    for(iDim = 0; iDim < nDim; ++iDim) {
+      PressExtra_Left_Der[RHOVX_INDEX_SOL + iDim]  -= Ku*pRM*MeanSoundSpeed*pLP*(Density_i + Density_j)*fa*UnitNormal[iDim]/Density_i;
+      PressExtra_Right_Der[RHOVX_INDEX_SOL + iDim] += Ku*pLP*MeanSoundSpeed*pRM*(Density_i + Density_j)*fa*UnitNormal[iDim]/Density_j;
+    }
+
+    /*--- Set whole pressure derivatives ---*/
+    su2double Pressure_Left_Der[nVar], Pressure_Right_Der[nVar];
+    for(iVar = 0; iVar < nVar; ++iVar) {
+      Pressure_Left_Der[iVar]  = pLP*S_i[iVar] + Pressure_i*PressPol_Left_Der[iVar] - PressExtra_Left_Der[iVar];
+      Pressure_Right_Der[iVar] = pRM*S_j[iVar] + Pressure_j*PressPol_Right_Der[iVar] - PressExtra_Right_Der[iVar];
+    }
+
+    /*--- Add global pressure contribution to the Jacobian ---*/
+    for(iDim = 0; iDim < nDim; ++iDim) {
+      for(jVar = 0; jVar < nVar; ++jVar) {
+        val_Jacobian_i[RHOVX_INDEX_SOL + iDim][jVar] += UnitNormal[iDim]*Pressure_Left_Der[jVar];
+        val_Jacobian_j[RHOVX_INDEX_SOL + iDim][jVar] += UnitNormal[iDim]*Pressure_Right_Der[jVar];
+      }
+    }
+
+  }
 
   //AD::SetPreaccOut(val_residual, nVar);
   //AD::EndPreacc();
@@ -502,6 +672,60 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const Vec& val_Mean_PrimVar, cons
                                                su2double** val_Proj_Jac_Tensor_j, CConfig* config) {
 
   throw Common::NotImplemented("Calcutation of Jacobians has not been implemented");
+
+  /*--- Local variables ---*/
+  unsigned short iDim, iVar, jVar;
+  su2double theta = 0.0, sqvel = 0.0, proj_viscousflux_vel = 0.0;
+
+  for(iDim = 0; iDim < nDim; ++iDim) {
+    theta += val_normal[iDim]*val_normal[iDim];
+    sqvel += val_Mean_PrimVar[VX_INDEX_PRIM + iDim]*val_Mean_PrimVar[VX_INDEX_PRIM + iDim];
+    proj_viscousflux_vel += val_Proj_Visc_Flux[RHOVX_INDEX_SOL + iDim]*val_Mean_PrimVar[VX_INDEX_PRIM + iDim];
+  }
+
+  /*--- Set Jacobian matrixes to zero ---*/
+  for(iVar = 0; iVar < nVar; ++iVar) {
+    for(jVar = 0; jVar < nVar; ++jVar) {
+      val_Proj_Jac_Tensor_i[iVar][jVar] = 0.0;
+      val_Proj_Jac_Tensor_j[iVar][jVar] = 0.0;
+    }
+  }
+
+  if(nDim == 2) {
+    su2double thetax = theta + val_normal[0]*val_normal[0]/3.0;
+    su2double thetay = theta + val_normal[1]*val_normal[1]/3.0;
+
+    su2double etaz = val_normal[0]*val_normal[1]/3.0;
+
+    su2double pix = val_Mean_PrimVar[VX_INDEX_PRIM]*thetax + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz;
+    su2double piy = val_Mean_PrimVar[VX_INDEX_PRIM]*etaz   + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay;
+
+    for(iVar = 0; iVar < nVar; ++iVar)
+      for(jVar = 0; jVar < nVar; ++jVar)
+        val_Proj_Jac_Tensor_j[iVar][jVar] = -val_Proj_Jac_Tensor_i[iVar][jVar];
+  }
+
+  else {
+    su2double thetax = theta + val_normal[0]*val_normal[0]/3.0;
+    su2double thetay = theta + val_normal[1]*val_normal[1]/3.0;
+    su2double thetaz = theta + val_normal[2]*val_normal[2]/3.0;
+
+    su2double etax = val_normal[1]*val_normal[2]/3.0;
+    su2double etay = val_normal[0]*val_normal[2]/3.0;
+    su2double etaz = val_normal[0]*val_normal[1]/3.0;
+
+    su2double pix = val_Mean_PrimVar[VX_INDEX_PRIM]*thetax + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz   +
+                    val_Mean_PrimVar[VX_INDEX_PRIM + 2]*etay;
+    su2double piy = val_Mean_PrimVar[VX_INDEX_PRIM]*etaz   + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay +
+                    val_Mean_PrimVar[VX_INDEX_PRIM + 2]*etax;
+    su2double piz = val_Mean_PrimVar[VX_INDEX_PRIM]*etay   + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*etax   +
+                    val_Mean_PrimVar[VX_INDEX_PRIM + 2]*thetaz;
+
+    for (iVar = 0; iVar < nVar; ++iVar)
+      for (jVar = 0; jVar < nVar; ++jVar)
+        val_Proj_Jac_Tensor_j[iVar][jVar] = -val_Proj_Jac_Tensor_i[iVar][jVar];
+  }
+
 }
 
 //
