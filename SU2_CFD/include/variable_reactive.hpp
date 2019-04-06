@@ -39,8 +39,7 @@ protected:
   RealVec    dTdU;                /*!< \brief Partial derivative of temperature w.r.t. conserved variables. */
 
   RealVec Ys;               /*!< \brief Auxiliary vector to store mass fractions separately. */
-  static RealVec Ri;        /*!< \brief Auxiliary vector to store specific gas constat for each species. */
-  RealVec Int_Energies;     /*!< \brief Auxiliary vector to store internal energy for each species. */
+  RealVec dTdYs, dPdYs;     /*!< \brief Auxiliary vectors for tmperature and pressure derivatives w.r.t partial densities. */
 
   /**
    * Mapping between the primitive variable name and its position in the physical data
@@ -73,7 +72,7 @@ protected:
    */
   static constexpr unsigned short T_INDEX_LIM = 0;
   static constexpr unsigned short VX_INDEX_LIM = 1;
-  static const unsigned short P_INDEX_LIM;
+  static unsigned short P_INDEX_LIM;
 
 public:
 

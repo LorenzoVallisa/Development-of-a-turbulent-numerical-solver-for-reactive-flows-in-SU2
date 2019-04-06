@@ -2434,15 +2434,13 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
         Secondary_j[RHOE_INDEX_SOL] = Gamma_j - 1.0;
 
         /*--- Derivatives with respect to partial densities ---*/
-        auto Ri = library->GetRiGas();
-        auto Int_Energies_i = library->ComputePartialEnergy(dim_temp_i);
-        auto Int_Energies_j = library->ComputePartialEnergy(dim_temp_j);
         for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-          Ri[iSpecies] /= config->GetGas_Constant_Ref();
-          Int_Energies_i[iSpecies] /= config->GetEnergy_Ref();
-          Int_Energies_j[iSpecies] /= config->GetEnergy_Ref();
-          Secondary_i[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*Primitive_i[T_INDEX_PRIM] - (Gamma_i - 1.0)*Int_Energies_i[iSpecies];
-          Secondary_j[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*Primitive_j[T_INDEX_PRIM] - (Gamma_j - 1.0)*Int_Energies_j[iSpecies];
+          Secondary_i[RHOS_INDEX_SOL + iSpecies] = library->ComputedP_dYs(dim_temp_i, Gamma_i, iSpecies)/config->GetEnergy_Ref();
+          Secondary_j[RHOS_INDEX_SOL + iSpecies] = library->ComputedP_dYs(dim_temp_j, Gamma_j, iSpecies)/config->GetEnergy_Ref();
+          if(US_System) {
+            Secondary_i[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+            Secondary_j[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+          }
         }
 
         numerics->SetSecondary(Secondary_i, Secondary_j);
@@ -2838,12 +2836,10 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
         Secondary[RHOE_INDEX_SOL] = Gamma - 1.0;
 
         /*--- Derivatives with respect to partial densities ---*/
-        auto Ri = library->GetRiGas();
-        auto Int_Energies = library->ComputePartialEnergy(dim_temp);
         for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-          Ri[iSpecies] /= config->GetGas_Constant_Ref();
-          Int_Energies[iSpecies] /= config->GetEnergy_Ref();
-          Secondary[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*V_inlet[T_INDEX_PRIM] - (Gamma - 1.0)*Int_Energies[iSpecies];
+          Secondary[RHOS_INDEX_SOL + iSpecies] = library->ComputedP_dYs(dim_temp, Gamma, iSpecies)/config->GetEnergy_Ref();
+          if(US_System)
+            Secondary[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
         }
 
         conv_numerics->SetSecondary(node[iPoint]->GetdPdU(), Secondary);
@@ -3103,14 +3099,11 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
         dim_temp = V_inlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
         if(US_System)
           dim_temp *= 5.0/9.0;
-        auto Ri = library->GetRiGas();
-        auto Int_Energies = library->ComputePartialEnergy(dim_temp);
         for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-          Ri[iSpecies] /= config->GetGas_Constant_Ref();
-          Int_Energies[iSpecies] /= config->GetEnergy_Ref();
-          Secondary[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*V_inlet[T_INDEX_PRIM] - (Gamma - 1.0)*Int_Energies[iSpecies];
+          Secondary[RHOS_INDEX_SOL + iSpecies] = library->ComputedP_dYs(dim_temp, Gamma, iSpecies)/config->GetEnergy_Ref();
+          if(US_System)
+            Secondary[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
         }
-
         conv_numerics->SetSecondary(node[iPoint]->GetdPdU(), Secondary);
       }
 
@@ -3412,15 +3405,13 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
           Secondary[RHOE_INDEX_SOL] = Gamma - 1.0;
 
           /*--- Derivatives with respect to partial densities ---*/
-          auto Ri = library->GetRiGas();
           su2double dim_temp = V_outlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
           if(US_System)
             dim_temp *= 5.0/9.0;
-          auto Int_Energies = library->ComputePartialEnergy(dim_temp);
           for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-            Ri[iSpecies] /= config->GetGas_Constant_Ref();
-            Int_Energies[iSpecies] /= config->GetEnergy_Ref();
-            Secondary[RHOS_INDEX_SOL + iSpecies] = Ri[iSpecies]*V_outlet[T_INDEX_PRIM] - (Gamma - 1.0)*Int_Energies[iSpecies];
+            Secondary[RHOS_INDEX_SOL + iSpecies] = library->ComputedP_dYs(dim_temp, Gamma, iSpecies)/config->GetEnergy_Ref();
+            if(US_System)
+              Secondary[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
           }
           conv_numerics->SetSecondary(node[iPoint]->GetdPdU(), Secondary);
         }

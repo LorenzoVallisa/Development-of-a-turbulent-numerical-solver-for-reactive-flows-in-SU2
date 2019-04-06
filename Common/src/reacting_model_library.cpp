@@ -261,14 +261,75 @@ namespace Framework {
 
   //
   //
-  /*--- This function computes the static enthalpy for each species. ---*/
-  RealVec ReactingModelLibrary::ComputePartialEnergy(const double temp) {
+  /*--- This function sets the internal energy for each species. ---*/
+  void ReactingModelLibrary::SetPartialEnergy(const double temp) {
     SetPartialEnthalpy(temp);
     /*--- Set internal energies ---*/
     for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
       Internal_Energies[iSpecies] = Enthalpies[iSpecies] - Ri[iSpecies]*temp;
+  }
 
+  //
+  //
+  /*--- This function computes the internal energy for each species. ---*/
+  RealVec ReactingModelLibrary::ComputePartialEnergy(const double temp) {
+    SetPartialEnergy(temp);
     return Internal_Energies;
+  }
+
+  //
+  //
+  /* This function computes the pressure derivative w.r.t. partial densities. ---*/
+  RealVec ReactingModelLibrary::ComputedP_dYs(const double temp, const double gamma) {
+    SetPartialEnergy(temp);
+    for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      dPdYs[iSpecies] = Ri[iSpecies]*temp - (gamma - 1.0)*Internal_Energies[iSpecies];
+
+    return dPdYs;
+  }
+
+  //
+  //
+  /*--- This function sets the static enthalpy for each species. ---*/
+  void ReactingModelLibrary::SetPartialEnthalpy(const double temp, unsigned short iSpecies) {
+    Enthalpies.at(iSpecies) = MathTools::GetSpline(std::get<T_DATA_SPLINE>(Enth_Spline[iSpecies]),
+                                                   std::get<X_DATA_SPLINE>(Enth_Spline[iSpecies]),
+                                                   std::get<Y_DATA_SPLINE>(Enth_Spline[iSpecies]),temp)/mMasses[iSpecies];
+  }
+
+  //
+  //
+  /*--- This function returns the computed static enthalpy for each species. ---*/
+  inline double ReactingModelLibrary::ComputePartialEnthalpy(const double temp, unsigned short iSpecies) {
+    SetPartialEnthalpy(temp, iSpecies);
+    return Enthalpies[iSpecies];
+  }
+
+  //
+  //
+  /*--- This function sets the internal energy for each species. ---*/
+  void ReactingModelLibrary::SetPartialEnergy(const double temp, unsigned short iSpecies) {
+    SetPartialEnthalpy(temp, iSpecies);
+    /*--- Set internal energies ---*/
+    Internal_Energies.at(iSpecies) = Enthalpies.at(iSpecies) - Ri.at(iSpecies)*temp;
+  }
+
+  //
+  //
+  /*--- This function computes the internal energy for each species. ---*/
+  double ReactingModelLibrary::ComputePartialEnergy(const double temp, unsigned short iSpecies) {
+    SetPartialEnergy(temp, iSpecies);
+    return Internal_Energies[iSpecies];
+  }
+
+  //
+  //
+  /* This function computes the pressure derivative w.r.t. partial densities. ---*/
+  double ReactingModelLibrary::ComputedP_dYs(const double temp, const double gamma, unsigned short iSpecies) {
+    SetPartialEnergy(temp, iSpecies);
+    dPdYs.at(iSpecies) = Ri[iSpecies]*temp - (gamma - 1.0)*Internal_Energies[iSpecies];
+
+    return dPdYs[iSpecies];
   }
 
   //
@@ -696,6 +757,7 @@ namespace Framework {
       CPs.resize(nSpecies);
       Thermal_Conductivities.resize(nSpecies);
 
+      dPdYs.resize(nSpecies);
       ys_over_mm.resize(nSpecies);
       rhoUdiff.resize(nSpecies);
       Dm_coeffs.resize(nSpecies);

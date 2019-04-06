@@ -80,6 +80,14 @@ namespace Framework {
     }
 
     /*!
+     * Get the gas constant for a desired species [J/(Kg*K)]
+     * \param[in] iSpecies - index of the desired species;
+    */
+    inline double GetRiGas(unsigned short iSpecies) const {
+      return Ri.at(iSpecies);
+    }
+
+    /*!
      * \brief Get the gas constant for the mixture [J/(Kg*K)]
      */
     inline double GetRgas(void) const override {
@@ -265,25 +273,74 @@ namespace Framework {
     double ComputeEnthalpy(const double temp, const RealVec& ys) override;
 
     /*!
-     * \brief Set the static enthalpy per unit of mass of each species
+     * \brief Set the static enthalpy per unit of mass of each species.
      * \param[in] temp - the mixture temperature
     */
     void SetPartialEnthalpy(const double temp) override;
 
     /*!
-     * \brief Return the static enthalpy per unit of mass of each species
+     * \brief Set the static enthalpy per unit of mass for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] iSpecies - index of desired species
+    */
+    void SetPartialEnthalpy(const double temp, unsigned short iSpecies) override;
+
+    /*!
+     * \brief Return the static enthalpy per unit of mass of each species.
      * \param[in] temp - the mixture temperature
     */
     RealVec ComputePartialEnthalpy(const double temp) override;
 
     /*!
-     * \brief Return the internal energy of each species
+     * \brief Compute the static enthalpy per unit of mass for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] iSpecies - index of desired species
+    */
+    double ComputePartialEnthalpy(const double temp, unsigned short iSpecies) override;
+
+    /*!
+     * \brief Set the internal energy per unit of mass of each species.
+     * \param[in] temp - the mixture temperature
+    */
+    void SetPartialEnergy(const double temp) override;
+
+    /*!
+     * \brief Set the internal energy per unit of mass for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] iSpecies - index of desired species
+    */
+    void SetPartialEnergy(const double temp, unsigned short iSpecies) override;
+
+    /*!
+     * \brief Return the internal energy of each species.
      * \param[in] temp - the mixture temperature
     */
     RealVec ComputePartialEnergy(const double temp) override;
 
     /*!
-     * \brief Set the actual concetration for each species
+     * \brief Compute the internal energy per unit of mass for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] iSpecies - index of desired species
+    */
+    double ComputePartialEnergy(const double temp, unsigned short iSpecies) override;
+
+    /*!
+     * \brief Computes the pressure derivative w.r.t. partial densities.
+     * \param[in] temp - temperature
+     * \param[in] gamma - frozen specific heat ratio
+    */
+    RealVec ComputedP_dYs(const double temp, const double gamma) override;
+
+    /*!
+     * \brief Compute the pressure derivative w.r.t. partial density for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] gamma - frozen specific heat ratio
+     * \param[in] iSpecies - index of desired species
+    */
+    double ComputedP_dYs(const double temp, const double gamma, unsigned short iSpecies) override;
+
+    /*!
+     * \brief Set the actual concetration for each species.
      * \param[in] rho - the mixture density
      * \param[in] ys - the actual mass fractions
     */
@@ -330,6 +387,37 @@ namespace Framework {
      */
     inline double ComputeFrozenGamma_FromCP(const double cp, const RealVec& ys) override {
       return cp/(cp - ComputeRgas(ys));
+    }
+
+    /*!
+     * \brief Computes the frozen specific heat ratio.
+     * \param[in] temp - mxiture temperature;
+     * \param[in] cp - specific heat at constant pressure
+     * \param[in] ys - The vector of the mass fractions of species
+     */
+    inline double ComputeFrozenSoundSpeed_FromCP(const double temp, const double cp, const RealVec& ys) override {
+      double gamma = ComputeFrozenGamma_FromCP(cp, ys);
+      return std::sqrt(gamma*Rgas*temp);
+    }
+
+    /*!
+     * \brief Computes the specific heat at constant pressure.
+     * \param[in] temp - temperature
+     * \param[in] sound_speed - frozen speed of sound
+     * \param[in] ys - The vector of the mass fractions of species
+    */
+    inline double ComputeCP_FromSoundSpeed(const double temp, const double sound_speed, const RealVec& ys) override {
+      SetRgas(ys);
+      return (sound_speed*sound_speed*Rgas)/(sound_speed*sound_speed - Rgas*temp);
+    }
+
+    /*!
+     * \brief Computes the specific heat at constant pressure.
+     * \param[in] gamma - frozen specific heat ratio
+     * \param[in] ys - The vector of the mass fractions of species
+    */
+    inline double ComputeCP_FromGamma(const double gamma, const RealVec& ys) override {
+      return gamma*ComputeRgas(ys)/(gamma - 1.0);
     }
 
     /*!
@@ -515,6 +603,8 @@ namespace Framework {
     RealVec Internal_Energies; /*!< \brief Internal Energy for each species. */
 
     RealVec CPs; /*!< \brief Specific heat at constant pressure for each species (Cp). */
+
+    RealVec dPdYs; /*!< \brief Auxiliary vector for pressure derivatives w.r.t partial densities. */
 
     RealVec Formation_Enthalpies; /*!< \brief Formation enthalpy for each species. */
 

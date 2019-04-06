@@ -106,6 +106,12 @@ namespace Framework  {
     virtual Vector GetRiGas(void) const = 0;
 
     /*!
+     * Get the gas constant for a desired species [J/(Kg*K)]
+     * \param[in] iSpecies - index of the desired species;
+    */
+    virtual double GetRiGas(unsigned short iSpecies) const = 0;
+
+    /*!
      * \brief Get the gas constant for the mixture [J/(Kg*K)]
     */
     virtual double GetRgas(void) const = 0;
@@ -284,22 +290,71 @@ namespace Framework  {
     virtual double ComputeEnthalpy(const double temp, const Vector& ys) = 0;
 
     /*!
-     * \brief Set the static enthalpy per unit of mass of each species
+     * \brief Set the static enthalpy per unit of mass of each species.
      * \param[in] temp - the mixture temperature
     */
     virtual void SetPartialEnthalpy(const double temp) = 0;
 
     /*!
-     * \brief Return the static enthalpy per unit of mass of each species
+     * \brief Set the static enthalpy per unit of mass for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] iSpecies - index of desired species
+    */
+    virtual void SetPartialEnthalpy(const double temp, unsigned short iSpecies) = 0;
+
+    /*!
+     * \brief Return the static enthalpy per unit of mass of each species.
      * \param[in] temp - the mixture temperature
     */
     virtual Vector ComputePartialEnthalpy(const double temp) = 0;
 
     /*!
-     * \brief Return the internal energy of each species
+     * \brief Compute the static enthalpy per unit of mass for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] iSpecies - index of desired species
+    */
+    virtual double ComputePartialEnthalpy(const double temp, unsigned short iSpecies) = 0;
+
+    /*!
+     * \brief Set the internal energy per unit of mass of each species.
+     * \param[in] temp - the mixture temperature
+    */
+    virtual void SetPartialEnergy(const double temp) = 0;
+
+    /*!
+     * \brief Set the internal energy per unit of mass for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] iSpecies - index of desired species
+    */
+    virtual void SetPartialEnergy(const double temp, unsigned short iSpecies) = 0;
+
+    /*!
+     * \brief Return the internal energy of each species.
      * \param[in] temp - the mixture temperature
     */
     virtual Vector ComputePartialEnergy(const double temp) = 0;
+
+    /*!
+     * \brief Compute the internal energy per unit of mass for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] iSpecies - index of desired species
+    */
+    virtual double ComputePartialEnergy(const double temp, unsigned short iSpecies) = 0;
+
+    /*!
+     * \brief Computes the pressure derivative w.r.t. partial densities.
+     * \param[in] temp - temperature
+     * \param[in] gamma - frozen specific heat ratio
+    */
+    virtual Vector ComputedP_dYs(const double temp, const double gamma) = 0;
+
+    /*!
+     * \brief Compute the pressure derivative w.r.t. partial density for a desired species.
+     * \param[in] temp - the mixture temperature
+     * \param[in] gamma - frozen specific heat ratio
+     * \param[in] iSpecies - index of desired species
+    */
+    virtual double ComputedP_dYs(const double temp, const double gamma, unsigned short iSpecies) = 0;
 
     /*!
      * \brief Set the actual concetration for each species
@@ -345,6 +400,29 @@ namespace Framework  {
      * \param[in] ys - The vector of the mass fractions of species
      */
     virtual double ComputeFrozenGamma_FromCP(const double cp, const Vector& ys) = 0;
+
+    /*!
+     * \brief Computes the frozen specific heat ratio.
+     * \param[in] temp - mxiture temperature;
+     * \param[in] cp - specific heat at constant pressure
+     * \param[in] ys - The vector of the mass fractions of species
+     */
+    virtual double ComputeFrozenSoundSpeed_FromCP(const double temp, const double cp, const Vector& ys) = 0;
+
+    /*!
+     * \brief Computes the specific heat at constant pressure.
+     * \param[in] temp - temperature
+     * \param[in] sound_speed - frozen speed of sound
+     * \param[in] ys - The vector of the mass fractions of species
+    */
+    virtual double ComputeCP_FromSoundSpeed(const double temp, const double sound_speed, const Vector& ys) = 0;
+
+    /*!
+     * \brief Computes the specific heat at constant pressure.
+     * \param[in] gamma - frozen specific heat ratio
+     * \param[in] ys - The vector of the mass fractions of species
+    */
+    virtual double ComputeCP_FromGamma(const double gamma, const Vector& ys) = 0;
 
     /*!
      * \brief Compute the thermal conductivity at given temperature
