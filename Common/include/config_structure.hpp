@@ -71,7 +71,7 @@ private:
   std::string  Library_Name;           /*!< \brief Name of library for physical-chemical options.*/
   std::string  Config_File_Lib;        /*!< \brief Name of the file to configure the library.*/
   std::string  Library_Path;           /*!< \brief Name of the library to look for files to configure the library.*/
-  //std::string* Species_Order;          /*!< \brief String list to check the coherence in species order declaration.*/
+  std::string* Species_Order;          /*!< \brief String list to check the coherence in species order declaration.*/
   //std::string* Marker_Inlet_MassFrac;  /*!< \brief String list with name of inlet boundary for mass fractions.*/
   //su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
   unsigned short nSpecies;    /*!< \brief Number of species in the mixture.*/
@@ -1233,9 +1233,9 @@ public:
    * \brief Get the order of species involved,
    * \return Pointer to list with all species in mixture.
   */
-  //inline std::string* GetSpeciesOrder(void) const {
-  //  return Species_Order;
-  //}
+  inline std::string* GetSpeciesOrder(void) const {
+    return Species_Order;
+  }
 
   /*!
    * \brief Get mass fraction for a desired inlet boundary

@@ -235,7 +235,7 @@ CReactiveEulerVariable::CReactiveEulerVariable(su2double* val_solution, unsigned
 //
 CReactiveEulerVariable::~CReactiveEulerVariable() {
   if(Gradient_Primitive != NULL) {
-    for(unsigned short iVar = 0; iVar < nVar; ++iVar)
+    for(unsigned short iVar = 0; iVar < nPrimVarGrad; ++iVar)
       delete[] Gradient_Primitive[iVar];
     delete[] Gradient_Primitive;
   }
@@ -266,7 +266,7 @@ bool CReactiveEulerVariable::SetPrimVar(CConfig* config) {
   }
   Cp = library->ComputeCP_FromSoundSpeed(dim_temp, dim_a, Ys)/config->GetEnergy_Ref();
   if(US_System)
-    Cp *= 3.28084*3.28084;
+    Cp *= 3.28084*3.28084*5.0/9.0;
 
   /*--- Set temperature and pressure derivatives ---*/
   CalcdTdU(Primitive.data(), config, dTdU.data());
@@ -299,8 +299,8 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   // U:  [rho, rhou, rhov, rhow, rhoE, rho1, ..., rhoNs]^T
   // V: [T, u, v, w, P, rho, h, a, rho1, ..., rhoNs,]^T
 
-  /*--- Rename variables forconvenience ---*/
-
+  /*--- Set booleans fro secant method ---*/
+  nonPhys = false;
 
   /*--- Assign species mass fraction and mixture density ---*/
   // NOTE: If any species densities are < 0, these values are re-assigned
@@ -334,9 +334,6 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   for(iDim = 0; iDim < nDim; ++iDim)
     V[VX_INDEX_PRIM + iDim] = U[RHOVX_INDEX_SOL + iDim]/rho;
   sqvel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
-
-  /*--- Set booleans fro secant method ---*/
-  nonPhys = false;
 
   /*--- Set temperature clipping values ---*/
   Tmin   = 50.0;
@@ -475,13 +472,13 @@ void CReactiveEulerVariable::CalcdTdU(su2double* V, CConfig* config, su2double* 
   su2double T = V[T_INDEX_PRIM];
 
   /*--- Compute useful quantities ---*/
-  su2double dim_cp = Cp*config->GetEnergy_Ref();
+  su2double dim_cp = Cp*config->GetGas_Constant_Ref();
   if(US_System)
-    dim_cp /= 3.28084*3.28084;
+    dim_cp /= 3.28084*3.28084*5.0/9.0;
   std::copy(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM+ nSpecies), Ys.begin());
   su2double Cv = library->ComputeCV_FromCP(dim_cp, Ys)/config->GetEnergy_Ref();
   if(US_System)
-    Cv *= 3.28084*3.28084;
+    Cv *= 3.28084*3.28084*5.0/9.0;
   su2double rhoCv = rho*Cv;
   su2double sq_vel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
   su2double dim_temp = T*config->GetTemperature_Ref();
@@ -520,7 +517,7 @@ void CReactiveEulerVariable::CalcdPdU(su2double* V, CConfig* config, su2double* 
   /*--- Useful quantities ---*/
   su2double dim_cp = Cp*config->GetEnergy_Ref();
   if(US_System)
-    dim_cp /= 3.28084*3.28084;
+    dim_cp /= 3.28084*3.28084*5.0/9.0;
   su2double Gamma = library->ComputeFrozenGamma_FromCP(dim_cp, Ys);
   su2double sq_vel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
 
@@ -615,7 +612,7 @@ bool CReactiveEulerVariable::SetSoundSpeed(CConfig* config) {
   su2double dim_cp = Cp*config->GetEnergy_Ref();
   su2double dim_temp = Primitive.at(T_INDEX_PRIM)*config->GetTemperature_Ref();
   if(US_System) {
-    dim_cp /= 3.28084*3.28084;
+    dim_cp /= 3.28084*3.28084*5.0/9.0;
     dim_temp *= 5.0/9.0;
   }
   std::copy(Primitive.cbegin() + RHOS_INDEX_PRIM, Primitive.cbegin() + (RHOS_INDEX_PRIM+ nSpecies), Ys.begin());

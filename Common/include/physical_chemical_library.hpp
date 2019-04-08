@@ -34,7 +34,7 @@ namespace Framework  {
     /*!
      * \brief Default destructor.
      */
-    virtual ~PhysicalChemicalLibrary() = default;
+    virtual ~PhysicalChemicalLibrary() {}
 
     /*!
      * \brief Get the name of the base class of library.

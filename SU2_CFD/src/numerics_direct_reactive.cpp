@@ -170,8 +170,14 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
     Phi_i[RHOVX_INDEX_SOL + iDim] = V_i[VX_INDEX_PRIM + iDim];
     Phi_j[RHOVX_INDEX_SOL + iDim] = V_j[VX_INDEX_PRIM + iDim];
   }
-  Phi_i[RHOE_INDEX_SOL] = Enthalpy_i + ProjGridVel_i*Pressure_i/(Density_i*ProjVelocity_i);
-  Phi_j[RHOE_INDEX_SOL] = Enthalpy_j + ProjGridVel_j*Pressure_j/(Density_j*ProjVelocity_j);
+  Phi_i[RHOE_INDEX_SOL] = Enthalpy_i;
+  Phi_j[RHOE_INDEX_SOL] = Enthalpy_j;
+  if(grid_movement) {
+    if(std::abs(ProjVelocity_i) > EPS)
+      Phi_i[RHOE_INDEX_SOL] += ProjGridVel_i*Pressure_i/(Density_i*ProjVelocity_i);
+    if(std::abs(ProjVelocity_j) > EPS)
+      Phi_j[RHOE_INDEX_SOL] += ProjGridVel_j*Pressure_j/(Density_j*ProjVelocity_j);
+  }
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
     Phi_i[RHOS_INDEX_SOL + iSpecies] = V_i[RHOS_INDEX_PRIM + iSpecies];
     Phi_j[RHOS_INDEX_SOL + iSpecies] = V_j[RHOS_INDEX_PRIM + iSpecies];
@@ -303,8 +309,8 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
     su2double m12_P = 0.5*(m12 + std::abs(m12));
     su2double m12_M = 0.5*(m12 - std::abs(m12));
     for(iVar = 0; iVar < nVar; ++iVar) {
-      val_Jacobian_i[RHOE_INDEX_SOL][iVar] += MeanSoundSpeed*m12_P*S_i[iVar]);
-      val_Jacobian_j[RHOE_INDEX_SOL][iVar] += MeanSoundSpeed*m12_M*S_j[iVar]);
+      val_Jacobian_i[RHOE_INDEX_SOL][iVar] += MeanSoundSpeed*m12_P*S_i[iVar];
+      val_Jacobian_j[RHOE_INDEX_SOL][iVar] += MeanSoundSpeed*m12_M*S_j[iVar];
     }
 
     /*--- Add contribution to the diagonal term ---*/
@@ -647,8 +653,7 @@ void CAvgGradReactive_Flow::GetViscousProjFlux(const Vec& val_primvar, const Rea
     Solve_SM(rho, alpha, val_Dij, Xs, Grad_Xs_iDim, Ys);
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
       Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim] = Jd[iSpecies];
-      Flux_Tensor[RHOE_INDEX_SOL][iDim] +=
-      Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim]*hs[iSpecies];
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] += Flux_Tensor[RHOS_INDEX_SOL + iSpecies][iDim]*hs[iSpecies];
     }
   }
 
@@ -741,8 +746,6 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   if(config->GetExtIter() == 0) {
     SU2_Assert(V_i != NULL, "The array for the primitive variables at node i has not been allocated");
     SU2_Assert(V_j != NULL, "The array for the primitive variables at node j has not been allocated");
-    SU2_Assert(PrimVar_Lim_i != NULL, "The array for the primitive variables at node i has not been allocated");
-    SU2_Assert(PrimVar_Lim_j != NULL, "The array for the primitive variables at node j has not been allocated");
 
     SU2_Assert(Mean_GradPrimVar.rows() == nPrimVarAvgGrad, "The number of rows in the mean gradient is not correct");
     SU2_Assert(Mean_GradPrimVar.cols() == nDim, "The number of columns in the mean gradient is not correct");
@@ -795,6 +798,12 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
     }
   }
   else {
+    /*--- Check memory allocation ---*/
+    if(config->GetExtIter() == 0) {
+      SU2_Assert(PrimVar_Lim_i != NULL, "The array for the primitive variables at node i has not been allocated");
+      SU2_Assert(PrimVar_Lim_j != NULL, "The array for the primitive variables at node j has not been allocated");
+    }
+
     for(iDim = 0; iDim < nDim; ++iDim) {
       /*--- Temperature ---*/
       Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) = 0.5*(PrimVar_Grad_i[T_INDEX_GRAD][iDim]*PrimVar_Lim_i[T_INDEX_LIM] +

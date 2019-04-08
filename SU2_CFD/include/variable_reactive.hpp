@@ -719,7 +719,7 @@ public:
   /*!
 	 * \brief Destructor of the class.
 	 */
-	virtual ~CReactiveNSVariable() = default;
+	virtual ~CReactiveNSVariable() {}
 
   /*!
    * \brief Get the index of mole fractions in primitive gradient

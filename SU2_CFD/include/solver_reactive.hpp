@@ -19,6 +19,8 @@ protected:
 
   unsigned short nSpecies; /*!< \brief Total number of species. */
   unsigned short nPrimVarLim; /*!< \brief Number of primitive variables to limit. */
+  unsigned short nMarker;  /*!< \brief Number of markers for deallocation. */
+  std::vector<unsigned long> nVertex; /*!< \brief Store the number of vertices on each marker for deallocation. */
 
   bool  space_centered,  /*!< \brief True if space centered scheme used. */
         implicit,      /*!< \brief True if euler implicit scheme used. */
@@ -28,6 +30,8 @@ protected:
         limiter; /*!< \brief True if limiting strategy is applied. */
 
   bool  US_System;  /*!< \brief True if using US units. */
+
+  su2double*** CharacPrimVar;  /*!< \brief Value of the characteristic variables at each boundary. */
 
   RealVec   Lower_Limit,   /*!< \brief Lower limit conserved variables. */
             Upper_Limit;   /*!< \brief Upper limit conserved variables. */
@@ -46,6 +50,9 @@ protected:
   RealVec   Prim_i, /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point i. */
             Prim_j, /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point j. */
             Primitive; /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at boundary node. */
+
+  RealVec   Primitive_i, Primitive_j, /*!< \brief Auxiliary nPrimVar vector for storing primitive at point i and j for limiting. */
+            Secondary_i, Secondary_j;/*!< \brief Auxiliary nVar vectors for storing pressure derivatives at point i and j for limiting. */
 
   RealVec   Buffer_Receive_U, /*!< \brief Auxiliary vector to receive information in case of parallel simulation. */
             Buffer_Send_U;    /*!< \brief Auxiliary vector to send information in case of parallel simulation. */
@@ -84,7 +91,7 @@ public:
 	/*!
 	 * \brief Destructor of the class.
 	 */
-	virtual ~CReactiveEulerSolver() = default;
+	virtual ~CReactiveEulerSolver();
 
   /*!
    * \brief Set the simulation to explicit
@@ -98,6 +105,16 @@ public:
    */
   inline static LibraryPtr GetLibrary(void) {
     return library;
+  }
+
+  /*!
+   * \brief Value of the characteristic variables at the boundaries.
+   * \param[in] val_marker - Surface marker where the coefficient is computed.
+   * \param[in] val_vertex - Vertex of the marker <i>val_marker</i> where the coefficient is evaluated.
+   * \return Value of the variables at the boundaries.
+   */
+  inline su2double* GetCharacPrimVar(unsigned short val_marker, unsigned long val_vertex) override {
+    return CharacPrimVar[val_marker][val_vertex];
   }
 
   /*!

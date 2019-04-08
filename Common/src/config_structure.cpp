@@ -389,7 +389,7 @@ void CConfig::SetPointersNull(void) {
   Aeroelastic_pitch   = NULL;
   MassFrac_FreeStream = NULL;
   /*---NOTE: New additions ---*/
-  //Species_Order = NULL;
+  Species_Order = NULL;
   //Marker_Inlet_MassFrac = NULL;
   //Inlet_MassFrac = NULL;
   /*---NOTE: Already present ---*/
@@ -549,7 +549,7 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   addDoubleListOption("FREESTREAM_MASS_FRAC", nSpecies, MassFrac_FreeStream);
 
   /*!\brief SPECIES_ORDER\n DESCRIPTION: Free-stream mass fractions */
-  //addStringListOption("SPECIES_ORDER", nSpecies, Species_Order);
+  addStringListOption("SPECIES_ORDER", nSpecies, Species_Order);
 
   /*!\brief INLET_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
   //addInlet_MassFracOption("INLET_MASS_FRAC", nMarker_Inlet, Marker_Inlet_MassFrac, Inlet_MassFrac);
@@ -5450,8 +5450,8 @@ CConfig::~CConfig(void) {
   if(MassFrac_FreeStream != NULL)
     delete[] MassFrac_FreeStream;
 
-  //if(Species_Order != NULL)
-  //  delete[] Species_Order;
+  if(Species_Order != NULL)
+    delete[] Species_Order;
 
   //if(Marker_Inlet_MassFrac != NULL)
   //  delete[] Marker_Inlet_MassFrac;

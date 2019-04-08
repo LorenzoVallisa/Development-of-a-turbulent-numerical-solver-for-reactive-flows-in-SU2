@@ -841,8 +841,8 @@ namespace Framework {
               Elementary_Reactions.push_back(is_rev);
               ReadChemCoefs(line);
             }
+            n_line++;
           }
-          n_line++;
         }
       }
       SU2_Assert(n_reac_read == nReactions,"The number of reactions detected doesn't match nReactions");
@@ -1173,6 +1173,8 @@ namespace Framework {
       Gamma.resize(0,0);
 
       Lib_Setup = false;
+      std::cout<<"Library unset."<<std::endl;
+      std::cout<<std::endl;
     }
     else
       throw Common::NotSetup("Trying to unsetup without calling setup first.");

@@ -58,7 +58,7 @@ public:
   /*!
 	 * \brief Destructor of the class.
 	 */
-	virtual ~CUpwReactiveAUSM() = default;
+	virtual ~CUpwReactiveAUSM() {}
 
   /*!
 	 * \brief Compute the residual associated to convective flux between two nodes i and j.
@@ -331,7 +331,7 @@ public:
   /*!
    * \brief Destructor of the class.
    */
-  virtual ~CSourceReactive() = default;
+  virtual ~CSourceReactive() {}
 
   /*!
    * \brief Calculation of the residual of chemistry source term

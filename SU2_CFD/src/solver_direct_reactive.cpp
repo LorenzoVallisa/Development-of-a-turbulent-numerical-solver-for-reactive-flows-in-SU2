@@ -14,8 +14,7 @@ namespace {
    */
   su2double ComputeArea(su2double* Normal, const unsigned short nDim) {
     su2double Area = std::inner_product(Normal, Normal + nDim, Normal, 0.0);
-    Area = std::sqrt(Area);
-    return Area;
+    return std::sqrt(Area);
   }
 } /*-- End of unnamed namespace ---*/
 
@@ -96,8 +95,14 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   nPrimVarLim = nDim + 2; /*--- Gradient Primitive variables (T, vx, vy, vz, P)^T ---*/
   nPrimVarGrad = nPrimVarLim; /*--- Primitive variables to limit (T, vx, vy, vz, P)^T ---*/
 
-  /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
+  /*--- Read freestream mass fractions. ---*/
   MassFrac_Inf = RealVec(config->GetMassFrac_FreeStream(), config->GetMassFrac_FreeStream() + nSpecies);
+
+  /*--- Check right order of species in configuration file ----*/
+  if(iMesh == MESH_0)
+    Check_FreeStream_Species_Order(config);
+
+  /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
   SetNondimensionalization(geometry, config, iMesh);
 
 	/*--- Allocate a CVariable array foreach node of the mesh ---*/
@@ -113,6 +118,7 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   Res_Sour = new su2double[nVar];
   Vector_i = new su2double[nDim];
   Vector_j = new su2double[nDim];
+  Vector   = new su2double[nDim];
 
   /*--- Define some structures for locating max residuals ---*/
   Point_Max = new unsigned long[nVar];
@@ -180,9 +186,38 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   else
     least_squares = false;
 
+  /*--- Store the value of the characteristic primitive variables at the boundaries ---*/
+  nMarker = config->GetnMarker_All();
+  CharacPrimVar = new su2double** [nMarker];
+  unsigned short iMarker;
+  unsigned long iVertex;
+  for(iMarker = 0; iMarker < nMarker; ++iMarker) {
+    CharacPrimVar[iMarker] = new su2double* [geometry->nVertex[iMarker]];
+    for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++) {
+      CharacPrimVar[iMarker][iVertex] = new su2double[nPrimVar];
+      for(iVar = 0; iVar < nPrimVar; ++iVar) {
+        CharacPrimVar[iMarker][iVertex][iVar] = 0.0;
+      }
+    }
+  }
+
+  /*--- Store the number of vertices on each marker for deallocation later ---*/
+  nVertex.reserve(nMarker);
+  for(iMarker = 0; iMarker < nMarker; ++iMarker)
+    nVertex.push_back(geometry->nVertex[iMarker]);
+
+  /*--- Set other variables ---*/
   grid_movement = config->GetGrid_Movement();
   space_centered = (config->GetKind_ConvNumScheme_Flow() == SPACE_CENTERED);
   second_order = (config->GetSpatialOrder_Flow() == SECOND_ORDER || config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER);
+  if(second_order) {
+    Primitive_i.resize(nPrimVar);
+    Primitive_j.resize(nPrimVar);
+    if(implicit) {
+      Secondary_i.resize(nVar);
+      Secondary_j.resize(nVar);
+    }
+  }
   unsigned long ExtIter = config->GetExtIter();
   limiter = (config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER && ExtIter <= config->GetLimiterIter());
   US_System = (config->GetSystemMeasurements() == US);
@@ -192,9 +227,6 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
 	Temperature_Inf  = config->GetTemperature_FreeStreamND();
 
   Velocity_Inf     = RealVec(config->GetVelocity_FreeStreamND(), config->GetVelocity_FreeStreamND() + nDim);
-
-  /*--- Check right order of species in configuration file ----*/
-  //Check_FreeStream_Species_Order(config);
 
   /*--- Initialize the far-field state ----*/
   node_infty = new CReactiveEulerVariable(Pressure_Inf, MassFrac_Inf, Velocity_Inf, Temperature_Inf, nDim, nVar, nSpecies,
@@ -264,23 +296,38 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
 //
 //
 /*!
+ * \brief Class CReactiveEulerSolver destructor
+ */
+//
+//
+CReactiveEulerSolver::~CReactiveEulerSolver() {
+  if(node_infty != NULL)
+    delete node_infty;
+}
+
+//
+//
+/*!
  * \brief Check coherence in species order declaration.
  */
 //
 //
-//void CReactiveEulerSolver::Check_FreeStream_Species_Order(CConfig* config) {
+void CReactiveEulerSolver::Check_FreeStream_Species_Order(CConfig* config) {
+  /*--- Check coherence in number of species from mass fractions freestream ---*/
+  SU2_Assert(nSpecies == config->GetnSpecies(), "Wrong number of species in the configuration file");
+
   /*--- Get the order in the configuration file to check the coherence ---*/
-  //auto Config_Order = config->GetSpeciesOrder();
+  auto Config_Order = config->GetSpeciesOrder();
 
   /*--- Check coherence in number of species first and then in the declaration order ---*/
-  //SU2_Assert(nSpecies == config->GetnSpecies(), "Wrong number of species in the configuration file");
-  //std::string name_species;
-  //for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-    //name_species = Config_Order[iSpecies];
-    //unsigned short idx_library = library->GetIndexSpecies(name_species);
-    //SU2_Assert(idx_library == iSpecies, "The species " + name_species + " is declared in different position in the library");
-  //}
-//}
+  SU2_Assert(nSpecies == config->GetnSpecies(), "Wrong number of species in the configuration file");
+  std::string name_species;
+  for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    name_species = Config_Order[iSpecies];
+    unsigned short idx_library = library->GetIndexSpecies(name_species);
+    SU2_Assert(idx_library == iSpecies, "The species " + name_species + " is declared in different position in the library");
+  }
+}
 
 //
 //
@@ -2295,6 +2342,7 @@ void CReactiveEulerSolver::Centered_Residual(CGeometry* geometry, CSolver** solv
 //
 void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
                                            CConfig* config, unsigned short iMesh) {
+  /*--- Local variables ---*/
   unsigned long iEdge, iPoint, jPoint, counter_local = 0, counter_global = 0;
   unsigned short iDim, iVar;
 
@@ -2308,8 +2356,8 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
     numerics->SetNormal(geometry->edge[iEdge]->GetNormal());
 
     /*--- Get primitive variables ---*/
-    auto Primitive_i = node[iPoint]->GetPrimitive();
-    auto Primitive_j = node[jPoint]->GetPrimitive();
+    auto V_i = node[iPoint]->GetPrimitive();
+    auto V_j = node[jPoint]->GetPrimitive();
 
     if(second_order) {
       if(config->GetExtIter() == 0) {
@@ -2321,18 +2369,18 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
         Vector_j[iDim] = -Vector_i[iDim];
       }
       auto Gradient_i = node[iPoint]->GetGradient_Primitive();
-      auto Gradient_j = node[iPoint]->GetGradient_Primitive();
+      auto Gradient_j = node[jPoint]->GetGradient_Primitive();
 
       /*--- Auxiliary vector to store reconstruction ---*/
       su2double Prim_Recon_i[nPrimVarLim];
       su2double Prim_Recon_j[nPrimVarLim];
 
-      Prim_Recon_i[T_INDEX_LIM] = Primitive_i[T_INDEX_PRIM];
-      Prim_Recon_j[T_INDEX_LIM] = Primitive_j[T_INDEX_PRIM];
-      Prim_Recon_i[P_INDEX_LIM] = Primitive_i[P_INDEX_PRIM];
-      Prim_Recon_j[P_INDEX_LIM] = Primitive_j[P_INDEX_PRIM];
-      std::copy(Primitive_i + VX_INDEX_PRIM, Primitive_i + (VX_INDEX_PRIM + nDim), Prim_Recon_i + VX_INDEX_LIM);
-      std::copy(Primitive_j + VX_INDEX_PRIM, Primitive_j + (VX_INDEX_PRIM + nDim), Prim_Recon_j + VX_INDEX_LIM);
+      Prim_Recon_i[T_INDEX_LIM] = V_i[T_INDEX_PRIM];
+      Prim_Recon_j[T_INDEX_LIM] = V_j[T_INDEX_PRIM];
+      Prim_Recon_i[P_INDEX_LIM] = V_i[P_INDEX_PRIM];
+      Prim_Recon_j[P_INDEX_LIM] = V_j[P_INDEX_PRIM];
+      std::copy(V_i + VX_INDEX_PRIM, V_i + (VX_INDEX_PRIM + nDim), Prim_Recon_i + VX_INDEX_LIM);
+      std::copy(V_j + VX_INDEX_PRIM, V_j + (VX_INDEX_PRIM + nDim), Prim_Recon_j + VX_INDEX_LIM);
 
       for(iVar = 0; iVar < nPrimVarLim; ++iVar) {
         Project_Grad_i = Project_Grad_j = 0.0;
@@ -2378,10 +2426,16 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
           non_phys_j = true;
       }
 
+      /*--- Copy reconstructed velocities ---*/
+      for(iDim = 0; iDim < nDim; ++iDim) {
+        Primitive_i[VX_INDEX_PRIM + iDim] = Prim_Recon_i[VX_INDEX_LIM + iDim];
+        Primitive_j[VX_INDEX_PRIM + iDim] = Prim_Recon_j[VX_INDEX_LIM + iDim];
+      }
+
       /*--- Compute other primitive variables accordingly to the reconstruction ---*/
       su2double dim_temp_i, Gamma_i, sq_vel_i;
       if(!non_phys_i) {
-        std::copy(Primitive_i + RHOS_INDEX_PRIM, Primitive_i + (RHOS_INDEX_PRIM + nSpecies), Ys_i.begin());
+        std::copy(V_i + RHOS_INDEX_PRIM, V_i + (RHOS_INDEX_PRIM + nSpecies), Ys_i.begin());
         su2double rho_recon_i = library->ComputeDensity(Primitive_i[T_INDEX_PRIM], Primitive_i[P_INDEX_PRIM], Ys_i);
         rho_recon_i *= config->GetGas_Constant_Ref();
         Primitive_i[RHO_INDEX_PRIM] = rho_recon_i;
@@ -2391,15 +2445,18 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
         Primitive_i[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp_i, Ys_i)/config->GetEnergy_Ref();
         if(US_System)
           Primitive_i[H_INDEX_PRIM] *= 3.28084*3.28084;
-        sq_vel_i = std::inner_product(Primitive_i + VX_INDEX_PRIM, Primitive_i + (VX_INDEX_PRIM + nDim), Primitive_i + VX_INDEX_PRIM, 0.0);
+        sq_vel_i = std::inner_product(Primitive_i.cbegin() + VX_INDEX_PRIM, Primitive_i.cbegin() + (VX_INDEX_PRIM + nDim),
+                                      Primitive_i.cbegin() + VX_INDEX_PRIM, 0.0);
         Primitive_i[H_INDEX_PRIM] += 0.5*sq_vel_i;
         Gamma_i = library->ComputeFrozenGamma(dim_temp_i, Ys_i);
         Primitive_i[A_INDEX_PRIM] = std::sqrt(Gamma_i*Primitive_i[P_INDEX_PRIM]/rho_recon_i);
       }
+      else
+        std::copy(V_i, V_i + nPrimVar, Primitive_i.data());
 
       su2double dim_temp_j, Gamma_j, sq_vel_j;
       if(!non_phys_j) {
-        std::copy(Primitive_j + RHOS_INDEX_PRIM, Primitive_j + (RHOS_INDEX_PRIM + nSpecies), Ys_j.begin());
+        std::copy(V_j + RHOS_INDEX_PRIM, V_j + (RHOS_INDEX_PRIM + nSpecies), Ys_j.begin());
         su2double rho_recon_j = library->ComputeDensity(Primitive_j[T_INDEX_PRIM], Primitive_j[P_INDEX_PRIM], Ys_j);
         rho_recon_j *= config->GetGas_Constant_Ref();
         Primitive_j[RHO_INDEX_PRIM] = rho_recon_j;
@@ -2409,47 +2466,71 @@ void CReactiveEulerSolver::Upwind_Residual(CGeometry* geometry, CSolver** solver
         Primitive_j[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp_j,Ys_j)/config->GetEnergy_Ref();
         if(US_System)
           Primitive_j[H_INDEX_PRIM] *= 3.28084*3.28084;
-        sq_vel_j = std::inner_product(Primitive_j + VX_INDEX_PRIM, Primitive_j + (VX_INDEX_PRIM + nDim), Primitive_j + VX_INDEX_PRIM, 0.0);
+        sq_vel_j = std::inner_product(Primitive_j.cbegin() + VX_INDEX_PRIM, Primitive_j.cbegin() + (VX_INDEX_PRIM + nDim),
+                                      Primitive_j.cbegin() + VX_INDEX_PRIM, 0.0);
         Primitive_j[H_INDEX_PRIM] += 0.5*sq_vel_j;
         Gamma_j = library->ComputeFrozenGamma(dim_temp_j, Ys_j);
         Primitive_j[A_INDEX_PRIM] = std::sqrt(Gamma_j*Primitive_j[P_INDEX_PRIM]/rho_recon_j);
       }
+      else
+        std::copy(V_j, V_j + nPrimVar, Primitive_j.data());
 
-      numerics->SetPrimitive(Primitive_i, Primitive_j);
+      numerics->SetPrimitive(Primitive_i.data(), Primitive_j.data());
+
+      /*--- Set pressure derivatives ---*/
       if(implicit) {
-        su2double Secondary_i[nVar], Secondary_j[nVar];
-
-        /*--- Derivatves with respect to density ---*/
-        Secondary_i[RHO_INDEX_SOL] = (Gamma_i - 1.0)*0.5*sq_vel_i;
-        Secondary_j[RHO_INDEX_SOL] = (Gamma_j - 1.0)*0.5*sq_vel_j;
-
-        /*--- Derivatives with respect to momentum ---*/
-        for(iDim = 0; iDim < nDim; ++iDim) {
-          Secondary_i[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma_i)*Primitive_i[VX_INDEX_PRIM + iDim];
-          Secondary_j[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma_j)*Primitive_j[VX_INDEX_PRIM + iDim];
+        /*--- Get primitive variables ---*/
+        auto S_i = node[iPoint]->GetdPdU();
+        auto S_j = node[jPoint]->GetdPdU();
+        for(iVar = 0; iVar < nVar; ++iVar) {
+          Secondary_i[iVar] = S_i[iVar];
+          Secondary_j[iVar] = S_j[iVar];
         }
 
-        /*--- Derivatives with respect to energy ---*/
-        Secondary_i[RHOE_INDEX_SOL] = Gamma_i - 1.0;
-        Secondary_j[RHOE_INDEX_SOL] = Gamma_j - 1.0;
+        if(!non_phys_i) {
+          /*--- Derivatives with respect to density ---*/
+          Secondary_i[RHO_INDEX_SOL] = (Gamma_i - 1.0)*0.5*sq_vel_i;
 
-        /*--- Derivatives with respect to partial densities ---*/
-        for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-          Secondary_i[RHOS_INDEX_SOL + iSpecies] = library->ComputedP_dYs(dim_temp_i, Gamma_i, iSpecies)/config->GetEnergy_Ref();
+          /*--- Derivatives with respect to momentum ---*/
+          for(iDim = 0; iDim < nDim; ++iDim)
+            Secondary_i[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma_i)*Primitive_i[VX_INDEX_PRIM + iDim];
+
+          /*--- Derivatives with respect to energy ---*/
+          Secondary_i[RHOE_INDEX_SOL] = Gamma_i - 1.0;
+
+          /*--- Derivatives with respect to partial densities ---*/
+          for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+            Secondary_i[RHOS_INDEX_SOL + iSpecies] = library->ComputedP_dYs(dim_temp_i, Gamma_i, iSpecies)/config->GetEnergy_Ref();
+            if(US_System)
+              Secondary_i[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+          }
+        }
+
+        if(!non_phys_j) {
+          /*--- Derivatives with respect to density ---*/
+          Secondary_j[RHO_INDEX_SOL] = (Gamma_j - 1.0)*0.5*sq_vel_j;
+          /*--- Derivatives with respect to momentum ---*/
+          for(iDim = 0; iDim < nDim; ++iDim)
+            Secondary_j[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma_j)*Primitive_j[VX_INDEX_PRIM + iDim];
+
+          /*--- Derivatives with respect to energy ---*/
+          Secondary_j[RHOE_INDEX_SOL] = Gamma_j - 1.0;
+
+          /*--- Derivatives with respect to partial densities ---*/
+          for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
           Secondary_j[RHOS_INDEX_SOL + iSpecies] = library->ComputedP_dYs(dim_temp_j, Gamma_j, iSpecies)/config->GetEnergy_Ref();
-          if(US_System) {
-            Secondary_i[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+          if(US_System)
             Secondary_j[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
           }
         }
 
-        numerics->SetSecondary(Secondary_i, Secondary_j);
+        numerics->SetSecondary(Secondary_i.data(), Secondary_j.data());
       }
     } /*--- End second order reconstruction ---*/
 
     else {
       /*--- Set primitive variables without reconstruction ---*/
-      numerics->SetPrimitive(Primitive_i, Primitive_j);
+      numerics->SetPrimitive(V_i, V_j);
       if(implicit)
         numerics->SetSecondary(node[iPoint]->GetdPdU(), node[jPoint]->GetdPdU());
     }
@@ -2749,9 +2830,10 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
 //
 void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
                                                CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) {
-	unsigned long iVertex, iPoint, Point_Normal;
+  /*--- Local variables ---*/
+  unsigned long iVertex, iPoint, Point_Normal;
 
-  su2double V_inlet[nPrimVar];
+  su2double V_aux[nPrimVar];
   su2double Normal[nDim];
 
   std::string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
@@ -2765,8 +2847,8 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
 	Temperature = config->GetInlet_Temperature(Marker_Tag);
 	Pressure    = config->GetInlet_Pressure(Marker_Tag);
 	auto Velocity = config->GetInlet_Velocity(Marker_Tag);
-  //Ys = RealVec(config->GetInlet_MassFrac(Marker_Tag), config->GetInlet_MassFrac(Marker_Tag) + nSpecies);
-  SU2_Assert(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0 < EPS, "The mass fractions don't sum up to 1 in inlet boundary");
+  Ys = RealVec(config->GetInlet_MassFrac(Marker_Tag), config->GetInlet_MassFrac(Marker_Tag) + nSpecies);
+  SU2_Assert(std::abs(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0) < EPS, "The mass fractions don't sum up to 1 in inlet boundary");
 
 	/*--- Density at the inlet from the gas law ---*/
 	Density = library->ComputeDensity(Temperature, Pressure, Ys);
@@ -2792,13 +2874,13 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
   SoundSpeed /= config->GetVelocity_Ref();
 
   /*--- Primitive variables using the derived quantities ---*/
-  V_inlet[T_INDEX_PRIM] = Temperature;
-  std::copy(Velocity, Velocity + nDim, V_inlet + VX_INDEX_PRIM);
-  V_inlet[P_INDEX_PRIM] = Pressure;
-  V_inlet[RHO_INDEX_PRIM] = Density;
+  V_aux[T_INDEX_PRIM] = Temperature;
+  std::copy(Velocity, Velocity + nDim, V_aux + VX_INDEX_PRIM);
+  V_aux[P_INDEX_PRIM] = Pressure;
+  V_aux[RHO_INDEX_PRIM] = Density;
   su2double Velocity2 = std::inner_product(Velocity, Velocity + nDim, Velocity, 0.0);
-  V_inlet[H_INDEX_PRIM] = Enthalpy + 0.5*Velocity2;
-  V_inlet[A_INDEX_PRIM] = SoundSpeed;
+  V_aux[H_INDEX_PRIM] = Enthalpy + 0.5*Velocity2;
+  V_aux[A_INDEX_PRIM] = SoundSpeed;
   std::copy(Ys.cbegin(), Ys.cend(), V_inlet + RHOS_INDEX_PRIM);
 
   /*--- Loop over all the vertices on this boundary (val_marker) ---*/
@@ -2815,7 +2897,11 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
       /*--- Pull primitve variable from actual point ---*/
       auto V_domain = node[iPoint]->GetPrimitive();
 
-      /*--- Pull primitve variable from actual point ---*/
+      /*--- Get characteristic variables on the boundary ---*/
+      auto V_inlet = GetCharacPrimVar(val_marker, iVertex);
+      std::copy(V_aux, V_aux + nPrimVar, V_inlet);
+
+      /*--- Set primitive variables for residual ---*/
       conv_numerics->SetPrimitive(V_domain, V_inlet);
       if(grid_movement)
         conv_numerics->SetGridVel(geometry->node[iPoint]->GetGridVel(), geometry->node[iPoint]->GetGridVel());
@@ -2875,6 +2961,10 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
   			visc_numerics->SetPrimitive(V_domain, V_inlet);
         visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
 
+        /*--- Set limited variables ---*/
+        if(limiter)
+          visc_numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[iPoint]->GetLimiter_Primitive());
+
         /*--- Laminar viscosity ---*/
         visc_numerics->SetLaminarViscosity(node[iPoint]->GetLaminarViscosity(), node[iPoint]->GetLaminarViscosity());
 
@@ -2915,20 +3005,20 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
 //
 void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
                                     CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) {
+  /*--- Local variables ---*/
   unsigned short iDim;
   unsigned long iVertex, iPoint, Point_Normal;
 
   su2double Velocity2, Temperature, Pressure, Density, Tot_Enthalpy, Entropy, Riemann, SoundSpeed, SoundSpeed2,
             Vn, Vel_Mag, Gamma, Gamma_Minus_One, dim_temp, alpha, Area;
   su2double Normal[nDim], UnitNormal[nDim], Velocity[nDim];
-  su2double V_inlet[nPrimVar];
 
   unsigned short Kind_Inlet = config->GetKind_Inlet();
   std::string Marker_Tag    = config->GetMarker_All_TagBound(val_marker);
   bool viscous              = config->GetViscous();
 
-  //Ys = RealVec(config->GetInlet_MassFrac(Marker_Tag), config->GetInlet_MassFrac(Marker_Tag) + nSpecies);
-  SU2_Assert(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0 < EPS, "The mass fractions don't sum up to 1 in inlet boundary");
+  Ys = RealVec(config->GetInlet_MassFrac(Marker_Tag), config->GetInlet_MassFrac(Marker_Tag) + nSpecies);
+  SU2_Assert(std::abs(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0) < EPS, "The mass fractions don't sum up to 1 in inlet boundary");
   auto Flow_Dir = config->GetInlet_FlowDir(Marker_Tag);
 
   /*--- Loop over all the vertices on this boundary marker ---*/
@@ -2951,6 +3041,10 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
 
       /*--- Retrieve solution at this boundary node ---*/
       auto V_domain = node[iPoint]->GetPrimitive();
+      su2double RealTot_Enthalpy = V_doman[H_INDEX_PRIM];
+
+      /*--- Get characteristic variables on the boundary ---*/
+      auto V_inlet = GetCharacPrimVar(val_marker, iVertex);
 
       /*--- Build the fictitious intlet state based on characteristics ---*/
       /*--- Subsonic inflow: there is one outgoing characteristic (u-c),
@@ -2970,11 +3064,14 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
             Vn += Velocity[iDim]*UnitNormal[iDim];
           }
           SoundSpeed = V_domain[A_INDEX_PRIM];
-          Tot_Enthalpy = V_domain[H_INDEX_PRIM];
-          Gamma = library->ComputeFrozenGamma(dim_temp, Ys);
+          Gamma = node[iPoint]->GetdPdU()[RHOE_INDEX_SOL] + 1.0;
           Gamma_Minus_One = Gamma - 1.0;
           Entropy = Pressure*std::pow(1.0/Density, Gamma);
           Riemann = Vn + 2.0*SoundSpeed/Gamma_Minus_One;
+
+          /*--- Correct enthalpy usign ideal gas relations ---*/
+          V_domain[H_INDEX_PRIM] = SoundSpeed*SoundSpeed/Gamma_Minus_One;
+          Tot_Enthalpy = V_domain[H_INDEX_PRIM];
 
           /*--- Compute inlet velocity magnitude ---*/
           alpha = std::inner_product(UnitNormal, UnitNormal + nDim, Flow_Dir, 0.0);
@@ -3001,7 +3098,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           SoundSpeed2 = Gamma_Minus_One*(Tot_Enthalpy - 0.5*Velocity2);
 
           /*--- Update temperature and density ---*/
-          su2double Rgas = library->GetRgas()/config->GetGas_Constant_Ref();
+          su2double Rgas = library->ComputeRgas(Ys)/config->GetGas_Constant_Ref();
           Temperature = SoundSpeed2/(Gamma*Rgas);
           Density = std::pow(Rgas*Temperature/Entropy, 1.0/(Gamma - 1.0));
           Pressure = Density*Temperature*Rgas;
@@ -3039,9 +3136,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
                 from the domain interior. ---*/
           Temperature = V_domain[T_INDEX_PRIM];
           dim_temp = Temperature*config->GetTemperature_Ref();
-          if(US_System)
-            dim_temp *= 5.0/9.0;
-          Gamma = library->ComputeFrozenGamma(dim_temp, Ys);
+          Gamma = node[iPoint]->GetdPdU()[RHOE_INDEX_SOL] + 1.0;
           Gamma_Minus_One = Gamma - 1.0;
           Vn = std::inner_product(Velocity, Velocity + nDim, UnitNormal, 0.0);
           Riemann = Vn + 2.0*SoundSpeed/Gamma_Minus_One;
@@ -3067,7 +3162,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
             dim_temp *= 5.0/9.0;
           V_inlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
           if(US_System)
-            V_inlet[H_INDEX_PRIM] *= 3.28084*3.28084*5.0/9.0;
+            V_inlet[H_INDEX_PRIM] *= 3.28084*3.28084;
           V_inlet[A_INDEX_PRIM] = SoundSpeed;
           std::copy(Ys.cbegin(), Ys.cend(), V_inlet + RHOS_INDEX_PRIM);
 
@@ -3137,6 +3232,10 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
         visc_numerics->SetPrimitive(V_domain, V_inlet);
         visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
 
+        /*--- Set limited variables ---*/
+        if(limiter)
+          visc_numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[iPoint]->GetLimiter_Primitive());
+
         /*--- Laminar viscosity ---*/
         visc_numerics->SetLaminarViscosity(node[iPoint]->GetLaminarViscosity(), node[iPoint]->GetLaminarViscosity());
 
@@ -3164,6 +3263,8 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           Jacobian.SubtractBlock(iPoint, iPoint, Jacobian_i);
         }
       }
+      /*--- Restore real enthalpy ---*/
+      V_domain[H_INDEX_PRIM] = RealTot_Enthalpy;
     } /*--- End of if GetDomain() ---*/
   } /*--- End of iVertex for loop ---*/
 }
@@ -3177,10 +3278,10 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
 //
 void CReactiveEulerSolver::BC_Supersonic_Outlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics,
                                                 CNumerics* visc_numerics, CConfig* config, unsigned short val_marker) {
+  /*--- Local variables ---*/
   unsigned long iVertex, iPoint, Point_Normal;
 
   su2double Normal[nDim];
-  su2double V_outlet[nPrimVar];
 
   std::string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
   bool viscous = config->GetViscous();
@@ -3198,6 +3299,9 @@ void CReactiveEulerSolver::BC_Supersonic_Outlet(CGeometry* geometry, CSolver** s
 
       /*--- Current solution at this boundary node ---*/
       auto V_domain = node[iPoint]->GetPrimitive();
+
+      /*--- Get characteristic variables on the boundary ---*/
+      auto V_inlet = GetCharacPrimVar(val_marker, iVertex);
 
       /*--- Supersonic exit flow: there are no incoming characteristics,
             so no boundary condition is necessary. Set outlet state to current
@@ -3243,6 +3347,10 @@ void CReactiveEulerSolver::BC_Supersonic_Outlet(CGeometry* geometry, CSolver** s
         /*--- Primitive variables and gradient ---*/
         visc_numerics->SetPrimitive(V_domain, V_outlet);
         visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
+
+        /*--- Set limited variables ---*/
+        if(limiter)
+          visc_numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[iPoint]->GetLimiter_Primitive());
 
         /*--- Laminar viscosity ---*/
         visc_numerics->SetLaminarViscosity(node[iPoint]->GetLaminarViscosity(), node[iPoint]->GetLaminarViscosity());
@@ -3290,7 +3398,6 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
   unsigned long iVertex, iPoint, Point_Normal;
 
   su2double Pressure, P_Exit, Velocity2, Density, Temperature, SoundSpeed, Gamma, Mach_Exit, Area;
-  su2double V_outlet[nPrimVar];
   su2double Velocity[nDim], Normal[nDim], UnitNormal[nDim];
 
   std::string Marker_Tag = config->GetMarker_All_TagBound(val_marker);
@@ -3314,6 +3421,9 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
 
       /*--- Current solution at this boundary node ---*/
       auto V_domain = node[iPoint]->GetPrimitive();
+
+      /*--- Get characteristic variables on the boundary ---*/
+      auto V_inlet = GetCharacPrimVar(val_marker, iVertex);
 
       /*--- Build the fictitious intlet state based on characteristics ---*/
       /*--- Retrieve the specified back pressure for this outlet. ---*/
@@ -3377,7 +3487,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         std::copy(V_domain + RHOS_INDEX_PRIM, V_domain + (RHOS_INDEX_PRIM + nSpecies), Ys.begin());
         V_outlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
         if(US_System)
-          V_outlet[H_INDEX_PRIM] *= 3.28084*3.28084*5.0/9.0;
+          V_outlet[H_INDEX_PRIM] *= 3.28084*3.28084;
         V_outlet[H_INDEX_PRIM] += 0.5*Velocity2;
         V_outlet[A_INDEX_PRIM] = SoundSpeed;
         std::copy(Ys.cbegin(), Ys.cend(), V_outlet + RHOS_INDEX_PRIM);
@@ -3449,6 +3559,10 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         /*--- Primitive variables and gradient ---*/
         visc_numerics->SetPrimitive(V_domain, V_outlet);
         visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
+
+        /*--- Set limited variables ---*/
+        if(limiter)
+          visc_numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[iPoint]->GetLimiter_Primitive());
 
         /*--- Laminar viscosity ---*/
         visc_numerics->SetLaminarViscosity(node[iPoint]->GetLaminarViscosity(), node[iPoint]->GetLaminarViscosity());
@@ -3527,8 +3641,14 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config, unsig
   nPrimVarLim = nDim + 2;  /*--- Primitive variables to limit (T, vx, vy, vz, P)^T ---*/
   nPrimVarGrad = nPrimVarLim + nSpecies; /*--- Gradient Primitive variables (T, vx, vy, vz, P, X1....XNs)^T ---*/
 
-  /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
+  /*--- Read freestream mass fractions. ---*/
   MassFrac_Inf = RealVec(config->GetMassFrac_FreeStream(), config->GetMassFrac_FreeStream() + nSpecies);
+
+  /*--- Check right order of species in configuration file ----*/
+  if(iMesh == MESH_0)
+    Check_FreeStream_Species_Order(config);
+
+  /*--- Perform the non-dimensionalization for the flow equations using the specified reference values. ---*/
   SetNondimensionalization(geometry, config, iMesh);
 
 	/*--- Allocate a CVariable array foreach node of the mesh ---*/
@@ -3545,6 +3665,7 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config, unsig
   Res_Visc = new su2double[nVar];
   Vector_i = new su2double[nDim];
   Vector_j = new su2double[nDim];
+  Vector   = new su2double[nDim];
 
   /*--- Define some structures for locating max residuals ---*/
   Point_Max = new unsigned long[nVar];
@@ -3612,9 +3733,38 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config, unsig
 	else
     least_squares = false;
 
+  /*--- Store the value of the characteristic primitive variables at the boundaries ---*/
+  nMarker = config->GetnMarker_All();
+  CharacPrimVar = new su2double** [nMarker];
+  unsigned short iMarker;
+  unsigned long iVertex;
+  for(iMarker = 0; iMarker < nMarker; ++iMarker) {
+    CharacPrimVar[iMarker] = new su2double* [geometry->nVertex[iMarker]];
+    for(iVertex = 0; iVertex < geometry->nVertex[iMarker]; iVertex++) {
+      CharacPrimVar[iMarker][iVertex] = new su2double[nPrimVar];
+      for(iVar = 0; iVar < nPrimVar; ++iVar) {
+        CharacPrimVar[iMarker][iVertex][iVar] = 0.0;
+      }
+    }
+  }
+
+  /*--- Store the number of vertices on each marker for deallocation later ---*/
+  nVertex.reserve(nMarker);
+  for(iMarker = 0; iMarker < nMarker; ++iMarker)
+    nVertex.push_back(geometry->nVertex[iMarker]);
+
+  /*--- Set other variables ---*/
   grid_movement = config->GetGrid_Movement();
   space_centered = (config->GetKind_ConvNumScheme_Flow() == SPACE_CENTERED);
   second_order = (config->GetSpatialOrder_Flow() == SECOND_ORDER || config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER);
+  if(second_order) {
+    Primitive_i.resize(nPrimVar);
+    Primitive_j.resize(nPrimVar);
+    if(implicit) {
+      Secondary_i.resize(nVar);
+      Secondary_j.resize(nVar);
+    }
+  }
   unsigned long ExtIter = config->GetExtIter();
   limiter = (config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER && ExtIter <= config->GetLimiterIter());
   US_System = (config->GetSystemMeasurements() == US);
@@ -3624,9 +3774,6 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config, unsig
 	Temperature_Inf  = config->GetTemperature_FreeStreamND();
 
   Velocity_Inf     = RealVec(config->GetVelocity_FreeStreamND(), config->GetVelocity_FreeStreamND() + nDim);
-
-  /*--- Check right order of species in configuration file ----*/
-  //Check_FreeStream_Species_Order(config);
 
   Viscosity_Inf    = config->GetViscosity_FreeStreamND();
 
@@ -3695,6 +3842,19 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config, unsig
   /*--- MPI solution ---*/
 	Set_MPI_Solution(geometry, config);
 }
+
+//
+//
+/*!
+ * \brief Class CReactiveNSSolver destructor
+ */
+//
+//
+CReactiveNSSolver::~CReactiveNSSolver() {
+  if(node_infty != NULL)
+    delete node_infty;
+}
+
 
 //
 //
@@ -3837,20 +3997,15 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
   /*--- Set the primitive variables ---*/
   unsigned long ErrorCounter = SetPrimitive_Variables(solver_container, config, Output);
 
-  /*--- Upwind second order reconstruction ---*/
-  if((second_order && !space_centered) && iMesh == MESH_0 && !Output) {
-    /*--- Gradient computation ---*/
-    if(least_squares)
-      SetPrimitive_Gradient_LS(geometry, config);
-    else if(config->GetKind_Gradient_Method() == GREEN_GAUSS)
-      SetPrimitive_Gradient_GG(geometry, config);
-    else
-      throw std::out_of_range("Unknown option in the computation of the gradient");
+  /*--- Gradient computation ---*/
+  if(least_squares)
+    SetPrimitive_Gradient_LS(geometry, config);
+  else if(config->GetKind_Gradient_Method() == GREEN_GAUSS)
+    SetPrimitive_Gradient_GG(geometry, config);
 
-    /*--- Limiter computation ---*/
-    if(limiter && iMesh == MESH_0 && !Output)
-      SetPrimitive_Limiter(geometry, config);
-  }
+  /*--- Limiter computation ---*/
+  if(limiter && iMesh == MESH_0 && !Output)
+    SetPrimitive_Limiter(geometry, config);
 
   /*--- Artificial dissipation ---*/
   if(space_centered && !Output)
@@ -4175,7 +4330,8 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
     numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[jPoint]->GetGradient_Primitive());
 
     /*--- Set primitve variables limited ---*/
-    numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[jPoint]->GetLimiter_Primitive());
+    if(limiter)
+      numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[jPoint]->GetLimiter_Primitive());
 
     /*--- Laminar viscosity ---*/
     numerics->SetLaminarViscosity(node[iPoint]->GetLaminarViscosity(), node[jPoint]->GetLaminarViscosity());
@@ -4396,7 +4552,7 @@ void CReactiveNSSolver::SetPrimitive_Gradient_LS(CGeometry* geometry, CConfig* c
       /*--- Compute molar fractions for jPoint ---*/
       Xs_j = library->GetMolarFromMass(RealVec(PrimVar_j.cbegin() + RHOS_INDEX_GRAD,
                                                PrimVar_j.cbegin() + (RHOS_INDEX_GRAD + nSpecies)));
-      std::copy(Xs_j.cbegin(), Xs_i.cend(), PrimVar_j.begin() + RHOS_INDEX_GRAD);
+      std::copy(Xs_j.cbegin(), Xs_j.cend(), PrimVar_j.begin() + RHOS_INDEX_GRAD);
 
       //AD::SetPreaccIn(Coord_j, nDim);
       //AD::SetPreaccIn(PrimVar_j, nPrimVarGrad);
