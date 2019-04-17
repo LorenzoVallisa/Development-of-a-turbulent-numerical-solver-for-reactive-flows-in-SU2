@@ -72,9 +72,21 @@ private:
   std::string  Config_File_Lib;        /*!< \brief Name of the file to configure the library.*/
   std::string  Library_Path;           /*!< \brief Name of the library to look for files to configure the library.*/
   std::string* Species_Order;          /*!< \brief String list to check the coherence in species order declaration.*/
-  //std::string* Marker_Inlet_MassFrac;  /*!< \brief String list with name of inlet boundary for mass fractions.*/
-  //su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
+  std::string* Marker_Inlet_MassFrac;  /*!< \brief String list with name of inlet boundary for mass fractions.*/
+  su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
   unsigned short nSpecies;    /*!< \brief Number of species in the mixture.*/
+  su2double rho_s,            /*!< \brief Fuel density.*/
+            c_s,              /*!< \brief Specific heat of fuel.*/
+            h_pf,             /*!< \brief Pyrolisis enthalpy of fuel.*/
+            kappa_s,          /*!< \brief Fuel thermal conductivity.*/
+            T_0;              /*!< \brief Fuel temperature far from surface.*/
+  std::string* Marker_Inflow_MassFrac;  /*!< \brief String list with name of inflow boundary for mass fractions.*/
+  su2double** Inflow_MassFrac; /*!< \brief Inflow mass fractions for each boundary.*/
+  unsigned short nSpecies_Inlet; /*!< \brief Number of species detected at inlet.*/
+  su2double* Velocity_Inflow;  /*!< \brief Inflow velocity.*/
+  su2double* Velocity_Dir_Inflow;     /*!< \brief Inflow velocity direction.*/
+  su2double Inflow_Mass_Flow;  /*!< \brief Inflow mass flow.*/
+  unsigned short nSpecies_Inflow; /*!< \brief Number of species detected at inflow.*/
 
   /*--- NOTE: Already present information to be read from config ---*/
   SU2_Comm SU2_Communicator; /*!< \brief MPI communicator of SU2.*/
@@ -861,11 +873,11 @@ private:
 
   /*--- NOTE: New option for inlet mass fraction ---*/
   void addInlet_MassFracOption(const std::string& name, unsigned short& nMarker_Inlet, std::string*& Marker_Inlet_MassFrac,
-                               su2double**& MassFractions) {
+                               su2double**& MassFractions, unsigned short& nSpecies_Inlet) {
     /*--- Check if this filed already exists in the configuration file ---*/
     assert(option_map.find(name) == option_map.end());
     all_options.insert(std::pair<std::string, bool>(name, true));
-    COptionBase* val = new COptionInlet_MassFrac(name, nMarker_Inlet, Marker_Inlet_MassFrac, MassFractions);
+    COptionBase* val = new COptionInlet_MassFrac(name, nMarker_Inlet, Marker_Inlet_MassFrac, MassFractions, nSpecies_Inlet);
     option_map.insert(pair<std::string, COptionBase*>(name, val));
   }
 
@@ -1222,19 +1234,27 @@ public:
   }
 
   /*!
-   * \brief Get number of species involved,
-   * \return Name of library.
+   * \brief Get number of species involved.
+   * \return Number of species.
   */
   inline unsigned short GetnSpecies(void) const {
     return nSpecies;
   }
 
   /*!
-   * \brief Get the order of species involved,
+   * \brief Get the order of species involved.
    * \return Pointer to list with all species in mixture.
   */
   inline std::string* GetSpeciesOrder(void) const {
     return Species_Order;
+  }
+
+  /*!
+   * \brief Get number of species involved
+   * \return Number of species at inlet.
+  */
+  inline unsigned short GetnSpecies_Inlet(void) const {
+    return nSpecies_Inlet;
   }
 
   /*!
@@ -1243,6 +1263,85 @@ public:
    * \return Inlet mass fractions.
   */
   su2double* GetInlet_MassFrac(std::string val_index) const;
+
+  /*!
+   * \brief Get fuel density.
+   * \return Fuel density.
+  */
+  inline su2double GetDensity_Fuel(void) const {
+    return rho_s;
+  }
+
+  /*!
+   * \brief Get fuel specific heat.
+   * \return Fuel specific heat.
+  */
+  inline su2double GetSpecificHeat_Fuel(void) const {
+    return c_s;
+  }
+
+  /*!
+   * \brief Get fuel enthalpy.
+   * \return Fuel enthalpy.
+  */
+  inline su2double GetEnthalpy_Fuel(void) const {
+    return h_pf;
+  }
+
+  /*!
+   * \brief Get fuel thermal conductivity.
+   * \return Fuel thermal conductivity.
+  */
+  inline su2double GetConductivity_Fuel(void) const {
+    return kappa_s;
+  }
+
+  /*!
+   * \brief Get fuel temperature far from the surface
+   * \return Far fuel temperature.
+  */
+  inline su2double GetTemperature_Fuel(void) const {
+    return T_0;
+  }
+
+  /*!
+   * \brief Get mass fraction for a desired inflow boundary
+   * \param[in] val_index - Index corresponding to the inflow boundary.
+   * \return Inflow mass fractions.
+  */
+  su2double* GetInflow_MassFrac(std::string val_index) const;
+
+  /*!
+   * \brief Get number of species involved
+   * \return Number of species at inflow.
+  */
+  inline unsigned short GetnSpecies_Inflow(void) const {
+    return nSpecies_Inflow;
+  }
+
+  /*!
+   * \brief Get velocity inflow.
+   * \return Inflow velocity.
+  */
+  inline su2double* GetVelocity_Inflow(void) const {
+    return Velocity_Inflow;
+  }
+
+  /*!
+   * \brief Get fuel mass flow.
+   * \return Inflow mass flow.
+  */
+  inline su2double GetMassFlow_Fuel(void) const {
+    return Inflow_Mass_Flow;
+  }
+
+  /*!
+   * \brief Get fuel mass flow
+   * \return Inflow mass flow.
+  */
+  inline su2double* GetVelocityDir_Inflow(void) const {
+    return Velocity_Dir_Inflow;
+  }
 
   /*--- NOTE: ALready present functions ---*/
   /*!

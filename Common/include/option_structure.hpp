@@ -318,6 +318,7 @@ enum ENUM_KIND_NONDIM {
   FREESTREAM_PRESS_EQ_ONE = 1, /*!< \brief Non-dimensional simulation. */
   FREESTREAM_VEL_EQ_MACH = 2, /*!< \brief Non-dimensional simulation. */
   FREESTREAM_VEL_EQ_ONE = 3, /*!< \brief Non-dimensional simulation. */
+  /*--- NOTE: New options ---*/
   REFERENCE = 4 /*!< \brief Non-dimensional simulation with specified values. */
 };
 static const map<string, ENUM_KIND_NONDIM> NonDim_Map = CCreateMap<string, ENUM_KIND_NONDIM>
@@ -325,6 +326,7 @@ static const map<string, ENUM_KIND_NONDIM> NonDim_Map = CCreateMap<string, ENUM_
 ("FREESTREAM_PRESS_EQ_ONE", FREESTREAM_PRESS_EQ_ONE)
 ("FREESTREAM_VEL_EQ_MACH", FREESTREAM_VEL_EQ_MACH)
 ("FREESTREAM_VEL_EQ_ONE", FREESTREAM_VEL_EQ_ONE)
+/*--- NOTE: New options ---*/
 ("REFERENCE", REFERENCE);
 
 /*!
@@ -889,12 +891,18 @@ static const map<string, INLET_TYPE> Inlet_Map = CCreateMap<string, INLET_TYPE>
 enum ENGINE_INFLOW_TYPE {
   FAN_FACE_MACH = 1,	         /*!< \brief User specifies fan face mach number. */
   FAN_FACE_MDOT = 2,           /*!< \brief User specifies Static pressure. */
-  FAN_FACE_PRESSURE = 3        /*!< \brief User specifies Static pressure. */
+  FAN_FACE_PRESSURE = 3,        /*!< \brief User specifies Static pressure. */
+  /*--- NOTE: New options ---*/
+  VELOCITY_INFLOW = 4,         /*!< \brief User specifies velocity inflow. */
+  MASS_FLOW_INFLOW = 5       /*!< \brief User specifies mass flow and velocity direction. */
 };
 static const map<string, ENGINE_INFLOW_TYPE> Engine_Inflow_Map = CCreateMap<string, ENGINE_INFLOW_TYPE>
 ("FAN_FACE_MACH", FAN_FACE_MACH)
 ("FAN_FACE_MDOT", FAN_FACE_MDOT)
-("FAN_FACE_PRESSURE", FAN_FACE_PRESSURE);
+("FAN_FACE_PRESSURE", FAN_FACE_PRESSURE)
+/*--- NOTE: New options ---*/
+("VELOCITY_INFLOW", VELOCITY_INFLOW)
+("MASS_FLOW_INFLOW", MASS_FLOW_INFLOW);
 
 /*!
  * \brief types actuator disk boundary treatments
@@ -3371,6 +3379,7 @@ private:
   unsigned short& size;  /*!< \brief Number of inlet markers. */
   std::string*& marker;  /*!< \brief Name of the boundary identifier. */
   su2double**& mass_fractions;  /*!< \brief Mass fractions. */
+  unsigned short& nSpecies;  /*!< \brief Number of species. */
 
 public:
   /*!
@@ -3381,8 +3390,8 @@ public:
    * \param[in] MassFrac_Inlet - Mass fractions at inlet
 	 */
   COptionInlet_MassFrac(std::string option_field_name, unsigned short& nMarker_Inlet, std::string* & Marker_Inlet,
-                        su2double**& MassFrac_Inlet): name(option_field_name), size(nMarker_Inlet), marker(Marker_Inlet),
-                                                      mass_fractions(MassFrac_Inlet) {}
+                        su2double**& MassFrac_Inlet, unsigned short& nS): name(option_field_name), size(nMarker_Inlet),
+                        marker(Marker_Inlet), mass_fractions(MassFrac_Inlet), nSpecies(nS) {}
 
   /*!
 	 * \brief Class destructor.
@@ -3400,6 +3409,7 @@ public:
       this->size = 0;
       this->marker = NULL;
       this->mass_fractions = NULL;
+      this->nSpecies = 0;
       return "";
     }
 
@@ -3433,13 +3443,13 @@ public:
     this->mass_fractions = new su2double*[this->size];
     unsigned long i;
     unsigned short nVals = totalVals/this->size;
-    unsigned short nSpecies = nVals - 1;
+    this->nSpecies = nVals - 1;
     for(i = 0; i < this->size; ++i)
-      this->mass_fractions[i] = new su2double[nSpecies];
+      this->mass_fractions[i] = new su2double[this->nSpecies];
 
     for(i = 0; i < this->size; ++i) {
       this->marker[i].assign(option_value[nVals*i]);
-      for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+      for(unsigned short iSpecies = 0; iSpecies < this->nSpecies; ++iSpecies) {
         std::istringstream ss_massfrac(option_value[nVals*i + iSpecies + 1]);
         if(!(ss_massfrac >> this->mass_fractions[i][iSpecies]))
           return badValue(option_value, "inlet", this->name);

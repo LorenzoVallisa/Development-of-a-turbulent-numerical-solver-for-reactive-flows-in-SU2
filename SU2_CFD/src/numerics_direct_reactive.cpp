@@ -763,6 +763,9 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
   Dij_j = Eigen::Map<RealMatrix>(Diffusion_Coeff_j, nSpecies, nSpecies);
   Mean_Dij = 2.0/(Dij_i.cwiseInverse() + Dij_j.cwiseInverse()).array();
 
+  /*--- Set to NULL for memory deallocation (double free because of base class) ---*/
+  Diffusion_Coeff_i = Diffusion_Coeff_j = NULL;
+  
   /*--- Copy primitive varaibles ---*/
   std::copy(V_i, V_i + nPrimVar, PrimVar_i.data());
   std::copy(V_j, V_j + nPrimVar, PrimVar_j.data());

@@ -307,7 +307,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   //       in the conserved vector to ensure positive density
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
     if(U[RHOS_INDEX_SOL + iSpecies] < 0.0) {
-      U[RHOS_INDEX_SOL + iSpecies] = 1e-30;
+      U[RHOS_INDEX_SOL + iSpecies] = 1.0e-30;
       nonPhys = true;
     }
   }
@@ -327,7 +327,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   nonPhys = nonPhys || (std::abs(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0) > EPS);
 
   /*--- Rename for convenience ---*/
-  rho = U[RHO_INDEX_PRIM];    // Density [Kg/m3]
+  rho = U[RHO_INDEX_SOL];    // Density [Kg/m3]
   rhoE = U[RHOE_INDEX_SOL];   // Density*total energy [J/m3]
 
   /*--- Assign mixture velocity ---*/
@@ -336,8 +336,8 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   sqvel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
 
   /*--- Set temperature clipping values ---*/
-  Tmin   = 50.0;
-  Tmax   = 6.0e4;
+  Tmin   = 200.0/config->GetTemperature_Ref();;
+  Tmax   = 6.0e4/config->GetTemperature_Ref();;
 
   /*--- Set temperature algorithm paramters ---*/
   NRtol    = 1.0e-6;    // Tolerance for the Secant method
@@ -346,7 +346,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   maxBIter = 32;        // Maximum Bisection method iterations
 
   /*--- Translational-Rotational Temperature ---*/
-  const su2double Rgas = library->ComputeRgas(Ys);
+  const su2double Rgas = library->ComputeRgas(Ys)/config->GetGas_Constant_Ref();
   const su2double C1 = (-rhoE + 0.5*rho*sqvel)/(rho*Rgas);
   const su2double C2 = 1.0/Rgas;
 
@@ -756,7 +756,7 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
   Thermal_Conductivity = library->ComputeEta(dim_temp, Ys)/config->GetConductivity_Ref();
   if(US_System)
     Thermal_Conductivity *= 0.12489444444;
-  Diffusion_Coeffs = library->GetDij_SM(dim_temp, dim_press)/(config->GetVelocity_Ref()*config->GetLength_Ref()*1e-4);
+  Diffusion_Coeffs = library->GetDij_SM(dim_temp, dim_press)/(config->GetVelocity_Ref()*config->GetLength_Ref()*1.0e4);
 
   return nonPhys;
 }

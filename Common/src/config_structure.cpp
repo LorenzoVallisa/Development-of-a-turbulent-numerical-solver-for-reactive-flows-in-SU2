@@ -390,8 +390,12 @@ void CConfig::SetPointersNull(void) {
   MassFrac_FreeStream = NULL;
   /*---NOTE: New additions ---*/
   Species_Order = NULL;
-  //Marker_Inlet_MassFrac = NULL;
-  //Inlet_MassFrac = NULL;
+  Marker_Inlet_MassFrac = NULL;
+  Inlet_MassFrac = NULL;
+  Marker_Inflow_MassFrac = NULL;
+  Inflow_MassFrac = NULL;
+  Velocity_Inflow = NULL;
+  Velocity_Dir_Inflow = NULL;
   /*---NOTE: Already present ---*/
   Velocity_FreeStream = NULL;
 
@@ -548,11 +552,11 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\brief FREESTREAM_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
   addDoubleListOption("FREESTREAM_MASS_FRAC", nSpecies, MassFrac_FreeStream);
 
-  /*!\brief SPECIES_ORDER\n DESCRIPTION: Free-stream mass fractions */
+  /*!\brief SPECIES_ORDER\n DESCRIPTION: Species order in the mixture */
   addStringListOption("SPECIES_ORDER", nSpecies, Species_Order);
 
-  /*!\brief INLET_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
-  //addInlet_MassFracOption("INLET_MASS_FRAC", nMarker_Inlet, Marker_Inlet_MassFrac, Inlet_MassFrac);
+  /*!\brief INLET_MASS_FRAC\n DESCRIPTION: Inlet mass fractions */
+  addInlet_MassFracOption("INLET_MASS_FRAC", nMarker_Inlet, Marker_Inlet_MassFrac, Inlet_MassFrac, nSpecies_Inlet);
 
   /*!\brief REF_DENSITY\n DESCRIPTION: Reference density for adimensionalitazion (1.0 kg/m3 by default) \ingroup Config*/
   addDoubleOption("REF_DENSITY", Density_Ref, 1.0);
@@ -563,6 +567,26 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\brief REF_PRESSURE\n DESCRIPTION: Reference pressure for adimensionalitazion (101325.0 Pa by default) \ingroup Config*/
   addDoubleOption("REF_PRESSURE", Pressure_Ref, 101325.0);
 
+  /*!\brief FUEL_DENSITY\n DESCRIPTION: Fuel density (960.0 kg/m3 by default) \ingroup Config*/
+  addDoubleOption("FUEL_DENSITY", rho_s, 960.0);
+
+  /*!\brief FUEL_SPECIFIC_HEAT\n DESCRIPTION: Fuel specific heat (2860.0 J/kg*K by default) \ingroup Config*/
+  addDoubleOption("FUEL_SPECIFIC_HEAT", c_s, 2860.0);
+
+  /*!\brief FUEL_ENTHALPY\n DESCRIPTION: Fuel enthalpy (1100000.0 J/kg by default) \ingroup Config*/
+  addDoubleOption("FUEL_ENTHALPY", h_pf, 1100000.0);
+
+  /*!\brief FUEL_CONDUCTIVITY\n DESCRIPTION: Fuel thermal conductivity (0.217 W/m*K by default) \ingroup Config*/
+  addDoubleOption("FUEL_CONDUCTIVITY", kappa_s, 0.217);
+
+  /*!\brief FUEL_TEMPERATURE\n DESCRIPTION: Fuel temperature far from surface (300.0 K by default) \ingroup Config*/
+  addDoubleOption("FUEL_TEMPERATURE", T_0, 300.0);
+
+  /*!\brief INFLOW_MASS_FRAC\n DESCRIPTION: Inflow mass fractions */
+  addInlet_MassFracOption("INFLOW_MASS_FRAC", nMarker_EngineInflow, Marker_Inflow_MassFrac, Inflow_MassFrac, nSpecies_Inflow);
+
+  /*!\brief FUEL_TEMPERATURE\n DESCRIPTION: Propellant mass flow (25.0 kg/m2*s by default) \ingroup Config*/
+  addDoubleOption("FUEL_MASS_FLOW", Inflow_Mass_Flow, 25.0);
 
   /*--- NOTE: Already present options ---*/
   /*!\brief REGIME_TYPE \n  DESCRIPTION: Regime type \n OPTIONS: see \link Regime_Map \endlink \ingroup Config*/
@@ -721,10 +745,18 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\par CONFIG_CATEGORY: Reference Conditions \ingroup Config*/
   /*--- Options related to reference values for nondimensionalization ---*/
 
-  Length_Ref = 1.0; //<---- NOTE: this should be given an option or set as a const
+  Length_Ref = 1.0; //<----  this should be given an option or set as a const
+  /*--- NOTE: New options ---*/
   /*!\brief REF_LENGTH\n DESCRIPTION: Reference length for adimensionalitazion (1.0 m by default) \ingroup Config*/
   addDoubleOption("REF_LENGTH", Length_Ref, 1.0);
 
+  /*!\brief INFLOW_VELOCITY\n DESCRIPTION: Inflow velocity (m/s) */
+  addDoubleArrayOption("INFLOW_VELOCITY", 3, Velocity_Inflow, default_vel_inf);
+
+  /*!\brief INFLOW_VELOCITY_DIR\n DESCRIPTION: Inflow velocity direction (this must be a unit vector) */
+  addDoubleArrayOption("INFLOW_VELOCITY_DIR", 3, Velocity_Dir_Inflow, default_vel_inf);
+
+  /*--- NOTE: Already present ---*/
   /*!\brief REF_ORIGIN_MOMENT_X\n DESCRIPTION: X Reference origin for moment computation \ingroup Config*/
   addDoubleListOption("REF_ORIGIN_MOMENT_X", nRefOriginMoment_X, RefOriginMoment_X);
   /*!\brief REF_ORIGIN_MOMENT_Y\n DESCRIPTION: Y Reference origin for moment computation \ingroup Config*/
@@ -1099,7 +1131,7 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
 
   /*!\brief CONV_NUM_METHOD_ADJFLOW
    *  \n DESCRIPTION: Convective numerical method for the adjoint solver.
-   *  \n OPTIONS:  See \link Upwind_Map \endlink , \link Centered_Map \endlink. Note: not all methods are guaranteed to be implemented for the adjoint solver. \ingroup Config */
+   *  \n OPTIONS:  See \link Upwind_Map \endlink , \link Centered_Map \endlink.  not all methods are guaranteed to be implemented for the adjoint solver. \ingroup Config */
   addConvectOption("CONV_NUM_METHOD_ADJFLOW", Kind_ConvNumScheme_AdjFlow, Kind_Centered_AdjFlow, Kind_Upwind_AdjFlow);
   /*!\brief SPATIAL_ORDER_ADJFLOW
    *  \n DESCRIPTION: Spatial numerical order integration \n OPTIONS: See \link SpatialOrder_Map \endlink \n DEFAULT: SECOND_ORDER \ingroup Config*/
@@ -5453,14 +5485,23 @@ CConfig::~CConfig(void) {
   if(Species_Order != NULL)
     delete[] Species_Order;
 
-  //if(Marker_Inlet_MassFrac != NULL)
-  //  delete[] Marker_Inlet_MassFrac;
+  if(Marker_Inlet_MassFrac != NULL)
+    delete[] Marker_Inlet_MassFrac;
 
-  //if(Inlet_MassFrac != NULL) {
-  //  for(iMarker = 0; iMarker < nMarker_Inlet; ++iMarker)
-  //    delete[] Inlet_MassFrac[iMarker];
-  //  delete[] Inlet_MassFrac;
-  //}
+  if(Inlet_MassFrac != NULL) {
+    for(iMarker = 0; iMarker < nMarker_Inlet; ++iMarker)
+      delete[] Inlet_MassFrac[iMarker];
+    delete[] Inlet_MassFrac;
+  }
+
+  if(Marker_Inflow_MassFrac != NULL)
+    delete[] Marker_Inflow_MassFrac;
+
+  if(Inflow_MassFrac != NULL) {
+    for(iMarker = 0; iMarker < nMarker_EngineInflow; ++iMarker)
+      delete[] Inflow_MassFrac[iMarker];
+    delete[] Inflow_MassFrac;
+  }
 
   /*--- NOTE: already present ---*/
   if (Riemann_FlowDir != NULL) {
@@ -5858,13 +5899,21 @@ void CConfig::SetGlobalParam(unsigned short val_solver,
 }
 
 /*--- NOTE: New function to compute inlet mass fractions ---*/
-//su2double* CConfig::GetInlet_MassFrac(string val_marker) const {
-//  unsigned short iMarker_Inlet;
-//  for(iMarker_Inlet = 0; iMarker_Inlet < nMarker_Inlet; ++iMarker_Inlet)
-//    if(Marker_Inlet_MassFrac[iMarker_Inlet] == val_marker)
-//      break;
-//  return Inlet_MassFrac[iMarker_Inlet];
-//}
+su2double* CConfig::GetInlet_MassFrac(std::string val_marker) const {
+  unsigned short iMarker_Inlet;
+  for(iMarker_Inlet = 0; iMarker_Inlet < nMarker_Inlet; ++iMarker_Inlet)
+    if(Marker_Inlet_MassFrac[iMarker_Inlet] == val_marker)
+      break;
+  return Inlet_MassFrac[iMarker_Inlet];
+}
+
+su2double* CConfig::GetInflow_MassFrac(std::string val_marker) const {
+  unsigned short iMarker_Inflow;
+  for(iMarker_Inflow = 0; iMarker_Inflow < nMarker_Inflow; ++iMarker_Inflow)
+    if(Marker_Inflow_MassFrac[iMarker_Inlet] == val_marker)
+      break;
+  return Inflow_MassFrac[iMarker_Inlet];
+}
 
 /*--- NOTE: Old functions ---*/
 su2double* CConfig::GetPeriodicRotCenter(string val_marker) {
