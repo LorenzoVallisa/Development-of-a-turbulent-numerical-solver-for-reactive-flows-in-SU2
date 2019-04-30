@@ -1,5 +1,6 @@
 #include "../include/solver_reactive.hpp"
 #include "../include/numerics_reactive.hpp"
+#include "../../externals/Eigen/IterativeLinearSolvers"
 
 #include "../../Common/include/reacting_model_library.hpp"
 #include "../../Common/include/not_implemented_exception.hpp"
@@ -4912,6 +4913,35 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
   } /*--- End of iVertex for loop ---*/
 }
 
+//
+//
+/*!
+ *\brief Solution Stefan-Maxwell equations
+ */
+//
+//
+CReactiveNSSolver::Vec CReactiveNSSolver::Solve_SM(const su2double val_density, const su2double val_alpha, const RealMatrix& val_Dij,
+                                                   const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys) {
+  /*--- Set tolerance ---*/
+  const su2double toll = 1e-11;
+
+  /*--- Rename for convenience ---*/
+  su2double rho = val_density;
+  su2double alpha = val_alpha;
+  RealMatrix Gamma_tilde(nSpecies, nSpecies);
+
+  /*--- Compute original matrix of Stefan-Maxwell equations ---*/
+  auto Gamma = library->GetGamma(rho, val_xs, val_ys, val_Dij);
+
+  /*--- Add artificial diffusion part ---*/
+  for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+    for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
+      Gamma_tilde(iSpecies,jSpecies) = Gamma(iSpecies,jSpecies) + alpha*val_ys[iSpecies];
+
+  Eigen::BiCGSTAB<RealMatrix> bicg(Gamma_tilde);
+  bicg.setTolerance(toll);
+  return bicg.solve(-val_grad_xs);
+}
 
 //
 //
@@ -4932,26 +4962,76 @@ void CReactiveNSSolver::BC_Engine_Inflow(CGeometry* geometry, CSolver** solver_c
     throw Common::NotImplemented("Regression BC not available in case of grid movement");
 
   /*--- Local variables ---*/
-  unsigned short iDim;
-  unsigned long iVertex, iPoint, jPoint;
+  unsigned short iDim, iSpecies;
+  unsigned long iVertex, iPoint, Point_Normal;
   su2double Area;
   su2double Normal[nDim], UnitNormal[nDim], Coord_ij[nDim];
-  su2double Grad_Ys[nSpecies][nDim];
+  su2double pg, rho_g, Tg, Tg_old, Tg_tmp, Vg, Vg_old;
+  RealVec Ys_g(nSpecies), Xs_g, Ys_int(nSpecies), Xs_int;
+  RealVec f_Ys(nSpecies), fprime_Ys(nSpecies);
+  su2double Ys_g_old[nSpecies], Ys_g_tmp[nSpecies], Grad_Xs_g[nSpecies][nDim];
+  Vec Jd, Jd_pert, Grad_Xs_iDim(nSpecies);
 
   /*--- Identify the boundary ---*/
 	auto Marker_Tag = config->GetMarker_All_TagBound(val_marker);
   SU2_Assert(config->GetnMarker_EngineInflow() == 1, "Only one fuel inflow is allowed");
 
-  /*--- Read surface data ---*/
+  /*--- Read surface and fuel data ---*/
   SU2_Assert(config->GetnSpecies_Inflow() == nSpecies, "Wrong number of species detected at inflow");
   Ys = RealVec(config->GetInflow_MassFrac(Marker_Tag), config->GetInflow_MassFrac(Marker_Tag) + nSpecies);
-  su2double rho_s = config->GetDensity_Fuel()/config->GetDensity_Ref();
-  su2double Cp_s = config->GetSpecificHeat_Fuel()/config->GetEnergy_Ref()*config->GetTemperature_Ref();
-  su2double h_pf = config->GetEnthalpy_Fuel()/config->GetEnergy_Ref();
-  su2double kappa_s = config->GetConductivity_Fuel()/config->GetConductivity_Ref();
-  su2double T0 = config->GetTemperature_Fuel()/config->GetTemperature_Ref();
+  SU2_Assert(std::abs(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0) < EPS, "The mass fractions don't sum up to 1 at inlet boundary");
+  auto Flow_Dir = config->GetVelocityDir_Inflow();
+  const su2double rho_s = config->GetDensity_Fuel()/config->GetDensity_Ref();
+  const su2double Cp_s = config->GetSpecificHeat_Fuel()/config->GetEnergy_Ref()*config->GetTemperature_Ref();
+  const su2double h_pf = config->GetEnthalpy_Fuel()/config->GetEnergy_Ref();
+  const su2double kappa_s = config->GetConductivity_Fuel()/config->GetConductivity_Ref();
+  const su2double T0 = config->GetTemperature_Fuel()/config->GetTemperature_Ref();
 
-  /*--- Loop over boundary points to calculate energy flux ---*/
+  /*--- Fuel regression rate data ---*/
+  const su2double A_1 = config->GetPrefactor_1_Fuel()/config->GetVelocity_Ref();
+  const su2double A_2 = config->GetPrefactor_2_Fuel()/config->GetVelocity_Ref();
+  const su2double Ea_1 = config->GetActivationEnergy_1_Fuel();
+  const su2double Ea_2 = config->GetActivationEnergy_2_Fuel();
+  const su2double T_bar = config->GetTemperatureBar_Fuel()/config->GetTemperature_Ref();
+  const su2double Ru = 1.987; /*--- Universal gas constant (cal/(mol*K)) ---*/
+
+  /*--- Auxiliary function for regression rate ---*/
+  auto rb = std::function<su2double(su2double)>([=](double T){
+    if(T < T_bar)
+      return A_2*std::exp(Ea_2/(Ru*(T*config->GetTemperature_Ref())));
+    return A_1*std::exp(Ea_1/(Ru*(T*config->GetTemperature_Ref())));
+  });
+
+  /*--- Auxiliary function for energy balance at wall ---*/
+  auto f_wall = std::function<su2double(su2double)>([&](double T){
+    su2double r_b = rb(T);
+    su2double dim_temp = T*config->GetTemperature_Ref();
+    if(US_System)
+      dim_temp *= 5.0/9.0;
+    auto hg_s = library->ComputePartialEnthalpy(dim_temp);
+    for(auto& elem: hg_s)
+      elem /= config->GetEnergy_Ref();
+    if(US_System) {
+      for(auto& elem: hg_s)
+        elem *= 3.28084*3.28084;
+    }
+    su2double hg = std::inner_product(hg_s.cbegin(), hg_s.cend(), Ys_g.cbegin(), 0.0);
+    su2double hgf = std::inner_product(hg_s.cbegin(), hg_s.cend(), Ys.cbegin(), 0.0);
+    su2double kappa_g = library->ComputeLambda(dim_temp, Ys_g)/config->GetConductivity_Ref();
+    if(US_System)
+      kappa_g /= 8.006796;
+    su2double Grad_Tw = -rho_s*Cp_s*r_b*(T - T0)/kappa_s;
+    su2double partial_res = 0.0;
+    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      partial_res += (Ys[iSpecies] - Ys_g[iSpecies])*hg_s[iSpecies];
+    return r_b*rho_s*(hg - hgf + h_pf + partial_res) + Grad_Tw*(kappa_s - kappa_g);
+  });
+
+  /*--- Limits for regula-falsi method ---*/
+  su2double Tmin = 200.0;
+  su2double Tmax = 6000.0;
+
+  /*--- Loop over boundary points to compute flux ---*/
   for(iVertex = 0; iVertex < geometry->nVertex[val_marker]; ++iVertex) {
     iPoint = geometry->vertex[val_marker][iVertex]->GetNode();
 		if(geometry->node[iPoint]->GetDomain()) {
@@ -4962,15 +5042,274 @@ void CReactiveNSSolver::BC_Engine_Inflow(CGeometry* geometry, CSolver** solver_c
         UnitNormal[iDim] = -Normal[iDim]/Area;
 
 			/*--- Compute closest normal neighbor ---*/
-      jPoint = geometry->vertex[val_marker][iVertex]->GetNormal_Neighbor();
+      Point_Normal = geometry->vertex[val_marker][iVertex]->GetNormal_Neighbor();
 
       auto Coord_i = geometry->node[iPoint]->GetCoord();
-      auto Coord_j = geometry->node[jPoint]->GetCoord();
+      auto Coord_j = geometry->node[Point_Normal]->GetCoord();
 
       for(iDim = 0; iDim < nDim; ++iDim)
         Coord_ij[iDim] = std::abs(Coord_j[iDim] - Coord_i[iDim]);
 
-    }
-  }
+      /*--- Get characteristic variables at inlet ---*/
+      auto V_inlet = GetCharacPrimVar(val_marker, iVertex);
 
+      /*--- Extrapolate pressure from the internal node ---*/
+      pg = node[Point_Normal]->GetPressure();
+      su2double dim_press = pg*config->GetPressure_Ref()/101325.0;
+      if(US_System)
+        dim_press *= 47.8803;
+
+      /*--- Set iterations for complete non-linear system ---*/
+      unsigned short maxIter = 10;
+      unsigned short iIter;
+      const su2double toll_sys = 1.0e-3;
+      bool conv_sys = false;
+
+      /*--- Set iterations for mass fractions and temperature system ---*/
+      unsigned short maxSubIter = 15;
+      unsigned short iSubIter;
+      const su2double toll_subsys = 1.0e-6;
+      bool conv_subsys = false;
+      Tg = node[Point_Normal]->GetTemperature();
+      Vg = 0.0;
+      for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+        Ys_g[iSpecies] = Ys_int[iSpecies] = node[Point_Normal]->GetMassFraction(iSpecies);
+      Xs_int = library->GetMolarFromMass(Ys_int);
+
+      /*--- Start non-linear system solution procedure ---*/
+      for(iIter = 0; iIter < maxIter; ++iIter) {
+        /*--- Save previous iteration values ---*/
+        Tg_old = Tg;
+        Vg_old = Vg;
+        std::copy(Ys_g.cbegin(), Ys_g.cend(), Ys_g_old);
+
+        su2double dim_temp = Tg*config->GetTemperature_Ref();
+        if(US_System)
+          dim_temp *= 5.0/9.0;
+        auto val_Dij = library->GetDij_SM(dim_temp, dim_press)/(config->GetVelocity_Ref()*config->GetLength_Ref()*1.0e4);
+        su2double alpha_Dij = 1.0/val_Dij.maxCoeff();
+
+        /*--- Solve iteratively mass fractions ---*/
+        su2double omega_bar = rho_s*rb(Tg);
+        for(iSubIter = 0; iSubIter < maxSubIter; ++iSubIter) {
+          /*--- Save previous subiteration values ---*/
+          std::copy(Ys_g.cbegin(), Ys_g.cend(), Ys_g_tmp);
+
+          /*--- NOTE: Compute molar fractions and its gradient ----*/
+          Xs_g = library->GetMolarFromMass(Ys_g);
+          for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+            for(iDim = 0; iDim < nDim; ++iDim)
+              Grad_Xs_g[iSpecies][iDim] = (Xs_int[iSpecies] - Xs_g[iSpecies])/Coord_ij[iDim];
+
+          /*--- Solve S-M equations ---*/
+          su2double rho_g = library->ComputeDensity(Tg, pg, Ys_g)*config->GetGas_Constant_Ref();
+          const su2double eps = 1.0e-7; /*--- Perturbation for numerical Jacobian ---*/
+          for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+            f_Ys[iSpecies] = (Ys_g[iSpecies] - Ys[iSpecies])*omega_bar;
+          std::fill(fprime_Ys.begin(), fprime_Ys.end(), 0.0);
+          for(iDim = 0; iDim < nDim; ++iDim) {
+            for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+              Grad_Xs_iDim[iSpecies] = Grad_Xs_g[iSpecies][iDim];
+            Jd = Solve_SM(rho_g, alpha_Dij, val_Dij, Xs_g, Grad_Xs_iDim, Ys_g);
+
+            for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+              /*--- Set current value of flux ---*/
+              f_Ys[iSpecies] += Jd[iSpecies]*UnitNormal[iDim];
+
+              /*--- Numerical Jacobian ---*/
+              Ys_g[iSpecies] += eps*Ys_g[iSpecies];
+              Xs_g = library->GetMolarFromMass(Ys_g);
+              Grad_Xs_iDim[iSpecies] = (Xs_int[iSpecies] - Xs_g[iSpecies])/Coord_ij[iDim];
+              Jd_pert = Solve_SM(rho_g, alpha_Dij, val_Dij, Xs_g, Grad_Xs_iDim, Ys_g);
+              fprime_Ys[iSpecies] += Jd_pert[iSpecies]*UnitNormal[iDim];
+
+              /*--- Restore value to pass to subsequent derivatives ---*/
+              Ys_g[iSpecies] = Ys_g_tmp[iSpecies];
+              Grad_Xs_iDim[iSpecies] = Grad_Xs_g[iSpecies][iDim];
+            }
+          }
+
+          /*--- Update mass fractions ---*/
+          for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+            fprime_Ys[iSpecies] += (Ys_g[iSpecies]*(1.0 + eps) - Ys[iSpecies])*omega_bar;
+            fprime_Ys[iSpecies] = (fprime_Ys[iSpecies] - f_Ys[iSpecies])/(eps*Ys_g[iSpecies]);
+            Ys_g[iSpecies] -= f_Ys[iSpecies]/fprime_Ys[iSpecies];
+          }
+
+          /*--- Check convergecne ---*/
+          su2double err_Ys = std::numeric_limits<su2double>::min();
+          for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+            err_Ys = std::max(err_Ys, std::abs(Ys_g[iSpecies] - Ys_g_tmp[iSpecies])/Ys_g_tmp[iSpecies]);
+          if(err_Ys < toll_subsys) {
+            conv_subsys = true;
+            break;
+          }
+        }
+        if(!conv_subsys)
+          throw std::runtime_error("Convergence not achieved for mass fractions system at inflow");
+
+        /*--- Solve iteratively wall temperature ---*/
+        conv_subsys = false;
+        su2double Ta = Tmin;
+        su2double Tb = Tmax;
+        su2double fa = f_wall(Ta);
+        su2double fb = f_wall(Tb);
+        for(iSubIter = 0; iSubIter < maxSubIter; ++iSubIter) {
+          /*--- Save previous subiteration value ---*/
+          Tg_tmp = Tg;
+
+          /*--- Regula falsi scheme update ----*/
+          Tg = (Ta*fb - Tb*fa)/(fb - fa);
+
+          /*--- Check convergence ---*/
+          if(std::abs(Tg - Tg_tmp)/Tg_tmp < toll_subsys) {
+            conv_subsys = true;
+            break;
+          }
+
+          /*--- Update limits ---*/
+          if(f_wall(Tg)*fa < 0) {
+            Tb = Tg;
+            fb = f_wall(Tb);
+          }
+          else {
+            Ta = Tg;
+            fa = f_wall(Ta);
+          }
+        }
+        if(!conv_subsys)
+          throw std::runtime_error("Convergence not achieved for wall temperature at inflow");
+
+        /*--- Compute wall density ---*/
+        rho_g = library->ComputeDensity(Tg, pg, Ys_g)*config->GetGas_Constant_Ref();
+
+        /*--- Compute wall velocity ---*/
+        su2double alpha = std::inner_product(UnitNormal, UnitNormal + nDim, Flow_Dir, 0.0);
+        su2double r_b = rb(Tg);
+        Vg = (rho_s - rho_g)*r_b/(rho_g*alpha);
+
+        /*--- Check global convergecne ---*/
+        su2double err_Ys = std::numeric_limits<su2double>::min();
+        for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+          err_Ys = std::max(err_Ys, std::abs(Ys_g[iSpecies] - Ys_g_old[iSpecies])/Ys_g_old[iSpecies]);
+        su2double err = std::max(std::abs(Vg_old - Vg)/Vg_old, std::max(std::abs(Tg_old - Tg)/Tg_old, err_Ys));
+        if(err < toll_sys) {
+          conv_sys = true;
+          break;
+        }
+      } /*--- End full system cycle ---*/
+      if(!conv_sys)
+        throw std::runtime_error("Convergence not achieved for regression boundary condtion system");
+
+      /*--- Set inlet state ---*/
+      V_inlet[T_INDEX_PRIM] = Tg;
+      for(iDim = 0; iDim < nDim; ++iDim)
+        V_inlet[VX_INDEX_PRIM + iDim] = Vg*Flow_Dir[iDim];
+      V_inlet[P_INDEX_PRIM] = pg;
+      V_inlet[RHO_INDEX_PRIM] = rho_g;
+      su2double dim_temp = Tg*config->GetTemperature_Ref();
+      if(US_System)
+        dim_temp *= 5.0/9.0;
+      V_inlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys_g)/config->GetEnergy_Ref();
+      if(US_System)
+        V_inlet[H_INDEX_PRIM] *= 3.28084*3.28084;
+      V_inlet[A_INDEX_PRIM] = library->ComputeFrozenSoundSpeed(dim_temp, Ys_g)/config->GetVelocity_Ref();
+      if(US_System)
+        V_inlet[A_INDEX_PRIM] *= 3.28084;
+      std::copy(Ys.cbegin(), Ys.cend(), V_inlet + RHOS_INDEX_PRIM);
+
+      /*--- Set normal for convective flux ---*/
+      conv_numerics->SetNormal(Normal);
+
+      /*--- Set primitive for convective flux ---*/
+      conv_numerics->SetPrimitive(node[iPoint]->GetPrimitive(), V_inlet);
+
+      if(implicit) {
+        su2double Secondary[nVar];
+        su2double Gamma = library->ComputeFrozenGamma_FromSoundSpeed(V_inlet[T_INDEX_PRIM], V_inlet[A_INDEX_PRIM], Ys);
+        Gamma *= config->GetGas_Constant_Ref();
+
+        /*--- Derivatives with respect to density ---*/
+        Secondary[RHO_INDEX_SOL] = (Gamma - 1.0)*0.5*Vg*Vg;
+
+        /*--- Derivatives with respect to momentum ---*/
+        for(iDim = 0; iDim < nDim; ++iDim)
+          Secondary[RHOVX_INDEX_SOL + iDim] = (1.0 - Gamma)*V_inlet[VX_INDEX_PRIM + iDim];
+
+        /*--- Derivatives with respect to energy ---*/
+        Secondary[RHOE_INDEX_SOL] = Gamma - 1.0;
+
+        /*--- Derivatives with respect to partial densities ---*/
+        su2double dim_temp = V_inlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
+        if(US_System)
+          dim_temp *= 5.0/9.0;
+        for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+          Secondary[RHOS_INDEX_SOL + iSpecies] = library->ComputedP_dYs(dim_temp, Gamma, iSpecies)/config->GetEnergy_Ref();
+          if(US_System)
+            Secondary[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+        }
+        conv_numerics->SetSecondary(node[iPoint]->GetdPdU(), Secondary);
+      }
+
+      /*--- Compute the residual using an upwind scheme ---*/
+      try {
+        conv_numerics->ComputeResidual(Res_Conv, Jacobian_i, Jacobian_j, config);
+      }
+      catch(const std::exception& e) {
+        std::cout<<e.what()<<std::endl;
+        dynamic_cast<CUpwReactiveAUSM*>(conv_numerics)->SetExplicit();
+        conv_numerics->ComputeResidual(Res_Conv, Jacobian_i, Jacobian_j, config);
+      }
+
+      /*--- Update residual value ---*/
+      LinSysRes.AddBlock(iPoint, Res_Conv);
+
+      /*--- Jacobian contribution for implicit integration ---*/
+      if(implicit) {
+        throw Common::NotImplemented("Implicit computation for inlet BC not implemented");
+
+        Jacobian.AddBlock(iPoint, iPoint, Jacobian_i);
+      }
+
+      /*--- NOTE: Viscous contribution ---*/
+      /*--- Set the normal vector and the coordinates ---*/
+      visc_numerics->SetNormal(Normal);
+      visc_numerics->SetCoord(geometry->node[iPoint]->GetCoord(), geometry->node[Point_Normal]->GetCoord());
+
+      /*--- Primitive variables, and gradient ---*/
+      visc_numerics->SetPrimitive(node[iPoint]->GetPrimitive(), V_inlet);
+      visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
+
+      /*--- Set limited variables ---*/
+      if(limiter)
+        visc_numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[iPoint]->GetLimiter_Primitive());
+
+      /*--- Laminar viscosity ---*/
+      visc_numerics->SetLaminarViscosity(node[iPoint]->GetLaminarViscosity(), node[iPoint]->GetLaminarViscosity());
+
+      /*--- Thermal conductivity ---*/
+      visc_numerics->SetThermalConductivity(node[iPoint]->GetThermalConductivity(), node[iPoint]->GetThermalConductivity());
+
+      /*--- Species binary coefficients ---*/
+      visc_numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
+
+      /*--- Compute and update residual ---*/
+      try {
+        visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
+      }
+      catch(const std::exception& e) {
+        std::cout<<e.what()<<std::endl;
+        dynamic_cast<CAvgGradReactive_Flow*>(visc_numerics)->SetExplicit();
+        visc_numerics->ComputeResidual(Res_Visc, Jacobian_i, Jacobian_j, config);
+      }
+      LinSysRes.SubtractBlock(iPoint, Res_Visc);
+
+      /*--- Jacobian contribution for implicit integration ---*/
+      if(implicit) {
+        throw Common::NotImplemented("Implicit computation for inlet BC not implemented");
+
+        Jacobian.SubtractBlock(iPoint, iPoint, Jacobian_i);
+      }
+    }
+  } /*--- End loop boundary points ---*/
 }

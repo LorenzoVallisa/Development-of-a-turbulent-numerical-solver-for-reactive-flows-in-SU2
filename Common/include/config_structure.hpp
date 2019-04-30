@@ -72,9 +72,10 @@ private:
   std::string  Config_File_Lib;        /*!< \brief Name of the file to configure the library.*/
   std::string  Library_Path;           /*!< \brief Name of the library to look for files to configure the library.*/
   std::string* Species_Order;          /*!< \brief String list to check the coherence in species order declaration.*/
+  unsigned short nSpecies;    /*!< \brief Number of species in the mixture.*/
   std::string* Marker_Inlet_MassFrac;  /*!< \brief String list with name of inlet boundary for mass fractions.*/
   su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
-  unsigned short nSpecies;    /*!< \brief Number of species in the mixture.*/
+  unsigned short nSpecies_Inlet; /*!< \brief Number of species detected at inlet.*/
   su2double rho_s,            /*!< \brief Fuel density.*/
             c_s,              /*!< \brief Specific heat of fuel.*/
             h_pf,             /*!< \brief Pyrolisis enthalpy of fuel.*/
@@ -82,11 +83,13 @@ private:
             T_0;              /*!< \brief Fuel temperature far from surface.*/
   std::string* Marker_Inflow_MassFrac;  /*!< \brief String list with name of inflow boundary for mass fractions.*/
   su2double** Inflow_MassFrac; /*!< \brief Inflow mass fractions for each boundary.*/
-  unsigned short nSpecies_Inlet; /*!< \brief Number of species detected at inlet.*/
-  su2double* Velocity_Inflow;  /*!< \brief Inflow velocity.*/
   su2double* Velocity_Dir_Inflow;     /*!< \brief Inflow velocity direction.*/
-  su2double Inflow_Mass_Flow;  /*!< \brief Inflow mass flow.*/
   unsigned short nSpecies_Inflow; /*!< \brief Number of species detected at inflow.*/
+  su2double Ea_1,                 /*!< \brief Activation energy of first interval for fuel regression.*/
+            Ea_2,                 /*!< \brief Activation energy of second interval for fuel regression.*/
+            A_1,                  /*!< \brief Exponential prefactor of first interval for fuel regression.*/
+            A_2,                  /*!< \brief Exponential prefactor of second interval for fuel regression.*/
+            T_bar;                /*!< \brief Temperature determining intervals for fuel regression.*/
 
   /*--- NOTE: Already present information to be read from config ---*/
   SU2_Comm SU2_Communicator; /*!< \brief MPI communicator of SU2.*/
@@ -1250,7 +1253,7 @@ public:
   }
 
   /*!
-   * \brief Get number of species involved
+   * \brief Get number of species detected at inlet.
    * \return Number of species at inlet.
   */
   inline unsigned short GetnSpecies_Inlet(void) const {
@@ -1312,27 +1315,11 @@ public:
   su2double* GetInflow_MassFrac(std::string val_index) const;
 
   /*!
-   * \brief Get number of species involved
+   * \brief Get number of species detected at inflow.
    * \return Number of species at inflow.
   */
   inline unsigned short GetnSpecies_Inflow(void) const {
     return nSpecies_Inflow;
-  }
-
-  /*!
-   * \brief Get velocity inflow.
-   * \return Inflow velocity.
-  */
-  inline su2double* GetVelocity_Inflow(void) const {
-    return Velocity_Inflow;
-  }
-
-  /*!
-   * \brief Get fuel mass flow.
-   * \return Inflow mass flow.
-  */
-  inline su2double GetMassFlow_Fuel(void) const {
-    return Inflow_Mass_Flow;
   }
 
   /*!
@@ -1341,6 +1328,46 @@ public:
   */
   inline su2double* GetVelocityDir_Inflow(void) const {
     return Velocity_Dir_Inflow;
+  }
+
+  /*!
+   * \brief Get fuel activation energy for first interval.
+   * \return Fuel activation energy for first interval.
+  */
+  inline su2double GetActivationEnergy_1_Fuel(void) const {
+    return Ea_1;
+  }
+
+  /*!
+   * \brief Get fuel activation energy for second interval.
+   * \return Fuel activation energy for second interval.
+  */
+  inline su2double GetActivationEnergy_2_Fuel(void) const {
+    return Ea_2;
+  }
+
+  /*!
+   * \brief Get fuel exponential prefactor for first interval.
+   * \return Fuel exponential prefactor for first interval.
+  */
+  inline su2double GetPrefactor_1_Fuel(void) const {
+    return A_1;
+  }
+
+  /*!
+   * \brief Get fuel exponential prefactor for second interval.
+   * \return Fuel exponential prefactor for second interval.
+  */
+  inline su2double GetPrefactor_2_Fuel(void) const {
+    return A_2;
+  }
+
+  /*!
+   * \brief Get fuel temperature determining first and second interval.
+   * \return Fuel temperature between first and second interval.
+  */
+  inline su2double GetTemperatureBar_Fuel(void) const {
+    return T_bar;
   }
 
   /*--- NOTE: ALready present functions ---*/

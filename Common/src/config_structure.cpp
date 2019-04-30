@@ -394,7 +394,6 @@ void CConfig::SetPointersNull(void) {
   Inlet_MassFrac = NULL;
   Marker_Inflow_MassFrac = NULL;
   Inflow_MassFrac = NULL;
-  Velocity_Inflow = NULL;
   Velocity_Dir_Inflow = NULL;
   /*---NOTE: Already present ---*/
   Velocity_FreeStream = NULL;
@@ -585,8 +584,20 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\brief INFLOW_MASS_FRAC\n DESCRIPTION: Inflow mass fractions */
   addInlet_MassFracOption("INFLOW_MASS_FRAC", nMarker_EngineInflow, Marker_Inflow_MassFrac, Inflow_MassFrac, nSpecies_Inflow);
 
-  /*!\brief FUEL_TEMPERATURE\n DESCRIPTION: Propellant mass flow (25.0 kg/m2*s by default) \ingroup Config*/
-  addDoubleOption("FUEL_MASS_FLOW", Inflow_Mass_Flow, 25.0);
+  /*!\brief FUEL_ACTIVATION_ENERGY_1\n DESCRIPTION: Fuel activation energy for first interval (4910.0 cal/mol by default) \ingroup Config*/
+  addDoubleOption("FUEL_ACTIVATION_ENERGY_1", Ea_1, 4910.0);
+
+  /*!\brief FUEL_ACTIVATION_ENERGY_2\n DESCRIPTION: Fuel activation energy for second interval (13350.0 cal/mol by default) \ingroup Config*/
+  addDoubleOption("FUEL_ACTIVATION_ENERGY_2", Ea_1, 13350.0);
+
+  /*!\brief FUEL_PREFACTOR_1\n DESCRIPTION: Fuel exponential prefactor for first interval (0.01104 m/s by default) \ingroup Config*/
+  addDoubleOption("FUEL_PREFACTOR_1", A_1, 0.01104);
+
+  /*!\brief FUEL_PREFACTOR_2\n DESCRIPTION: Fuel exponential prefactor for second interval (3.965 m/s by default) \ingroup Config*/
+  addDoubleOption("FUEL_PREFACTOR_2", A_1, 3.965);
+
+  /*!\brief FUEL_BAR_TEMPERATURE\n DESCRIPTION: Temperature for fuel regrssion intervals (722.0 K by default) \ingroup Config*/
+  addDoubleOption("FUEL_BAR_TEMPERATURE", T_bar, 722.0);
 
   /*--- NOTE: Already present options ---*/
   /*!\brief REGIME_TYPE \n  DESCRIPTION: Regime type \n OPTIONS: see \link Regime_Map \endlink \ingroup Config*/
@@ -749,9 +760,6 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*--- NOTE: New options ---*/
   /*!\brief REF_LENGTH\n DESCRIPTION: Reference length for adimensionalitazion (1.0 m by default) \ingroup Config*/
   addDoubleOption("REF_LENGTH", Length_Ref, 1.0);
-
-  /*!\brief INFLOW_VELOCITY\n DESCRIPTION: Inflow velocity (m/s) */
-  addDoubleArrayOption("INFLOW_VELOCITY", 3, Velocity_Inflow, default_vel_inf);
 
   /*!\brief INFLOW_VELOCITY_DIR\n DESCRIPTION: Inflow velocity direction (this must be a unit vector) */
   addDoubleArrayOption("INFLOW_VELOCITY_DIR", 3, Velocity_Dir_Inflow, default_vel_inf);

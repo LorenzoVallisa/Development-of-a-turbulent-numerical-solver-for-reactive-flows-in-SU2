@@ -892,17 +892,11 @@ enum ENGINE_INFLOW_TYPE {
   FAN_FACE_MACH = 1,	         /*!< \brief User specifies fan face mach number. */
   FAN_FACE_MDOT = 2,           /*!< \brief User specifies Static pressure. */
   FAN_FACE_PRESSURE = 3,        /*!< \brief User specifies Static pressure. */
-  /*--- NOTE: New options ---*/
-  VELOCITY_INFLOW = 4,         /*!< \brief User specifies velocity inflow. */
-  MASS_FLOW_INFLOW = 5       /*!< \brief User specifies mass flow and velocity direction. */
 };
 static const map<string, ENGINE_INFLOW_TYPE> Engine_Inflow_Map = CCreateMap<string, ENGINE_INFLOW_TYPE>
 ("FAN_FACE_MACH", FAN_FACE_MACH)
 ("FAN_FACE_MDOT", FAN_FACE_MDOT)
-("FAN_FACE_PRESSURE", FAN_FACE_PRESSURE)
-/*--- NOTE: New options ---*/
-("VELOCITY_INFLOW", VELOCITY_INFLOW)
-("MASS_FLOW_INFLOW", MASS_FLOW_INFLOW);
+("FAN_FACE_PRESSURE", FAN_FACE_PRESSURE);
 
 /*!
  * \brief types actuator disk boundary treatments

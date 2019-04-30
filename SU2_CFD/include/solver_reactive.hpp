@@ -390,6 +390,9 @@ public:
  *  \author G. Orlando.
  */
 class CReactiveNSSolver:public CReactiveEulerSolver {
+public:
+  using Vec = Eigen::VectorXd;
+
 protected:
   su2double Viscosity_Inf;	/*!< \brief Viscosity at the infinity. */
 
@@ -507,6 +510,19 @@ protected:
  	 */
   void Load_Restart(CGeometry* geometry, CConfig* config) override;
 
+private:
+  /*!
+   * \brief Compute the diffusive flux along a certain direction
+   * \param[in] val_density - Density of the mixture.
+   * \param[in] val_alpha - Parameter for artifical diffusion.
+   * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.
+   * \param[in] val_xs - Molar fractions.
+   * \param[in] val_grad_xs - Component along the desired dimension of gradient of molar fractions.
+   * \param[in] val_ys - Mass fractions.
+   * \return Multispecies diffusion flux along a certain direction
+   */
+  Vec Solve_SM(const su2double val_density, const su2double val_alpha, const RealMatrix& val_Dij,
+               const RealVec& val_xs, const Vec& val_grad_xs, const RealVec& val_ys);
 };
 
 #endif
