@@ -1065,8 +1065,8 @@ namespace Framework {
       /*--- If nobody has configured the library path, we try to do it here with a default value ---*/
       if(Lib_Path == "") {
         std::cout<<"Library path set to default"<<std::endl;
-        //auto base_dir = std::experimental::filesystem::current_path().string();
-        //Lib_Path = base_dir;
+        auto base_dir = std::experimental::filesystem::current_path().string();
+        Lib_Path = base_dir;
         //std::cout<<Lib_Path<<std::endl;
       }
 
