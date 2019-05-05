@@ -353,6 +353,12 @@ namespace Framework {
     double ComputeConcentration(const double rho, const RealVec& ys) override;
 
     /*!
+     * \brief Return the specific heat at constant pressure per unit of mass of each species.
+     * \param[in] temp - the mixture temperature
+    */
+    RealVec ComputeCps(const double temp) override;
+
+    /*!
      * \brief Computes the specific heat at constant pressure
      * \param[in] temp - temperature
      * \param[in] ys - mass fractions
@@ -466,9 +472,10 @@ namespace Framework {
     * \param[in] temp - the mixture temperature
     * \param[in] rho - the mixture density
     * \param[in] ys - the species mass fractions
+    * \param[in] turbulent - flag to say if we use PSR or PaSR
     * \return Mass production terms
     */
-    RealVec GetMassProductionTerm(const double temp, const double rho, const RealVec& ys) override;
+    RealVec GetMassProductionTerm(const double temp, const double rho, const RealVec& ys, bool turbulent) override;
 
     /*!
      * Compute the Jacobian of source chemistry. NOTE: It requires SetReactionRates call
@@ -476,7 +483,7 @@ namespace Framework {
      * \param[in] rho - the mixture density
      * \return Contribution to source derivatives with respect to mixture density and partial densitiies
      */
-    RealMatrix GetSourceJacobian(const double temp, const double rho) override;
+    RealMatrix GetSourceJacobian(const double temp, const double rho, bool turbulent) override;
 
     /*!
      * \brief Return the effective diffusion coefficients to solve Stefan-Maxwell equation
@@ -524,6 +531,12 @@ namespace Framework {
      * \param[in] ys - the species mass fractions
     */
     void SetReactionRates(const double temp, const double rho, const RealVec& ys);
+
+    /*!
+     * Set forwardreaction rate derivative with respect to temperature.
+     * \param[in] temp - the mixture temperature
+    */
+    void SetFr_Derivatives(const double temp);
 
     /*!
       * \brief Read transport data
@@ -643,6 +656,10 @@ namespace Framework {
     RealVec Kc; /*!< \brief Auxiliary vector for equilibrium constants. */
 
     RealVec Kc_Derivatives; /*!< \brief Auxiliary vector for equilibrium constants derivative. */
+
+    RealVec Kf_Derivatives; /*!< \brief Auxiliary vector for forward rate derivative. */
+
+    RealVec Time_Charac; /*!< \brief Auxiliary vector for characteristic time ratio in case of PaSR. */
 
     RealMatrix Source_Jacobian; /*!< \brief Auxiliary matrix for source chemistry Jacobian. */
 

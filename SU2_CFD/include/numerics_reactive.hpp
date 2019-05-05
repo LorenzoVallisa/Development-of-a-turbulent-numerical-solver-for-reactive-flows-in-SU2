@@ -109,7 +109,8 @@ protected:
   Vec Proj_Mean_GradPrimVar_Edge; /*!< \brief Projected mean value of the gradient. */
 
   RealVec Xs_i, Xs_j;         /*!< \brief Auxiliary vectors for mole fractions at point i and j. */
-  RealVec Xs,Ys;              /*!< \brief Auxiliary vectors for mean mole and mass fractions. */
+  RealVec Ys_i, Ys_j;         /*!< \brief Auxiliary vectors for mole fractions at point i and j. */
+  RealVec Xs, Ys;             /*!< \brief Auxiliary vectors for mean mole and mass fractions. */
   RealMatrix Grad_Xs;         /*!< \brief Auxiliary matrix for mean gradient of mole fractions. */
 
 private:
@@ -134,8 +135,11 @@ private:
   RealMatrix Gamma, Gamma_tilde;  /*!< \brief Auxiliary matrices for solving Stefan-Maxwell equations. */
 
   RealVec hs;                   /*!< \brief Auxiliary vector to store partial enthalpy for species diffusion flux contribution. */
+  RealVec Cps;                  /*!< \brief Auxiliary vector to store Cp for species diffusion flux Jacobian contribution. */
 
-  Vec Jd;                       /*!< \brief Auxiliary vectors to store S-M solution. */
+  Vec Jd;                       /*!< \brief Auxiliary vector to store S-M solution. */
+
+  Vec Ds_i, Ds_j, Mean_Ds, Ds;  /*!< \brief Auxiliary vectors to store Rmashaw self consistent diffusion coefficients for Jacobian. */
 
   unsigned short T_INDEX_AVGGRAD,
                  VX_INDEX_AVGGRAD,

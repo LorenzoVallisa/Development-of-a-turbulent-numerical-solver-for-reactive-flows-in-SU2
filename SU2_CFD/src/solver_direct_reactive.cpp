@@ -3045,6 +3045,32 @@ void CReactiveEulerSolver::BC_Supersonic_Inlet(CGeometry* geometry, CSolver** so
   			visc_numerics->SetPrimitive(V_domain, V_inlet);
         visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
 
+        /*--- Set temperature derivatives if implicit ---*/
+        if(implicit) {
+          su2double Secondary[nVar];
+
+          su2double dim_temp = V_inlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
+          if(US_System)
+            dim_temp *= 5.0/9.0;
+          su2double Cv = library->ComputeCV(dim_temp, Ys)/config->GetGas_Constant_Ref();
+          if(US_System)
+            Cv *= 3.28084*3.28084*5.0/9.0;
+          su2double rhoCv = V_inlet[RHO_INDEX_PRIM]*Cv;
+          su2double sq_vel = std::inner_product(V_inlet + VX_INDEX_PRIM, V_inlet + (VX_INDEX_PRIM + nDim), V_inlet + VX_INDEX_PRIM, 0.0);
+
+          /*--- Set temperature derivatives ---*/
+          Secondary[RHO_INDEX_SOL] = 0.5*sq_vel/rhoCv;
+          for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+            Secondary[RHOVX_INDEX_SOL + iDim] = -V_inlet[VX_INDEX_PRIM + iDim]/rhoCv;
+          Secondary[RHOE_INDEX_SOL] = 1.0/rhoCv;
+          for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+            Secondary[RHOS_INDEX_SOL + iSpecies] = -library->ComputePartialEnergy(dim_temp, iSpecies)/(config->GetEnergy_Ref()*rhoCv);
+            if(US_System)
+              Secondary[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+          }
+          visc_numerics->SetSecondary(node[iPoint]->GetdTdU(), Secondary);
+        }
+
         /*--- Set limited variables ---*/
         if(limiter)
           visc_numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[iPoint]->GetLimiter_Primitive());
@@ -3247,7 +3273,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
         /*--- Mass flow has been specified at the inlet. ---*/
         case MASS_FLOW: {
           /*--- Local variables ---*/
-          su2double Density, Pressure
+          su2double Density, Pressure;
 
           /*--- Retrieve the specified mass flow for the inlet. ---*/
           Density = config->GetInlet_Ttotal(Marker_Tag);
@@ -3357,6 +3383,32 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
         /*--- Primitive variables, and gradient ---*/
         visc_numerics->SetPrimitive(V_domain, V_inlet);
         visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
+
+        /*--- Set temperature derivatives if implicit ---*/
+        if(implicit) {
+          su2double Secondary[nVar];
+
+          su2double dim_temp = V_inlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
+          if(US_System)
+            dim_temp *= 5.0/9.0;
+          su2double Cv = library->ComputeCV(dim_temp, Ys)/config->GetGas_Constant_Ref();
+          if(US_System)
+            Cv *= 3.28084*3.28084*5.0/9.0;
+          su2double rhoCv = V_inlet[RHO_INDEX_PRIM]*Cv;
+          su2double sq_vel = std::inner_product(V_inlet + VX_INDEX_PRIM, V_inlet + (VX_INDEX_PRIM + nDim), V_inlet + VX_INDEX_PRIM, 0.0);
+
+          /*--- Set temperature derivatives ---*/
+          Secondary[RHO_INDEX_SOL] = 0.5*sq_vel/rhoCv;
+          for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+            Secondary[RHOVX_INDEX_SOL + iDim] = -V_inlet[VX_INDEX_PRIM + iDim]/rhoCv;
+          Secondary[RHOE_INDEX_SOL] = 1.0/rhoCv;
+          for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+            Secondary[RHOS_INDEX_SOL + iSpecies] = -library->ComputePartialEnergy(dim_temp, iSpecies)/(config->GetEnergy_Ref()*rhoCv);
+            if(US_System)
+              Secondary[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+          }
+          visc_numerics->SetSecondary(node[iPoint]->GetdTdU(), Secondary);
+        }
 
         /*--- Set limited variables ---*/
         if(limiter)
@@ -3471,6 +3523,33 @@ void CReactiveEulerSolver::BC_Supersonic_Outlet(CGeometry* geometry, CSolver** s
         /*--- Primitive variables and gradient ---*/
         visc_numerics->SetPrimitive(V_domain, V_outlet);
         visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
+
+        /*--- Set temperature derivatives if implicit ---*/
+        if(implicit) {
+          su2double Secondary[nVar];
+
+          su2double dim_temp = V_outlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
+          if(US_System)
+            dim_temp *= 5.0/9.0;
+          su2double Cv = library->ComputeCV(dim_temp, Ys)/config->GetGas_Constant_Ref();
+          if(US_System)
+            Cv *= 3.28084*3.28084*5.0/9.0;
+          su2double rhoCv = V_outlet[RHO_INDEX_PRIM]*Cv;
+          su2double sq_vel = std::inner_product(V_outlet + VX_INDEX_PRIM, V_outlet + (VX_INDEX_PRIM + nDim), V_outlet + VX_INDEX_PRIM, 0.0);
+          std::copy(V_outlet + RHOS_INDEX_PRIM, V_outlet + (RHOS_INDEX_PRIM + nSpecies), Ys.begin());
+
+          /*--- Set temperature derivatives ---*/
+          Secondary[RHO_INDEX_SOL] = 0.5*sq_vel/rhoCv;
+          for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+            Secondary[RHOVX_INDEX_SOL + iDim] = -V_outlet[VX_INDEX_PRIM + iDim]/rhoCv;
+          Secondary[RHOE_INDEX_SOL] = 1.0/rhoCv;
+          for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+            Secondary[RHOS_INDEX_SOL + iSpecies] = -library->ComputePartialEnergy(dim_temp, iSpecies)/(config->GetEnergy_Ref()*rhoCv);
+            if(US_System)
+              Secondary[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+          }
+          visc_numerics->SetSecondary(node[iPoint]->GetdTdU(), Secondary);
+        }
 
         /*--- Set limited variables ---*/
         if(limiter)
@@ -3683,6 +3762,32 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         /*--- Primitive variables and gradient ---*/
         visc_numerics->SetPrimitive(V_domain, V_outlet);
         visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
+
+        /*--- Set temperature derivatives if implicit ---*/
+        if(implicit) {
+          su2double Secondary[nVar];
+
+          su2double dim_temp = V_outlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
+          if(US_System)
+            dim_temp *= 5.0/9.0;
+          su2double Cv = library->ComputeCV(dim_temp, Ys)/config->GetGas_Constant_Ref();
+          if(US_System)
+            Cv *= 3.28084*3.28084*5.0/9.0;
+          su2double rhoCv = V_outlet[RHO_INDEX_PRIM]*Cv;
+          su2double sq_vel = std::inner_product(V_outlet + VX_INDEX_PRIM, V_outlet + (VX_INDEX_PRIM + nDim), V_outlet + VX_INDEX_PRIM, 0.0);
+
+          /*--- Set temperature derivatives ---*/
+          Secondary[RHO_INDEX_SOL] = 0.5*sq_vel/rhoCv;
+          for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+            Secondary[RHOVX_INDEX_SOL + iDim] = -V_outlet[VX_INDEX_PRIM + iDim]/rhoCv;
+          Secondary[RHOE_INDEX_SOL] = 1.0/rhoCv;
+          for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+            Secondary[RHOS_INDEX_SOL + iSpecies] = -library->ComputePartialEnergy(dim_temp, iSpecies)/(config->GetEnergy_Ref()*rhoCv);
+            if(US_System)
+              Secondary[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+          }
+          visc_numerics->SetSecondary(node[iPoint]->GetdTdU(), Secondary);
+        }
 
         /*--- Set limited variables ---*/
         if(limiter)
@@ -4440,6 +4545,10 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
     numerics->SetPrimitive(node[iPoint]->GetPrimitive(), node[jPoint]->GetPrimitive());
     numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[jPoint]->GetGradient_Primitive());
 
+    /*--- Set temperature derivatives if implicit ---*/
+    if(implicit)
+      numerics->SetSecondary(node[iPoint]->GetdTdU(), node[jPoint]->GetdTdU());
+
     /*--- Set primitve variables limited ---*/
     if(limiter)
       numerics->SetPrimVarLimiter(node[iPoint]->GetLimiter_Primitive(), node[jPoint]->GetLimiter_Primitive());
@@ -4884,7 +4993,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
       }
 
       /*--- If the wall is moving, there are additional residual contributions
-            due to pressure (p v_wall\cdot n) and shear stress ((tau*v_wall) \cdot n). ---*/
+            due to pressure (p v_{wall}\cdot n) and shear stress ((tau*v_{wall}) \cdot n). ---*/
       if(grid_movement) {
         /*--- Get the projected grid velocity at the current boundary node ---*/
         su2double ProjGridVel = std::inner_product(Vector, Vector + nDim, UnitNormal, 0.0);
@@ -5009,7 +5118,7 @@ void CReactiveNSSolver::BC_Engine_Inflow(CGeometry* geometry, CSolver** solver_c
   RealVec Ys_g(nSpecies), Xs_g, Ys_int(nSpecies), Xs_int;
   RealVec f_Ys(nSpecies), fprime_Ys(nSpecies);
   su2double Ys_g_old[nSpecies], Ys_g_tmp[nSpecies], Grad_Xs_g[nSpecies][nDim];
-  Vec Jd, Jd_pert, Grad_Xs_iDim(nSpecies);
+  Vec Jd, Jd_pert, Grad_Xs_norm(nSpecies);
 
   /*--- Identify the boundary ---*/
 	auto Marker_Tag = config->GetMarker_All_TagBound(val_marker);
@@ -5035,7 +5144,7 @@ void CReactiveNSSolver::BC_Engine_Inflow(CGeometry* geometry, CSolver** solver_c
   const su2double Ru = 1.987; /*--- Universal gas constant (cal/(mol*K)) ---*/
 
   /*--- Auxiliary function for regression rate ---*/
-  auto rb = std::function<su2double(su2double)>([=](double T){
+  auto rb = std::function<su2double(su2double)>([&](double T){
     if(T < T_bar)
       return A_2*std::exp(Ea_2/(Ru*(T*config->GetTemperature_Ref())));
     return A_1*std::exp(Ea_1/(Ru*(T*config->GetTemperature_Ref())));
@@ -5142,35 +5251,37 @@ void CReactiveNSSolver::BC_Engine_Inflow(CGeometry* geometry, CSolver** solver_c
 
           /*--- Solve S-M equations ---*/
           su2double rho_g = library->ComputeDensity(Tg, pg, Ys_g)*config->GetGas_Constant_Ref();
-          const su2double eps = 1.0e-7; /*--- Perturbation for numerical Jacobian ---*/
           for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
             f_Ys[iSpecies] = (Ys_g[iSpecies] - Ys[iSpecies])*omega_bar;
-          std::fill(fprime_Ys.begin(), fprime_Ys.end(), 0.0);
           for(iDim = 0; iDim < nDim; ++iDim) {
             for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-              Grad_Xs_iDim[iSpecies] = Grad_Xs_g[iSpecies][iDim];
-            Jd = Solve_SM(rho_g, alpha_Dij, val_Dij, Xs_g, Grad_Xs_iDim, Ys_g);
+              Grad_Xs_norm[iSpecies] += Grad_Xs_g[iSpecies][iDim]*UnitNormal[iDim];
+          }
+          Jd = Solve_SM(rho_g, alpha_Dij, val_Dij, Xs_g, Grad_Xs_norm, Ys_g);
 
-            for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-              /*--- Set current value of flux ---*/
-              f_Ys[iSpecies] += Jd[iSpecies]*UnitNormal[iDim];
+          const su2double eps = 1.0e-7; /*--- Perturbation for numerical Jacobian ---*/
+          std::fill(fprime_Ys.begin(), fprime_Ys.end(), 0.0);
+          for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+            /*--- Set current value of flux ---*/
+            f_Ys[iSpecies] = (Ys_g[iSpecies] - Ys[iSpecies])*omega_bar + Jd[iSpecies];
 
-              /*--- Numerical Jacobian ---*/
-              Ys_g[iSpecies] += eps*Ys_g[iSpecies];
-              Xs_g = library->GetMolarFromMass(Ys_g);
-              Grad_Xs_iDim[iSpecies] = (Xs_int[iSpecies] - Xs_g[iSpecies])/Coord_ij[iDim];
-              Jd_pert = Solve_SM(rho_g, alpha_Dij, val_Dij, Xs_g, Grad_Xs_iDim, Ys_g);
-              fprime_Ys[iSpecies] += Jd_pert[iSpecies]*UnitNormal[iDim];
+            /*--- Numerical Jacobian ---*/
+            Ys_g[iSpecies] += eps*Ys_g[iSpecies];
+            Xs_g = library->GetMolarFromMass(Ys_g);
+            su2double old_grad_norm = Grad_Xs_norm[iSpecies];
+            Grad_Xs_norm[iSpecies] = 0.0;
+            for(iDim = 0; iDim < nDim; ++iDim)
+              Grad_Xs_norm[iSpecies] += (Xs_int[iSpecies] - Xs_g[iSpecies])/Coord_ij[iDim]*UnitNormal[iDim];
+            Jd_pert = Solve_SM(rho_g, alpha_Dij, val_Dij, Xs_g, Grad_Xs_norm, Ys_g);
+            fprime_Ys[iSpecies] = (Ys_g[iSpecies] - Ys[iSpecies])*omega_bar + Jd_pert[iSpecies];
 
-              /*--- Restore value to pass to subsequent derivatives ---*/
-              Ys_g[iSpecies] = Ys_g_tmp[iSpecies];
-              Grad_Xs_iDim[iSpecies] = Grad_Xs_g[iSpecies][iDim];
-            }
+            /*--- Restore value to pass to subsequent derivatives ---*/
+            Ys_g[iSpecies] = Ys_g_tmp[iSpecies];
+            Grad_Xs_norm[iSpecies] = old_grad_norm;
           }
 
           /*--- Update mass fractions ---*/
           for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-            fprime_Ys[iSpecies] += (Ys_g[iSpecies]*(1.0 + eps) - Ys[iSpecies])*omega_bar;
             fprime_Ys[iSpecies] = (fprime_Ys[iSpecies] - f_Ys[iSpecies])/(eps*Ys_g[iSpecies]);
             Ys_g[iSpecies] -= f_Ys[iSpecies]/fprime_Ys[iSpecies];
           }
@@ -5318,6 +5429,32 @@ void CReactiveNSSolver::BC_Engine_Inflow(CGeometry* geometry, CSolver** solver_c
       /*--- Primitive variables, and gradient ---*/
       visc_numerics->SetPrimitive(node[iPoint]->GetPrimitive(), V_inlet);
       visc_numerics->SetPrimVarGradient(node[iPoint]->GetGradient_Primitive(), node[iPoint]->GetGradient_Primitive());
+
+      /*--- Set temperature derivatives if implicit ---*/
+      if(implicit) {
+        su2double Secondary[nVar];
+
+        su2double dim_temp = V_inlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
+        if(US_System)
+          dim_temp *= 5.0/9.0;
+        su2double Cv = library->ComputeCV(dim_temp, Ys)/config->GetGas_Constant_Ref();
+        if(US_System)
+          Cv *= 3.28084*3.28084*5.0/9.0;
+        su2double rhoCv = V_inlet[RHO_INDEX_PRIM]*Cv;
+        su2double sq_vel = std::inner_product(V_inlet + VX_INDEX_PRIM, V_inlet + (VX_INDEX_PRIM + nDim), V_inlet + VX_INDEX_PRIM, 0.0);
+
+        /*--- Set temperature derivatives ---*/
+        Secondary[RHO_INDEX_SOL] = 0.5*sq_vel/rhoCv;
+        for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+          Secondary[RHOVX_INDEX_SOL + iDim] = -V_inlet[VX_INDEX_PRIM + iDim]/rhoCv;
+        Secondary[RHOE_INDEX_SOL] = 1.0/rhoCv;
+        for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+          Secondary[RHOS_INDEX_SOL + iSpecies] = -library->ComputePartialEnergy(dim_temp, iSpecies)/(config->GetEnergy_Ref()*rhoCv);
+          if(US_System)
+            Secondary[RHOS_INDEX_SOL + iSpecies] *= 3.28084*3.28084;
+        }
+        visc_numerics->SetSecondary(node[iPoint]->GetdTdU(), Secondary);
+      }
 
       /*--- Set limited variables ---*/
       if(limiter)

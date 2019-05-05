@@ -371,6 +371,12 @@ namespace Framework  {
     virtual double ComputeConcentration(const double rho, const Vector& ys) = 0;
 
     /*!
+     * \brief Return the specific heat at constant pressure per unit of mass of each species.
+     * \param[in] temp - the mixture temperature
+    */
+    virtual Vector ComputeCps(const double temp) = 0;
+
+    /*!
      * \brief Compute the specific heat at constant pressure
      * \param[in] temp - temperature
      * \param[in] ys - mass fractions
@@ -456,9 +462,10 @@ namespace Framework  {
      * \param[in] temp - the mixture temperature
      * \param[in] rho - the mixture density
      * \param[in] ys - the species mass fractions
+     * \param[in] turbulent - flag to say if we use PSR or PaSR
      * \return Mass production terms
     */
-    virtual Vector GetMassProductionTerm(const double temp, const double rho, const Vector& ys) = 0;
+    virtual Vector GetMassProductionTerm(const double temp, const double rho, const Vector& ys, bool turbulent) = 0;
 
     /*!
      * Compute the Jacobian of source chemistry. NOTE: It requires SetReactionRates call
@@ -466,7 +473,7 @@ namespace Framework  {
      * \param[in] rho - the mixture density
      * \return Source Jacobian
      */
-     virtual Matrix GetSourceJacobian(const double temp, const double rho) = 0;
+     virtual Matrix GetSourceJacobian(const double temp, const double rho, bool turbulent) = 0;
 
     /*!
      * \brief Return the effective diffusion coefficients to solve Stefan-Maxwell equation using Sutton algorithm

@@ -336,6 +336,17 @@ namespace Framework {
 
   //
   //
+  /*--- This function computes the specific heat at constant pressure for each species. ---*/
+  RealVec ReactingModelLibrary::ComputeCps(const double temp) {
+    for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      CPs[iSpecies] = MathTools::GetSpline(std::get<T_DATA_SPLINE>(Cp_Spline[iSpecies]),std::get<X_DATA_SPLINE>(Cp_Spline[iSpecies]),
+                                           std::get<Y_DATA_SPLINE>(Cp_Spline[iSpecies]),temp)/mMasses[iSpecies];
+
+    return CPs;
+  }
+
+  //
+  //
   /*--- This function computes the specific heat at constant pressure. ---*/
   double ReactingModelLibrary::ComputeCP(const double temp, const RealVec& ys) {
     for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
@@ -580,7 +591,7 @@ namespace Framework {
 
   //
   //
-  /* This function computes the omega term. */
+  /* This function sets the forward and backward reaction rates. */
   void ReactingModelLibrary::SetReactionRates(const double temp, const double rho, const RealVec& ys) {
     SetConcentration(rho, ys);
 
@@ -608,19 +619,46 @@ namespace Framework {
 
   //
   //
+  /* This function sets the forward reaction rate derivatives with respect to temperature. */
+  inline void ReactingModelLibrary::SetFr_Derivatives(const double temp) {
+    for(unsigned short iReac = 0; iReac < nReactions; ++iReac)
+      Kf_Derivatives[iReac] = (Betas[iReac] + Temps_Activation[iReac]/temp)/temp*Forward_Rates[iReac];
+  }
+
+  //
+  //
   /* This function computes the omega term. */
-  RealVec ReactingModelLibrary::GetMassProductionTerm(const double temp, const double rho, const RealVec& ys) {
+  RealVec ReactingModelLibrary::GetMassProductionTerm(const double temp, const double rho, const RealVec& ys, bool turbulent) {
     /*--- Initialize to zero ---*/
     std::fill(Omega.begin(), Omega.end(), 0.0);
 
     /*--- Set forward and backward reaction rates ---*/
     SetReactionRates(temp, rho, ys);
 
+    /*--- Set internal energies and forward rate derivatives ----*/
+    double Cv = 0.0;
+    if(turbulent) {
+      SetPartialEnergy(temp);
+      SetFr_Derivatives(temp);
+      Cv = ComputeCV(temp, ys);
+    }
+
     /*--- Compute mass production term ---*/
+    double max_e = 0.0;
     for(unsigned short iReac = 0; iReac < nReactions; ++iReac) {
-      for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      if(turbulent)
+        max_e = std::numeric_limits<double>::min();
+      for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
         Omega[iSpecies] += mMasses[iSpecies]*(Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac))*
                                              (Forward_Rates[iReac] - Backward_Rates[iReac]);
+        if(turbulent && (Stoich_Coeffs_Products(iSpecies,iReac) != 0 || Stoich_Coeffs_Reactants(iSpecies,iReac) != 0))
+          max_e = std::max(max_e, Internal_Energies[iSpecies])
+      }
+      if(turbulent) {
+        double tau_c = rho*Cv/(max_e*Kf_Derivatives[iReac]);
+        //Time_Charac[iReac] = tau_c/(tau_c + tau_mix)
+        //Omega[iSpecies] *= Time_Charac[iReac];
+      }
     }
     std::transform(Omega.begin(), Omega.end(), Omega.begin(), std::bind1st(std::multiplies<double>(), 1.0e3));
     return Omega;
@@ -629,7 +667,7 @@ namespace Framework {
   //
   //
   /* This function computes the source chemistry Jacobian. NOTE: It requires SetReactionRates call*/
-  ReactingModelLibrary::RealMatrix ReactingModelLibrary::GetSourceJacobian(const double temp, const double rho) {
+  ReactingModelLibrary::RealMatrix ReactingModelLibrary::GetSourceJacobian(const double temp, const double rho, bool turbulent) {
     /*--- Initialize to zero ---*/
     Source_Jacobian.setZero();
 
@@ -657,21 +695,32 @@ namespace Framework {
     }
 
     /*--- Compute Jacobian ---*/
+    double tmp, for_contr;
     for(iReac = 0; iReac < nReactions; ++iReac) {
-      double tmp = (Betas[iReac] + Temps_Activation[iReac]/temp)/temp;
-      double for_contr = Forward_Rates[iReac]*tmp;
+      if(!turbulent) {
+        tmp = (Betas[iReac] + Temps_Activation[iReac]/temp)/temp;
+        for_contr = Forward_Rates[iReac]*tmp;
+      }
+      else {
+        tmp = Kf_Derivatives[iReac]/Forward_Rates[iReac];
+        for_contr = Kf_Derivatives[iReac];
+      }
       double back_contr = Backward_Rates[iReac]*(tmp - Kc_Derivatives[iReac]/Kc[iReac]);
       for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
         /*--- Derivatives with respect to density ---*/
         double fixed_contr =  1.0e3*mMasses[iSpecies]*
                               (Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac));
         Source_Jacobian(iSpecies,0) += fixed_contr*(for_contr - back_contr);
+        //if(turbulent)
+        //  Source_Jacobian(iSpecies,0) *= Time_Charac[iReac];
 
         /*--- Derivatives with respect to partial densitiy ---*/
         for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
           Source_Jacobian(iSpecies,jSpecies + 1) += fixed_contr*
                                                    (Forward_Rates[iReac]*Stoich_Coeffs_Reactants_Exp(jSpecies,iReac)/(rho*Ys[jSpecies]) -
                                                     Backward_Rates[iReac]*Stoich_Coeffs_Products_Exp(jSpecies,iReac)/(rho*Ys[jSpecies]));
+          //if(turbulent)
+          //  Source_Jacobian(iSpecies,jSpecies + 1) *= Time_Charac[iReac];
       }
     }
 
@@ -823,6 +872,8 @@ namespace Framework {
             Backward_Rates.resize(nReactions);
             Kc.resize(nReactions);
             Kc_Derivatives.resize(nReactions);
+            Kf_Derivatives.resize(nReactions);
+            Time_Charac.resize(nReactions);
 
             Elementary_Reactions.reserve(nReactions);
             As.reserve(nReactions);
@@ -1156,6 +1207,8 @@ namespace Framework {
       Backward_Rates.clear();
       Kc.clear();
       Kc_Derivatives.clear();
+      Kf_Derivatives.clear();
+      Time_Charac.clear();
       As.clear();
       Betas.clear();
       Temps_Activation.clear();

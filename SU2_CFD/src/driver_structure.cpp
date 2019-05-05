@@ -3669,6 +3669,10 @@ void CFluidDriver::ResetConvergence() {
       if( (config_container[iZone]->GetKind_Solver() == ADJ_RANS) || (config_container[iZone]->GetKind_Solver() == DISC_ADJ_RANS) )
         integration_container[iZone][ADJTURB_SOL]->SetConvergence(false);
       break;
+
+    case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
+      integration_container[ZONE_0][REACTIVE_SOL]->SetConvergence(false);
+      break;
     }
   }
 

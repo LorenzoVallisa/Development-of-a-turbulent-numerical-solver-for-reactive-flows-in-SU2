@@ -476,7 +476,7 @@ void CReactiveEulerVariable::CalcdTdU(su2double* V, CConfig* config, su2double* 
   if(US_System)
     dim_cp /= 3.28084*3.28084*5.0/9.0;
   std::copy(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM+ nSpecies), Ys.begin());
-  su2double Cv = library->ComputeCV_FromCP(dim_cp, Ys)/config->GetEnergy_Ref();
+  su2double Cv = library->ComputeCV_FromCP(dim_cp, Ys)/config->GetGas_Constant_Ref();
   if(US_System)
     Cv *= 3.28084*3.28084*5.0/9.0;
   su2double rhoCv = rho*Cv;

@@ -127,14 +127,14 @@ public:
   unsigned long SetPrimitive_Variables(CSolver** solver_container, CConfig* config, bool Output) override;
 
   /*!
-   * \brief Set gradient primitive variables static const unsigned Green Gauss.
+   * \brief Set gradient primitive variables using Green Gauss.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
   void SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* config) override;
 
   /*!
-   * \brief Set gradient primitive variables static const unsigned weighted least squares.
+   * \brief Set gradient primitive variables using weighted least squares.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
