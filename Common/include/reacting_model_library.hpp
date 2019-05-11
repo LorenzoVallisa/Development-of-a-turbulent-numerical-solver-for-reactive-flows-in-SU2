@@ -494,20 +494,32 @@ namespace Framework {
     RealVec GetDiffCoeffs(const double temp, const double pressure, const RealVec& ys) override;
 
    /*!
-    * Return the binary diffusion coefficients
+    * \brief Return the binary diffusion coefficients
     * \param[in] temp - the mixture temperature
     * \param[in] pressure - the mixture pressure
     */
     RealMatrix GetDij_SM(const double temp, const double pressure) override;
 
     /*!
-     * Return the matrix of Stefan-Maxwell equations
+     * \brief Return the matrix of Stefan-Maxwell equations
      * \param[in] rho - the mixture density
      * \param[in] xs - current molar fractions
      * \param[in] ys - current mass fractions
      * \param[in] val_Dij - current binary diffusion coefficients
      */
     RealMatrix GetGamma(const double rho, const RealVec& xs, const RealVec& ys, const RealMatrix& val_Dij) override;
+
+    /*!
+     * \brief Compute the regression rate at specified temperature with an empirical law
+     * \param[in] temp - the mixture temperature
+     */
+    double ComputeRegressionRate(const double temp) override;
+
+    /*!
+     * \brief Read all physical data about fuel
+     * \param[in] f_name - File with the fuel data to be read
+     */
+    void ReadDataFuel(const std::string& f_name) override;
 
   private:
     /*!
@@ -525,18 +537,12 @@ namespace Framework {
     std::pair<double,double> ComputeRateConstants(const double temp, unsigned short iReac);
 
     /*!
-     * Set forward and backward reaction rates for each reaction.
+     * \brief Set forward and backward reaction rates for each reaction.
      * \param[in] temp - the mixture temperature
      * \param[in] rho - the mixture density
      * \param[in] ys - the species mass fractions
     */
     void SetReactionRates(const double temp, const double rho, const RealVec& ys);
-
-    /*!
-     * Set forwardreaction rate derivative with respect to temperature.
-     * \param[in] temp - the mixture temperature
-    */
-    void SetFr_Derivatives(const double temp);
 
     /*!
       * \brief Read transport data
@@ -572,7 +578,7 @@ namespace Framework {
     void ReadReactSpecies(const std::string& line, bool is_elem, unsigned n_reac);
 
     /*!
-      * Read coefficients to compute reaction rates from line
+      * \brief Read coefficients to compute reaction rates from line
       * \param[in] line - line to be read
     */
     void ReadChemCoefs(const std::string& line);
@@ -657,15 +663,15 @@ namespace Framework {
 
     RealVec Kc_Derivatives; /*!< \brief Auxiliary vector for equilibrium constants derivative. */
 
-    RealVec Kf_Derivatives; /*!< \brief Auxiliary vector for forward rate derivative. */
-
-    RealVec Time_Charac; /*!< \brief Auxiliary vector for characteristic time ratio in case of PaSR. */
-
     RealMatrix Source_Jacobian; /*!< \brief Auxiliary matrix for source chemistry Jacobian. */
+
+    std::array<double,5> Fuel_Data; /*!< \brief Auxiliary array for fuel data in case of regression boundary condition. */
 
   private:
 
     enum {T_DATA_SPLINE = 0, X_DATA_SPLINE = 1, Y_DATA_SPLINE = 2}; /*!< \brief Enumerator for spline indexes. */
+
+    enum {A1_INDEX = 1, A2_INDEX = 2, EA1_INDEX = 3, EA2_INDEX = 4, TBAR_INDEX = 5}; /*!< \brief Enumerator for regression rate data indexes. */
 
   }; /*-- End of class ReactingModelLibrary ---*/
 

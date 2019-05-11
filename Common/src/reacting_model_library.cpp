@@ -619,45 +619,19 @@ namespace Framework {
 
   //
   //
-  /* This function sets the forward reaction rate derivatives with respect to temperature. */
-  inline void ReactingModelLibrary::SetFr_Derivatives(const double temp) {
-    for(unsigned short iReac = 0; iReac < nReactions; ++iReac)
-      Kf_Derivatives[iReac] = (Betas[iReac] + Temps_Activation[iReac]/temp)/temp*Forward_Rates[iReac];
-  }
-
-  //
-  //
   /* This function computes the omega term. */
-  RealVec ReactingModelLibrary::GetMassProductionTerm(const double temp, const double rho, const RealVec& ys, bool turbulent) {
+  RealVec ReactingModelLibrary::GetMassProductionTerm(const double temp, const double rho, const RealVec& ys) {
     /*--- Initialize to zero ---*/
     std::fill(Omega.begin(), Omega.end(), 0.0);
 
     /*--- Set forward and backward reaction rates ---*/
     SetReactionRates(temp, rho, ys);
 
-    /*--- Set internal energies and forward rate derivatives ----*/
-    double Cv = 0.0;
-    if(turbulent) {
-      SetPartialEnergy(temp);
-      SetFr_Derivatives(temp);
-      Cv = ComputeCV(temp, ys);
-    }
-
     /*--- Compute mass production term ---*/
-    double max_e = 0.0;
     for(unsigned short iReac = 0; iReac < nReactions; ++iReac) {
-      if(turbulent)
-        max_e = std::numeric_limits<double>::min();
       for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
         Omega[iSpecies] += mMasses[iSpecies]*(Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac))*
                                              (Forward_Rates[iReac] - Backward_Rates[iReac]);
-        if(turbulent && (Stoich_Coeffs_Products(iSpecies,iReac) != 0 || Stoich_Coeffs_Reactants(iSpecies,iReac) != 0))
-          max_e = std::max(max_e, Internal_Energies[iSpecies])
-      }
-      if(turbulent) {
-        double tau_c = rho*Cv/(max_e*Kf_Derivatives[iReac]);
-        //Time_Charac[iReac] = tau_c/(tau_c + tau_mix)
-        //Omega[iSpecies] *= Time_Charac[iReac];
       }
     }
     std::transform(Omega.begin(), Omega.end(), Omega.begin(), std::bind1st(std::multiplies<double>(), 1.0e3));
@@ -667,7 +641,7 @@ namespace Framework {
   //
   //
   /* This function computes the source chemistry Jacobian. NOTE: It requires SetReactionRates call*/
-  ReactingModelLibrary::RealMatrix ReactingModelLibrary::GetSourceJacobian(const double temp, const double rho, bool turbulent) {
+  ReactingModelLibrary::RealMatrix ReactingModelLibrary::GetSourceJacobian(const double temp, const double rho) {
     /*--- Initialize to zero ---*/
     Source_Jacobian.setZero();
 
@@ -695,32 +669,21 @@ namespace Framework {
     }
 
     /*--- Compute Jacobian ---*/
-    double tmp, for_contr;
     for(iReac = 0; iReac < nReactions; ++iReac) {
-      if(!turbulent) {
-        tmp = (Betas[iReac] + Temps_Activation[iReac]/temp)/temp;
-        for_contr = Forward_Rates[iReac]*tmp;
-      }
-      else {
-        tmp = Kf_Derivatives[iReac]/Forward_Rates[iReac];
-        for_contr = Kf_Derivatives[iReac];
-      }
+      double tmp = (Betas[iReac] + Temps_Activation[iReac]/temp)/temp;
+      double for_contr = Forward_Rates[iReac]*tmp;
       double back_contr = Backward_Rates[iReac]*(tmp - Kc_Derivatives[iReac]/Kc[iReac]);
       for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
         /*--- Derivatives with respect to density ---*/
         double fixed_contr =  1.0e3*mMasses[iSpecies]*
                               (Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac));
         Source_Jacobian(iSpecies,0) += fixed_contr*(for_contr - back_contr);
-        //if(turbulent)
-        //  Source_Jacobian(iSpecies,0) *= Time_Charac[iReac];
 
         /*--- Derivatives with respect to partial densitiy ---*/
         for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
           Source_Jacobian(iSpecies,jSpecies + 1) += fixed_contr*
                                                    (Forward_Rates[iReac]*Stoich_Coeffs_Reactants_Exp(jSpecies,iReac)/(rho*Ys[jSpecies]) -
                                                     Backward_Rates[iReac]*Stoich_Coeffs_Products_Exp(jSpecies,iReac)/(rho*Ys[jSpecies]));
-          //if(turbulent)
-          //  Source_Jacobian(iSpecies,jSpecies + 1) *= Time_Charac[iReac];
       }
     }
 
@@ -872,8 +835,6 @@ namespace Framework {
             Backward_Rates.resize(nReactions);
             Kc.resize(nReactions);
             Kc_Derivatives.resize(nReactions);
-            Kf_Derivatives.resize(nReactions);
-            Time_Charac.resize(nReactions);
 
             Elementary_Reactions.reserve(nReactions);
             As.reserve(nReactions);
@@ -1109,6 +1070,69 @@ namespace Framework {
 
   //
   //
+  /* This function reads the physical data of the fuel in case of regression boundary condition. */
+  void ReactingModelLibrary::ReadDataFuel(const std::string& f_name) {
+    /*--- Local variables ---*/
+    std::string line;
+    unsigned short n_line = 0;
+    std::array<bool,5> set_data;
+    std::fill(set_data.begin(), set_data.end(), false);
+    std::array<std::size_t,5> found_pos;
+    unsigned short n_found, elem_found;
+
+    std::ifstream fuel_file(Lib_Path + "/" + f_name);
+    if(fuel_file.is_open()) {
+      /*---- Read lines ---*/
+      while(fuel_file.good() && !fuel_file.eof()) {
+        std::getline(fuel_file,line);
+        /*--- Check if we encounter the termination character ---*/
+        if(line == "STOP")
+          break;
+        /*--- We avoid clearly reading comments and empty lines in the file ---*/
+        if(!line.empty() && !std::ispunct(line.at(0))) {
+          found_pos[A1_INDEX] = line.find("A1   = ",0);
+          found_pos[A2_INDEX] = line.find("A2   = ",0);
+          found_pos[EA1_INDEX] = line.find("EA1  = ",0);
+          found_pos[EA2_INDEX] = line.find("EA2  = ",0);
+          found_pos[TBAR_INDEX] = line.find("Tbar = ",0);
+
+          n_found = 0;
+          for(unsigned short iData = 0; iData < 5; ++iData) {
+            if(found_pos[iData] != std::string::n_pos) {
+              n_found++;
+              elem_found = iData;
+            }
+          }
+          SU2_Assert(n_found = 1, "Multiple data read on single line");
+          SU2_Assert(set_data[elem_found] == false, "Detected data has already been read. Check the file content");
+          line.erase(0,7);
+          Fuel_Data[elem_found] = std::stod(line);
+          set_data[elem_found] = true;
+          n_line++;
+        }
+      }
+      fuel_file.close();
+      auto it = std::find(set_data.begin(), set_data.end(), false);
+      SU2_Assert(it == set_data.end(), "Some fuel properties has not been setted. Check file content");
+    }
+    else {
+      std::cerr<<"Unable to open the fuel data file: "<<f_name<<std::endl;
+      std::exit(1);
+    }
+  }
+
+  //
+  //
+  /*--- Compute fuel regression rate at specified temperature ---*/
+  inline double ReactingModelLibrary::ComputeRegressionRate(const double temp) {
+    const double Ru = 1.987; /*--- Universal gas constant (cal/(mol*K)) ---*/
+    if(temp < Fuel_Data[TBAR_INDEX])
+      return Fuel_Data[A2_INDEX]*std::exp(Fuel_Data[EA2_INDEX]/(Ru*temp));
+    return Fuel_Data[A1_INDEX]*std::exp(Fuel_Data[EA1_INDEX]/(Ru*temp));
+  }
+
+  //
+  //
   /*--- Setup library ---*/
   void ReactingModelLibrary::Setup(void) {
     if(!Lib_Setup) {
@@ -1145,7 +1169,7 @@ namespace Framework {
       using size_type = std::vector<std::string>::size_type;
       size_type max_n_file = 2*nSpecies + 2;
       size_type n_file = list_file.size();
-      SU2_Assert((n_file == max_n_file) || (n_file == max_n_file - 1),"The number of files present in the configuration file is wrong");
+      SU2_Assert((n_file == max_n_file) || (n_file == max_n_file - 1), "The number of files present in the configuration file is wrong");
 
       /*--- Set the specific gas constants ---*/
       SetRiGas();
@@ -1207,8 +1231,6 @@ namespace Framework {
       Backward_Rates.clear();
       Kc.clear();
       Kc_Derivatives.clear();
-      Kf_Derivatives.clear();
-      Time_Charac.clear();
       As.clear();
       Betas.clear();
       Temps_Activation.clear();

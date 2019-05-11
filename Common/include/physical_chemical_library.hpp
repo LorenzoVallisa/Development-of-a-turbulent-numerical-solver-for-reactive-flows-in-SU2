@@ -484,7 +484,7 @@ namespace Framework  {
     virtual Vector GetDiffCoeffs(const double temp, const double pressure, const Vector& ys) = 0;
 
     /*!
-     * Return the diffusion velocities of species multiplied by the species
+     * \brief Return the binary diffusion coefficients
      * densities for nonequilibrium computations
      * \param[in] pressure - the mixture pressure
      * \param[in] temp - the mixture temperature
@@ -492,13 +492,25 @@ namespace Framework  {
     virtual Matrix GetDij_SM(const double pressure, const double temp) = 0;
 
     /*!
-     * Return thematrix of Stefan-Maxwell equations
+     * \brief Return the matrix of Stefan-Maxwell equations
      * \param[in] rho - the mixture density
      * \param[in] xs - current molar fractions
      * \param[in] ys - current mass fractions
      * \param[in] val_Dij - current binary diffusion coefficients
      */
     virtual Matrix GetGamma(const double rho, const Vector& xs, const Vector& ys, const Matrix& val_Dij) = 0;
+
+    /*!
+     * \brief Compute the regression rate at specified temperature with an empirical law
+     * \param[in] temp - the mixture temperature
+     */
+    virtual double ComputeRegressionRate(const double temp) = 0;
+
+    /*!
+     * \brief Read all physical data about fuel
+     * \param[in] f_name - File with the fuel data to be read
+     */
+    virtual void ReadDataFuel(const std::string& f_nmae) = 0;
 
   protected:
 

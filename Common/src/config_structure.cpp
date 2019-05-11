@@ -584,20 +584,8 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\brief INFLOW_MASS_FRAC\n DESCRIPTION: Inflow mass fractions */
   addInlet_MassFracOption("INFLOW_MASS_FRAC", nMarker_EngineInflow, Marker_Inflow_MassFrac, Inflow_MassFrac, nSpecies_Inflow);
 
-  /*!\brief FUEL_ACTIVATION_ENERGY_1\n DESCRIPTION: Fuel activation energy for first interval (4910.0 cal/mol by default) \ingroup Config*/
-  addDoubleOption("FUEL_ACTIVATION_ENERGY_1", Ea_1, 4910.0);
-
-  /*!\brief FUEL_ACTIVATION_ENERGY_2\n DESCRIPTION: Fuel activation energy for second interval (13350.0 cal/mol by default) \ingroup Config*/
-  addDoubleOption("FUEL_ACTIVATION_ENERGY_2", Ea_1, 13350.0);
-
-  /*!\brief FUEL_PREFACTOR_1\n DESCRIPTION: Fuel exponential prefactor for first interval (0.01104 m/s by default) \ingroup Config*/
-  addDoubleOption("FUEL_PREFACTOR_1", A_1, 0.01104);
-
-  /*!\brief FUEL_PREFACTOR_2\n DESCRIPTION: Fuel exponential prefactor for second interval (3.965 m/s by default) \ingroup Config*/
-  addDoubleOption("FUEL_PREFACTOR_2", A_1, 3.965);
-
-  /*!\brief FUEL_BAR_TEMPERATURE\n DESCRIPTION: Temperature for fuel regrssion intervals (722.0 K by default) \ingroup Config*/
-  addDoubleOption("FUEL_BAR_TEMPERATURE", T_bar, 722.0);
+  /*!\brief FUEL_DATA_FILE \n  DESCRIPTION: File where all the physical properties of the fuel are specified */
+  addStringOption("FUEL_DATA_FILE", Fuel_File, "");
 
   /*--- NOTE: Already present options ---*/
   /*!\brief REGIME_TYPE \n  DESCRIPTION: Regime type \n OPTIONS: see \link Regime_Map \endlink \ingroup Config*/
