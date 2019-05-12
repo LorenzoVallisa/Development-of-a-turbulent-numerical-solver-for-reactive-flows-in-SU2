@@ -733,13 +733,15 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const Vec& val_Mean_PrimVar, cons
 
   /*--- Calculate useful diffusion parameters ---*/
   // Summation term of the diffusion fluxes
-  su2double sumY = 0.0;
   su2double sumY_i = 0.0;
   su2double sumY_j = 0.0;
+  su2double sigma_i = 0.0;
+  su2double sigma_j = 0.0;
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-    sumY_i += Ds[iSpecies]*theta/dij*Ys_i[iSpecies];
-    sumY_j += Ds[iSpecies]*theta/dij*Ys_j[iSpecies];
-    sumY   += Ds[iSpecies]*theta/dij*(Ys_j[iSpecies] - Ys_i[iSpecies]);
+    sumY_i += Ds[iSpecies]*Ys_i[iSpecies];
+    sumY_j += Ds[iSpecies]*Ys_j[iSpecies];
+    sigma_i += Ys_i[iSpecies];
+    sigma_j += Ys_j[iSpecies];
   }
 
   /*--- Diffusion Jacobian matrices ---*/
@@ -747,26 +749,13 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const Vec& val_Mean_PrimVar, cons
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
     for(jSpecies  = 0; jSpecies < nSpecies; ++jSpecies) {
       // first term
-      dJdr_j[iSpecies][jSpecies] +=  Ds[iSpecies]*theta/dij*Ys_j[iSpecies];
-      dJdr_i[iSpecies][jSpecies] += -Ds[iSpecies]*theta/dij*Ys_i[iSpecies];
+      dJdr_i[iSpecies][jSpecies] += -0.5*Ds[iSpecies]*theta*Ys_i[iSpecies];
+      dJdr_j[iSpecies][jSpecies] +=  0.5*Ds[iSpecies]*theta*Ys_j[iSpecies];
 
       // second term
-      dJdr_j[iSpecies][jSpecies] += 0.25*(Ys_i[iSpecies] + Ys_j[iSpecies])*(Ys_i[iSpecies] + Ys_j[iSpecies])*
-                                          Ds[jSpecies]*theta/(dij*Ys_j[iSpecies]) -
-                                    0.25*(Ys_i[iSpecies] + Ys_j[iSpecies])*(Ys_i[iSpecies] + Ys_j[iSpecies])*sumY_j/Ys_j[iSpecies];
-
-      dJdr_i[iSpecies][jSpecies] += - 0.25*(Ys_i[iSpecies] + Ys_j[iSpecies])*(Ys_i[iSpecies] + Ys_j[iSpecies])*
-                                            Ds[jSpecies]*theta/(dij*Ys_i[iSpecies])
-                                    + 0.25*(Ys_i[iSpecies] + Ys_j[iSpecies])*(Ys_i[iSpecies] + Ys_j[iSpecies])*sumY_i/Ys_i[iSpecies];
+      dJdr_i[iSpecies][jSpecies] += 0.5*sumY_i*theta;
+      dJdr_j[iSpecies][jSpecies] += -0.5*sumY_j*theta;
     }
-
-    // first term
-    dJdr_j[iSpecies][iSpecies] += -0.5*Ds[iSpecies]*theta/dij*(1.0 + Ys_i[ispecies]/Ys_j[iSpecies]);
-    dJdr_i[iSpecies][iSpecies] +=  0.5*Ds[iSpecies]*theta/dij*(1.0 + Ys_j[iSpecies]/Ys_i[iSpecies]);
-
-    // second term
-    dJdr_j[iSpecies][iSpecies] += 0.25*(1.0 + Ys_i[iSpecies]/Ys_j[iSpecies])*sumY;
-    dJdr_i[iSpecies][iSpecies] += 0.25*(1.0 + Ys_j[iSpecies]/Ys_i[iSpecies])*sumY;
   }
 
   /*--- Calculate transformation matrix ---*/
@@ -779,11 +768,9 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const Vec& val_Mean_PrimVar, cons
     dVdUj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + iSpecies] = 1.0;
   }
   for(iDim = 0; iDim < nDim; ++iDim) {
-    for(iSpecies = 0; iSpecies < nSpecies; iSpecies++) {
-      dVdUi[RHOVX_INDEX_SOL + iDim][RHOS_INDEX_SOL + iSpecies] = -V_i[VX_INDEX_PRIM + iDim]/V_i[RHO_INDEX_PRIM];
-      dVdUj[RHOVX_INDEX_SOL + iDim][RHOS_INDEX_SOL + iSpecies] = -V_j[VX_INDEX_PRIM + iDim]/V_j[RHO_INDEX_PRIM];
-    }
+    dVdUi[RHOVX_INDEX_SOL + iDim][RHO_INDEX_SOL] = -V_i[VX_INDEX_PRIM + iDim]/V_i[RHO_INDEX_PRIM];
     dVdUi[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + iDim] = 1.0/V_i[RHO_INDEX_PRIM];
+    dVdUj[RHOVX_INDEX_SOL + iDim][RHO_INDEX_SOL] = -V_j[VX_INDEX_PRIM + iDim]/V_j[RHO_INDEX_PRIM];
     dVdUj[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + iDim] = 1.0/V_j[RHO_INDEX_PRIM];
   }
   for(iVar = 0; iVar < nVar; ++iVar) {
@@ -818,38 +805,6 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const Vec& val_Mean_PrimVar, cons
     dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] = (mu/rho*pix + ktr*theta*val_Mean_PrimVar[VX_INDEX_PRIM])/dij*val_dS;
     dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] = (mu/rho*piy + ktr*theta*val_Mean_PrimVar[VX_INDEX_PRIM + 1])/dij*val_dS;
     dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = ktr*theta/dij*val_dS;
-    //for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-    //  dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] = ktr*theta/dij*val_dS;
-
-    for(iVar = 0; iVar < nVar; ++iVar)
-      for(jVar = 0; jVar < nVar; ++jVar)
-        dFdVi[iVar][jVar] = -dFdVj[iVar][jVar];
-
-    // Common terms
-    dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += 0.5*val_Fv[RHOVX_INDEX_SOL];
-    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += 0.5*val_Fv[RHOVX_INDEX_SOL];
-    dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += 0.5*val_Fv[RHOVX_INDEX_SOL + 1];
-    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += 0.5*val_Fv[RHOVX_INDEX_SOL + 1];
-    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      //dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Fv[RHOS_INDEX_SOL]*(Ru/Ms[iSpecies] +
-      //                                                       Cvtr[iSpecies]   );
-      //dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Fv[RHOS_INDEX_SOL]*(Ru/Ms[iSpecies] +
-      //                                                       Cvtr[iSpecies]   );
-    }
-
-    // Unique terms
-    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
-        dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] += (-Ys_j[iSpecies]*Ds[iSpecies]*theta/dij + sumY_j)*val_dS;
-        dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] += (-Ys_i[iSpecies]*Ds[iSpecies]*theta/dij + sumY_i)*val_dS;
-        dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]  += -dJdr_j[iSpecies][jSpecies]*val_dS;
-        dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]  += -dJdr_i[iSpecies][jSpecies]*val_dS;
-        dFdVj[RHO_INDEX_SOL][RHOS_INDEX_SOL + jSpecies] += dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]
-        dFdVi[RHO_INDEX_SOL][RHOS_INDEX_SOL + jSpecies] += dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]
-        dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] += -dJdr_j[jSpecies][iSpecies]*hs[jSpecies]*val_dS;
-        dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] += -dJdr_i[jSpecies][iSpecies]*hs[jSpecies]*val_dS;
-      }
-    }
 
   } /*--- End onf nDim = 2 ---*/
   else {
@@ -888,39 +843,36 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const Vec& val_Mean_PrimVar, cons
     dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] = (mu/rho*piy + ktr*theta*val_Mean_PrimVar[VX_INDEX_PRIM + 1])/dij*val_dS;
     dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] = (mu/rho*piz + ktr*theta*val_Mean_PrimVar[VX_INDEX_PRIM + 2])/dij*val_dS;
     dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = ktr*theta/dij*val_dS;
-    //for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-    //  dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] = ktr*theta/dij*val_dS;
 
-    for(iVar = 0; iVar < nVar; ++iVar)
-      for(jVar = 0; jVar < nVar; ++jVar)
-        dFdVi[iVar][jVar] = -dFdVj[iVar][jVar];
-
-    // Common terms
-    for(iDim = 0; iDim < nDim; ++iDim) {
-      dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*val_Fv[RHOVX_INDEX_SOL + iDim];
-      dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*val_Fv[RHOVX_INDEX_SOL + iDim];
-    }
-    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      //dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Fv[iSpecies]*(Ru/Ms[iSpecies] +
-      //                                                       Cvtr[iSpecies]   );
-      //dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Fv[iSpecies]*(Ru/Ms[iSpecies] +
-      //                                                       Cvtr[iSpecies]   );
-    }
-
-    // Unique terms
-    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-      for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
-        dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] += (-Ys_j[iSpecies]*Ds[iSpecies]*theta/dij + sumY_j)*val_dS;
-        dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] += (-Ys_i[iSpecies]*Ds[iSpecies]*theta/dij + sumY_i)*val_dS;
-        dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]  += -dJdr_j[iSpecies][jSpecies]*val_dS;
-        dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]  += -dJdr_i[iSpecies][jSpecies]*val_dS;
-        dFdVj[RHO_INDEX_SOL][RHOS_INDEX_SOL + jSpecies] += dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]
-        dFdVi[RHO_INDEX_SOL][RHOS_INDEX_SOL + jSpecies] += dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]
-        dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] += -dJdr_j[jSpecies][iSpecies]*hs[jSpecies]*val_dS;
-        dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] += -dJdr_i[jSpecies][iSpecies]*hs[jSpecies]*val_dS;
-      }
-    }
   } /*--- End of nDim = 3 ---*/
+
+  for(iVar = 0; iVar < nVar; ++iVar)
+    for(jVar = 0; jVar < nVar; ++jVar)
+      dFdVi[iVar][jVar] = -dFdVj[iVar][jVar];
+
+  // Common terms
+  for(iDim = 0; iDim < nDim; ++iDim) {
+    dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*val_Proj_Visc_Flux[RHOVX_INDEX_SOL + iDim];
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*val_Proj_Visc_Flux[RHOVX_INDEX_SOL + iDim];
+  }
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Proj_Visc_Flux[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
+    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Proj_Visc_Flux[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
+  }
+
+  // Unique terms
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+      dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] += 2.0*sigma_j*Ys_j[iSpecies]*(-Ds[iSpecies] + sumY_j)*theta*val_dS/dij;;
+      dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] += 2.0*sigma_i*Ys_i[iSpecies]*(-Ds[iSpecies] + sumY_i)*theta*val_dS/dij;
+      dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies] += -dJdr_j[iSpecies][jSpecies]*val_dS/dij;
+      dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies] += -dJdr_i[iSpecies][jSpecies]*val_dS/dij;
+      dFdVj[RHO_INDEX_SOL][RHOS_INDEX_SOL + jSpecies] += dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]
+      dFdVi[RHO_INDEX_SOL][RHOS_INDEX_SOL + jSpecies] += dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]
+      dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] += -dJdr_j[jSpecies][iSpecies]*hs[jSpecies]*val_dS/dij;
+      dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] += -dJdr_i[jSpecies][iSpecies]*hs[jSpecies]*val_dS/dij;
+    }
+  }
 
   for(iVar = 0; iVar < nVar; ++iVar) {
     for(jVar = 0; jVar < nVar; ++jVar) {
@@ -931,7 +883,7 @@ void CAvgGradReactive_Flow::GetViscousProjJacs(const Vec& val_Mean_PrimVar, cons
     }
   }
 
-}
+} /*--- End of function ---*/
 
 //
 //
