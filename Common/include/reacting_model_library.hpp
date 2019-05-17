@@ -1,6 +1,8 @@
 #ifndef SU2_REACTING_MODEL_LIBRARY
 #define SU2_REACTING_MODEL_LIBRARY
 
+#include "Framework/builder_provider.hpp"
+
 #include "physical_chemical_library.hpp"
 
 #include "../../externals/Eigen/Dense"
@@ -676,5 +678,10 @@ namespace Framework {
   }; /*-- End of class ReactingModelLibrary ---*/
 
 } /*-- End of Namespace Framework ---*/
+
+/*--- Register through provider builder ---*/
+namespace Common {
+  ProviderBuilder<Framework::PhysicalChemicalLibrary<Framework::RealVec,Eigen::MatrixXd>, Framework::ReactingModelLibrary> dummy("MyLibrary");
+}
 
 #endif

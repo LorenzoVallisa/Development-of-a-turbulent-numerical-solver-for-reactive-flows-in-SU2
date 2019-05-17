@@ -5,7 +5,6 @@
 
 #include <type_traits>
 #include <memory>
-#include "su2_assert.hpp"
 
 namespace Common {
 

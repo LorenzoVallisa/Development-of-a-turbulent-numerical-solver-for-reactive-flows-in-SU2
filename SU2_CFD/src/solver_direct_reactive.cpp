@@ -3315,6 +3315,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           V_inlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
           if(US_System)
             V_inlet[H_INDEX_PRIM] *= 3.28084*3.28084;
+          V_inlet[H_INDEX_PRIM] += 0.5*Vel_Mag;
           V_inlet[A_INDEX_PRIM] = SoundSpeed;
           std::copy(Ys.cbegin(), Ys.cend(), V_inlet + RHOS_INDEX_PRIM);
 
@@ -5360,6 +5361,7 @@ void CReactiveNSSolver::BC_Engine_Inflow(CGeometry* geometry, CSolver** solver_c
       V_inlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys_g)/config->GetEnergy_Ref();
       if(US_System)
         V_inlet[H_INDEX_PRIM] *= 3.28084*3.28084;
+      V_inlet[H_INDEX_PRIM] += 0.5*Vg;
       V_inlet[A_INDEX_PRIM] = library->ComputeFrozenSoundSpeed(dim_temp, Ys_g)/config->GetVelocity_Ref();
       if(US_System)
         V_inlet[A_INDEX_PRIM] *= 3.28084;
