@@ -93,6 +93,8 @@ protected:
   unsigned short nPrimVarAvgGrad; /*!< \brief Numbers of primitive variables to compute gradient for average computation. */
   unsigned short nSpecies; /*!< \brief Total number of species. */
 
+  su2double alpha;        /*!< \brief Artificial diffusion coefficient for Stefan-Maxwell equations. */
+
   Vec PrimVar_i,          /*!< \brief Primitive variables at node i. */
       PrimVar_j;          /*!< \brief Primitive variables at node j. */
   Vec Mean_PrimVar;       /*!< \brief Mean primitive variables. */
@@ -131,14 +133,13 @@ protected:
   RealVec hs,                   /*!< \brief Auxiliary vector to store partial enthalpy for species diffusion flux contribution. */
           Cps;                  /*!< \brief Auxiliary vector to store Cp for species diffusion flux Jacobian contribution. */
 
-  Vec Jd;                       /*!< \brief Auxiliary vector to store S-M solution. */
+  Vec Jd,                       /*!< \brief Auxiliary vector to store S-M solution. */
+      Jd_orig;                  /*!< \brief Auxiliary vector to store S-M solution in case of implicit computations. */
 
-  Vec Ds_i,
-      Ds_j,
-      Ds;                       /*!< \brief Auxiliary vectors to store Ramshaw self consistent diffusion coefficients for Jacobian. */
+  Vec Grad_Xs_norm;            /*!< \brief Auxiliary vector to store normal gradient of mole fractrions in case of implicit computations. */
 
-  RealVec Ys_i,
-          Ys_j;                 /*!< \brief Auxiliary vectors to store mass fractions for Jacobian. */
+  RealVec Ys_orig,
+          Xs_orig;             /*!< \brief Auxiliary vectors to store mean mass and mole fractions for Jacobian. */
 
   unsigned short T_INDEX_AVGGRAD,
                  VX_INDEX_AVGGRAD,
@@ -238,7 +239,9 @@ protected:
    * \param[in] val_Mean_PrimVar - Mean value of the primitive variables.
    * \param[in] val_laminar_viscosity - Value of the laminar viscosity.
    * \param[in] val_thermal_conductivity - Value of the thermal conductivity.
-   * \param[in] val_diffusion_coeff - Value of diffusion coefficients for each species
+   * \param[in] val_alpha - Value of artificual diffusion coefficient to solve Stefan-Maxwell equations.
+   * \param[in] val_grad_xs_norm - Value of normal gradient of mole fractions.
+   * \param[in] val_diffusion_coeff - Value of binary diffusion coefficients at interface.
    * \param[in] val_dist_ij - Distance between the points.
    * \param[in] val_dS - Area of the current face.
    * \param[in] val_normal - Normal vector
@@ -248,8 +251,9 @@ protected:
    * \param[in] config - Definition of the particular problem
   */
   void GetViscousProjJacs(const Vec& val_Mean_PrimVar, const su2double val_laminar_viscosity, const su2double val_thermal_conductivity,
-                          const Vec& val_diffusion_coeff, const su2double val_dist_ij, const su2double val_dS, su2double* val_normal,
-                          su2double* val_Proj_Visc_Flux, su2double** val_Proj_Jac_Tensor_i, su2double** val_Proj_Jac_Tensor_j, CConfig* config);
+                          const su2double val_alpha, const Vec& val_grad_xs_norm, const RealMatrix& val_diffusion_coeff,
+                          const su2double val_dist_ij, const su2double val_dS, su2double* val_normal, su2double* val_Proj_Visc_Flux,
+                          su2double** val_Proj_Jac_Tensor_i, su2double** val_Proj_Jac_Tensor_j, CConfig* config);
 
   /*!
    * \brief Compute the diffusive flux along a certain direction
