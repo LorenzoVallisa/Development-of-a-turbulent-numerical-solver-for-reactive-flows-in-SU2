@@ -474,10 +474,9 @@ namespace Framework {
     * \param[in] temp - the mixture temperature
     * \param[in] rho - the mixture density
     * \param[in] ys - the species mass fractions
-    * \param[in] turbulent - flag to say if we use PSR or PaSR
     * \return Mass production terms
     */
-    RealVec GetMassProductionTerm(const double temp, const double rho, const RealVec& ys, bool turbulent) override;
+    RealVec GetMassProductionTerm(const double temp, const double rho, const RealVec& ys) override;
 
     /*!
      * Compute the Jacobian of source chemistry. NOTE: It requires SetReactionRates call
@@ -485,7 +484,7 @@ namespace Framework {
      * \param[in] rho - the mixture density
      * \return Contribution to source derivatives with respect to mixture density and partial densitiies
      */
-    RealMatrix GetSourceJacobian(const double temp, const double rho, bool turbulent) override;
+    RealMatrix GetSourceJacobian(const double temp, const double rho) override;
 
     /*!
      * \brief Return the effective diffusion coefficients to solve Stefan-Maxwell equation
@@ -680,8 +679,8 @@ namespace Framework {
 } /*-- End of Namespace Framework ---*/
 
 /*--- Register through provider builder ---*/
-namespace Common {
-  ProviderBuilder<Framework::PhysicalChemicalLibrary<Framework::RealVec,Eigen::MatrixXd>, Framework::ReactingModelLibrary> dummy("MyLibrary");
-}
+//namespace Common {
+//  ProviderBuilder<Framework::PhysicalChemicalLibrary<Framework::RealVec,Eigen::MatrixXd>, Framework::ReactingModelLibrary> dummy("MyLibrary");
+//}
 
 #endif

@@ -5739,7 +5739,7 @@ unsigned short CConfig::GetContainerPosition(unsigned short val_eqsystem) {
     case RUNTIME_ADJTURB_SYS:   return ADJTURB_SOL;
     case RUNTIME_MULTIGRID_SYS: return 0;
     // simulation addition
-    case RUNTIME_REACTIVE_SYS:  return REACTIVE_SOL;
+    case RUNTIME_REACTIVE_SYS:  return FLOW_SOL;
   }
   return 0;
 }
@@ -5905,10 +5905,10 @@ su2double* CConfig::GetInlet_MassFrac(std::string val_marker) const {
 
 su2double* CConfig::GetInflow_MassFrac(std::string val_marker) const {
   unsigned short iMarker_Inflow;
-  for(iMarker_Inflow = 0; iMarker_Inflow < nMarker_Inflow; ++iMarker_Inflow)
-    if(Marker_Inflow_MassFrac[iMarker_Inlet] == val_marker)
+  for(iMarker_Inflow = 0; iMarker_Inflow < nMarker_EngineInflow; ++iMarker_Inflow)
+    if(Marker_Inflow_MassFrac[iMarker_Inflow] == val_marker)
       break;
-  return Inflow_MassFrac[iMarker_Inlet];
+  return Inflow_MassFrac[iMarker_Inflow];
 }
 
 /*--- NOTE: Old functions ---*/

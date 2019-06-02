@@ -332,10 +332,7 @@ void CIntegration::Time_Integration(CGeometry *geometry, CSolver **solver_contai
       solver_container[MainSolver]->ExplicitEuler_Iteration(geometry, solver_container, config);
       break;
     case (EULER_IMPLICIT):
-      if(KindSolver == REACTIVE_EULER || KindSolver == REACTIVE_NAVIER_STOKES)
-        solver_container[MainSolver]->ExplicitEuler_Iteration(geometry, solver_container, config);
-      else
-        solver_container[MainSolver]->ImplicitEuler_Iteration(geometry, solver_container, config);
+      solver_container[MainSolver]->ImplicitEuler_Iteration(geometry, solver_container, config);
       break;
     }
 

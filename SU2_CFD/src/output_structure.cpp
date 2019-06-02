@@ -4916,6 +4916,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
             switch (config[val_iZone]->GetKind_Solver()) {
               case EULER : case NAVIER_STOKES: case RANS:
               case ADJ_EULER : case ADJ_NAVIER_STOKES: case ADJ_RANS:
+              case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
 
                 cout << endl << "---------------------- Local Time Stepping Summary ----------------------" << endl;
 
@@ -5474,14 +5475,14 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
             std::cout.precision(6);
             std::cout.setf(std::ios::fixed, std::ios::floatfield);
             std::cout.width(13);
-            std::cout<<std::log10(residual_flow[0]);
+            std::cout<<std::log10(solver_container[val_iZone][FinestMesh][FLOW_SOL]->GetRes_RMS(0));
             if(nDim == 2) {
               std::cout.width(14);
-              std::cout<< std::log10(residual_flow[3]);
+              std::cout<< std::log10(solver_container[val_iZone][FinestMesh][FLOW_SOL]->GetRes_RMS(3));
             }
             else {
               std::cout.width(14);
-              std::cout<< std::log10(residual_flow[4]);
+              std::cout<< std::log10(solver_container[val_iZone][FinestMesh][FLOW_SOL]->GetRes_RMS(4));
             }
           }
 

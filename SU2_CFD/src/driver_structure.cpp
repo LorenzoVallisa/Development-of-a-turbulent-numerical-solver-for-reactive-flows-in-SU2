@@ -786,35 +786,19 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
       }
     }
 
-    // Reactive part addition
+    // NOTE: Reactive part addition
     if(reactive_euler) {
-      solver_container[iMGlevel][REACTIVE_SOL] = new CReactiveEulerSolver(geometry[iMGlevel], config, iMGlevel);
-      try {
-        solver_container[iMGlevel][REACTIVE_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
-                                                                iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
-      }
-      catch(const std::exception& e) {
-        std::cout<<e.what()<<std::endl;
-        static_cast<CReactiveEulerSolver*>(solver_container[iMGlevel][REACTIVE_SOL])->SetExplicit();
-        solver_container[iMGlevel][REACTIVE_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
-                                                                iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
-      }
+      solver_container[iMGlevel][FLOW_SOL] = new CReactiveEulerSolver(geometry[iMGlevel], config, iMGlevel);
+      solver_container[iMGlevel][FLOW_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
+                                                          iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
     }
     if(reactive_ns) {
-      solver_container[iMGlevel][REACTIVE_SOL] = new CReactiveNSSolver(geometry[iMGlevel], config, iMGlevel);
-      try {
-        solver_container[iMGlevel][REACTIVE_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
-                                                                iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
-      }
-      catch(const std::exception& e) {
-        std::cout<<e.what()<<std::endl;
-        static_cast<CReactiveNSSolver*>(solver_container[iMGlevel][REACTIVE_SOL])->SetExplicit();
-        solver_container[iMGlevel][REACTIVE_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
-                                                                iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
-      }
+      solver_container[iMGlevel][FLOW_SOL] = new CReactiveNSSolver(geometry[iMGlevel], config, iMGlevel);
+      solver_container[iMGlevel][FLOW_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
+                                                          iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
     }
 
-    // Previous contribution
+    // NOTE: Previous contribution
     if (turbulent) {
       if (spalart_allmaras) {
         solver_container[iMGlevel][TURB_SOL] = new CTurbSASolver(geometry[iMGlevel], config, iMGlevel, solver_container[iMGlevel][FLOW_SOL]->GetFluidModel() );
@@ -966,7 +950,7 @@ void CDriver::Solver_Postprocessing(CSolver ***solver_container, CGeometry **geo
     }
 
     if (reactive_euler || reactive_ns) {
-      delete solver_container[iMGlevel][REACTIVE_SOL];
+      delete solver_container[iMGlevel][FLOW_SOL];
     }
 
     if (turbulent) {
@@ -1055,7 +1039,7 @@ void CDriver::Integration_Preprocessing(CIntegration **integration_container,
   if (fem) integration_container[FEA_SOL] = new CStructuralIntegration(config);
 
   if(reactive_euler || reactive_ns)
-    integration_container[REACTIVE_SOL] = new CMultiGridIntegration(config);
+    integration_container[FLOW_SOL] = new CMultiGridIntegration(config);
 
   /*--- Allocate solution for adjoint problem ---*/
   if (adj_euler) integration_container[ADJFLOW_SOL] = new CMultiGridIntegration(config);
@@ -1124,7 +1108,7 @@ void CDriver::Integration_Postprocessing(CIntegration **integration_container,
   if (fem) delete integration_container[FEA_SOL];
 
   if (reactive_euler || reactive_ns)
-    delete integration_container[REACTIVE_SOL];
+    delete integration_container[FLOW_SOL];
 
   /*--- DeAllocate solution for adjoint problem ---*/
   if (adj_euler || adj_ns || disc_adj) delete integration_container[ADJFLOW_SOL];
@@ -1232,7 +1216,7 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
   if (heat)        nVar_Heat = solver_container[MESH_0][HEAT_SOL]->GetnVar();
 
   if(reactive_euler || reactive_ns)
-    nVar_Reactive = solver_container[MESH_0][REACTIVE_SOL]->GetnVar();
+    nVar_Reactive = solver_container[MESH_0][FLOW_SOL]->GetnVar();
 
   /*--- Number of variables for adjoint problem ---*/
 
@@ -1504,9 +1488,9 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
 
           case AUSM:
             for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
-              numerics_container[iMGlevel][REACTIVE_SOL][CONV_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
+              numerics_container[iMGlevel][FLOW_SOL][CONV_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
                                                                                            CReactiveEulerSolver::GetLibrary());
-              numerics_container[iMGlevel][REACTIVE_SOL][CONV_BOUND_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
+              numerics_container[iMGlevel][FLOW_SOL][CONV_BOUND_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
                                                                                                  CReactiveEulerSolver::GetLibrary());
             }
             break;
@@ -1526,19 +1510,19 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
 
     /*--- Definition of the viscous scheme for each equation and mesh level ---*/
     for(iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel)
-      numerics_container[iMGlevel][REACTIVE_SOL][VISC_TERM] = new CAvgGradReactive_Flow(nDim, nVar_Reactive, config,
+      numerics_container[iMGlevel][FLOW_SOL][VISC_TERM] = new CAvgGradReactive_Flow(nDim, nVar_Reactive, config,
                                                                                         CReactiveNSSolver::GetLibrary());
 
     /*--- Definition of the boundary condition method ---*/
     for(iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel)
-      numerics_container[iMGlevel][REACTIVE_SOL][VISC_BOUND_TERM] = new CAvgGradReactive_Flow(nDim, nVar_Reactive, config,
-                                                                                              CReactiveNSSolver::GetLibrary());
+      numerics_container[iMGlevel][FLOW_SOL][VISC_BOUND_TERM] = new CAvgGradReactive_Boundary(nDim, nVar_Reactive, config,
+                                                                                                  CReactiveNSSolver::GetLibrary());
 
     /*--- Defining Source Terms --*/
     for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
-      numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_FIRST_TERM] = new CSourceReactive(nDim, nVar_Reactive, config,
+      numerics_container[iMGlevel][FLOW_SOL][SOURCE_FIRST_TERM] = new CSourceReactive(nDim, nVar_Reactive, config,
                                                                                           CReactiveEulerSolver::GetLibrary());
-      numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_SECOND_TERM] = new CSourceNothing(nDim, nVar_Reactive, config);
+      numerics_container[iMGlevel][FLOW_SOL][SOURCE_SECOND_TERM] = new CSourceNothing(nDim, nVar_Reactive, config);
     }
 
   }
@@ -2094,14 +2078,14 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
     /*--- Definition of the convective scheme for each equation and mesh level ---*/
     for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
       //Convective part
-      delete numerics_container[iMGlevel][REACTIVE_SOL][CONV_TERM];
-      delete numerics_container[iMGlevel][REACTIVE_SOL][CONV_BOUND_TERM];
+      delete numerics_container[iMGlevel][FLOW_SOL][CONV_TERM];
+      delete numerics_container[iMGlevel][FLOW_SOL][CONV_BOUND_TERM];
       //Viscous part
-      delete numerics_container[iMGlevel][REACTIVE_SOL][VISC_TERM];
-      delete numerics_container[iMGlevel][REACTIVE_SOL][VISC_BOUND_TERM];
+      delete numerics_container[iMGlevel][FLOW_SOL][VISC_TERM];
+      delete numerics_container[iMGlevel][FLOW_SOL][VISC_BOUND_TERM];
       //Source part
-      delete numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_FIRST_TERM];
-      delete numerics_container[iMGlevel][REACTIVE_SOL][SOURCE_SECOND_TERM];
+      delete numerics_container[iMGlevel][FLOW_SOL][SOURCE_FIRST_TERM];
+      delete numerics_container[iMGlevel][FLOW_SOL][SOURCE_SECOND_TERM];
     }
   }
 
@@ -2733,7 +2717,7 @@ void CDriver::PreprocessExtIter(unsigned long ExtIter) {
       (config_container[ZONE_0]->GetKind_Solver() == REACTIVE_EULER ||
        config_container[ZONE_0]->GetKind_Solver() == REACTIVE_NAVIER_STOKES)) {
   for (iZone = 0; iZone < nZone; ++iZone)
-    solver_container[iZone][MESH_0][REACTIVE_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
+    solver_container[iZone][MESH_0][FLOW_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
                                                                        config_container[iZone], ExtIter);
   }
 
@@ -2797,7 +2781,7 @@ bool CDriver::Monitor(unsigned long ExtIter) {
       StopCalc = integration_container[ZONE_0][ADJFLOW_SOL]->GetConvergence(); break;
     //Reactive part additions
     case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
-      StopCalc = integration_container[ZONE_0][REACTIVE_SOL]->GetConvergence();
+      StopCalc = integration_container[ZONE_0][FLOW_SOL]->GetConvergence();
       break;
   }
 
@@ -3671,7 +3655,7 @@ void CFluidDriver::ResetConvergence() {
       break;
 
     case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
-      integration_container[ZONE_0][REACTIVE_SOL]->SetConvergence(false);
+      integration_container[ZONE_0][FLOW_SOL]->SetConvergence(false);
       break;
     }
   }

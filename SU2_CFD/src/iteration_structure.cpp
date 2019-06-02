@@ -533,7 +533,7 @@ void CMeanFlowIteration::Iterate(COutput *output,
   /*--- Solve the Euler, Navier-Stokes or Reynolds-averaged Navier-Stokes (RANS) equations (one iteration) ---*/
   if (config_container[val_iZone]->GetKind_Solver() == REACTIVE_EULER ||
       config_container[val_iZone]->GetKind_Solver() == REACTIVE_NAVIER_STOKES)
-    integration_container[val_iZone][REACTIVE_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,
+    integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,
                                                                         config_container, RUNTIME_REACTIVE_SYS, IntIter, val_iZone);
   else
     integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,

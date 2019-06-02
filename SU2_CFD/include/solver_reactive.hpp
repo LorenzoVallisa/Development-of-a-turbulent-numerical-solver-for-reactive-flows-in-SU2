@@ -38,7 +38,7 @@ protected:
 
   su2double Density_Inf,       /*!< \brief Free stream density. */
             Pressure_Inf,		  /*!< \brief Free stream pressure. */
-	          Temperature_Inf;   /*!< \brief Trans.-rot. free stream temperature. */
+	          Temperature_Inf;   /*!< \brief Translational free stream temperature. */
 
   RealVec   Velocity_Inf,  /*!< \brief Free stream flow velocity. */
             MassFrac_Inf;  /*!< \brief Free stream species mass fraction. */
@@ -47,18 +47,21 @@ protected:
             PrimVar_j,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at point j. */
             PrimVar_Vertex;  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at boundary node. */
 
-  RealVec   Prim_i, /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point i. */
-            Prim_j, /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point j. */
-            Primitive; /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at boundary node. */
+  RealVec   Prim_i,       /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point i. */
+            Prim_j,       /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point j. */
+            Primitive;    /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at boundary node. */
 
-  RealVec   Primitive_i, Primitive_j, /*!< \brief Auxiliary nPrimVar vector for storing primitive at point i and j for limiting. */
-            Secondary_i, Secondary_j;/*!< \brief Auxiliary nVar vectors for storing pressure derivatives at point i and j for limiting. */
+  RealVec   Primitive_i,    /*!< \brief Auxiliary nPrimVar vector for storing primitive at point i in case of limiting. */
+            Primitive_j,    /*!< \brief Auxiliary nPrimVar vector for storing primitive at point j in case of limiting. */
+            Secondary_i,    /*!< \brief Auxiliary nVar vectors for storing pressure derivatives at point i for limiting in implicit case. */
+            Secondary_j;    /*!< \brief Auxiliary nVar vectors for storing pressure derivatives at point j for limiting in implicit case. */
 
   RealVec   Buffer_Receive_U, /*!< \brief Auxiliary vector to receive information in case of parallel simulation. */
             Buffer_Send_U;    /*!< \brief Auxiliary vector to send information in case of parallel simulation. */
 
-  RealVec Ys_i, Ys_j;  /*!< \brief Auxiliary vectors to store mass fractions at node i and j. */
-  RealVec Ys;         /*!< \brief Auxiliary vector to store mass fractions. */
+  RealVec   Ys_i,       /*!< \brief Auxiliary vector to store mass fractions at node i. */
+            Ys_j,       /*!< \brief Auxiliary vector to store mass fractions at node j. */
+            Ys;         /*!< \brief Auxiliary vector to store mass fractions. */
 
 protected:
   unsigned short T_INDEX_PRIM, VX_INDEX_PRIM,
@@ -82,7 +85,7 @@ public:
   CReactiveEulerSolver();
 
 	/*!
-	 * \overloaded constructor of the class
+	 * \overloaded Constructor of the class
 	 * \param[in] geometry - Geometrical definition of the problem.
 	 * \param[in] config - Definition of the particular problem.
 	 */
@@ -94,13 +97,6 @@ public:
 	virtual ~CReactiveEulerSolver();
 
   /*!
-   * \brief Set the simulation to explicit
-   */
-  inline void SetExplicit(void) {
-    implicit = false;
-  }
-
-  /*!
    * \brief Get the pointer to the external library for physical-chemical properties
    */
   inline static LibraryPtr GetLibrary(void) {
@@ -108,7 +104,7 @@ public:
   }
 
   /*!
-   * \brief Value of the characteristic variables at the boundaries.
+   * \brief Get the value of the characteristic variables at the boundaries.
    * \param[in] val_marker - Surface marker where the coefficient is computed.
    * \param[in] val_vertex - Vertex of the marker <i>val_marker</i> where the coefficient is evaluated.
    * \return Value of the variables at the boundaries.
@@ -118,7 +114,7 @@ public:
   }
 
   /*!
-   * \brief Set primitive variables in each point reporting non physical data
+   * \brief Set primitive variables in each point reporting non physical data.
    * \param[in] solver_container - Container vector with all the solutions.
    * \param[in] config - Definition of the particular problem.
    * \param[in] Output - boolean to determine whether to print output.
@@ -127,14 +123,14 @@ public:
   unsigned long SetPrimitive_Variables(CSolver** solver_container, CConfig* config, bool Output) override;
 
   /*!
-   * \brief Set gradient primitive variables using Green Gauss.
+   * \brief Set the gradient of primitive variables using Green Gauss.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
   void SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* config) override;
 
   /*!
-   * \brief Set gradient primitive variables using weighted least squares.
+   * \brief Set the gradient primitive variables using weighted least squares.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
@@ -155,7 +151,7 @@ public:
   void SetNondimensionalization(CGeometry* geometry, CConfig* config, unsigned short iMesh) override;
 
   /*!
-   * \brief Call MPI to set solution in case of parallel simulation
+   * \brief Call MPI to set solution in case of parallel simulation.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
@@ -176,7 +172,7 @@ public:
   void Set_MPI_Primitive_Gradient(CGeometry* geometry, CConfig* config) override;
 
   /*!
-   * \brief Preprocessing.
+   * \brief Solver preprocessing. This function in particular sets the primitive variables according to current state in all nodes.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solver_container - Container vector with all the solutions.
    * \param[in] config - Definition of the particular problem.
@@ -199,18 +195,18 @@ public:
                     unsigned short iMesh, unsigned long Iteration) override;
 
   /*!
-   * \brief Compute the time step for solving the Navier-Stokes equations.
+   * \brief Set the residual in case of dual time simulations.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solver_container - Container vector with all the solutions.
    * \param[in] config - Definition of the particular problem.
    * \param[in] iMesh - Index of the mesh in multigrid computations.
-   * \param[in] Iteration - Index of the current iteration.
+   * \param[in] RunTime_EqSystem - System of equations which is going to be solved.
    */
    void SetResidual_DualTime(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iRKStep,
                              unsigned short iMesh, unsigned short RunTime_EqSystem) override;
 
   /*!
-   * \brief Compute the spatial integration static const unsigned a centered scheme.
+   * \brief Compute the spatial integration using a centered scheme.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solver_container - Container vector with all the solutions.
    * \param[in] numerics - Description of the numerical method.
@@ -218,19 +214,19 @@ public:
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    * \param[in] iRKStep - Current step of the Runge-Kutta iteration.
    */
-  void Centered_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
-                         CConfig* config, unsigned short iMesh, unsigned short iRKStep) override;
+   void Centered_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
+                          CConfig* config, unsigned short iMesh, unsigned short iRKStep) override;
 
   /*!
-   * \brief Compute the spatial integration static const unsigned a upwind scheme.
+   * \brief Compute the spatial integration using an upwind scheme.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solver_container - Container vector with all the solutions.
    * \param[in] numerics - Description of the numerical method.
    * \param[in] config - Definition of the particular problem.
    * \param[in] iMesh - Index of the mesh in multigrid computations.
    */
-  void Upwind_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
-                       CConfig* config, unsigned short iMesh) override;
+   void Upwind_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
+                        CConfig* config, unsigned short iMesh) override;
 
    /*!
     * \brief Source term integration.
@@ -241,25 +237,25 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] iMesh - Index of the mesh in multigrid computations.
     */
-   void Source_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics, CNumerics* second_numerics,
-                        CConfig* config, unsigned short iMesh) override;
+    void Source_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics, CNumerics* second_numerics,
+                         CConfig* config, unsigned short iMesh) override;
 
    /*!
     * \brief Set the free-stream solution all over the domain.
     * \param[in] config - Definition of the particular problem.
     */
-   void SetFreeStream_Solution(CConfig* config) override;
+    void SetFreeStream_Solution(CConfig* config) override;
 
    /*!
-    * \brief Impose via the residual the Euler wall boundary condition.
+    * \brief Impose via the residual the Euler wall boundary condition (\bm{u}\cdot\bm{n} = 0).
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container vector with all the solutions.
     * \param[in] numerics - Description of the numerical method.
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Euler_Wall(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
-                      CConfig* config, unsigned short val_marker) override;
+    void BC_Euler_Wall(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
+                       CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose the far-field boundary condition.
@@ -270,11 +266,11 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Far_Field(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
-                     CConfig* config, unsigned short val_marker) override {}
+    void BC_Far_Field(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
+                     CConfig* config, unsigned short val_marker) override;
 
    /*!
-    * \brief Impose the inlet boundary condition.
+    * \brief Impose the subsonic inlet boundary condition.
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container vector with all the solutions.
     * \param[in] conv_numerics - Description of the numerical method.
@@ -282,8 +278,8 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
-                 CConfig* config, unsigned short val_marker) override;
+    void BC_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
+                  CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose a supersonic inlet boundary condition.
@@ -294,8 +290,8 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Supersonic_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
-                            CConfig* config, unsigned short val_marker) override;
+    void BC_Supersonic_Inlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
+                             CConfig* config, unsigned short val_marker) override;
 
    /*!
     * \brief Impose a supersonic outlet boundary condition.
@@ -306,11 +302,11 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Supersonic_Outlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
-                             CConfig* config, unsigned short val_marker) override;
+    void BC_Supersonic_Outlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
+                              CConfig* config, unsigned short val_marker) override;
 
    /*!
-    * \brief Impose the outlet boundary condition.
+    * \brief Impose the outlet boundary condition (supersonic or subsonic according to current state).
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container vector with all the solutions.
     * \param[in] conv_numerics - Description of the numerical method for convective term.
@@ -318,70 +314,69 @@ public:
     * \param[in] config - Definition of the particular problem.
     * \param[in] val_marker - Surface marker where the boundary condition is applied.
     */
-   void BC_Outlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
-                  CConfig* config, unsigned short val_marker) override;
+    void BC_Outlet(CGeometry* geometry, CSolver** solver_container, CNumerics* conv_numerics, CNumerics* visc_numerics,
+                   CConfig* config, unsigned short val_marker) override;
 
    /*!
-    * \brief Set the initial conditions.
+    * \brief Set the initial condition.
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container with all the solutions.
     * \param[in] config - Definition of the particular problem.
     * \param[in] ExtIter - External iteration.
     */
-   void SetInitialCondition(CGeometry** geometry, CSolver*** solver_container, CConfig *config, unsigned long ExtIter) override;
-
+    void SetInitialCondition(CGeometry** geometry, CSolver*** solver_container, CConfig *config, unsigned long ExtIter) override;
 
    /*!
-    * \brief Update the solution static const unsigned a Runge-Kutta scheme.
+    * \brief Update the solution using a Runge-Kutta scheme.
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container vector with all the solutions.
     * \param[in] config - Definition of the particular problem.
     * \param[in] iRKStep - Current step of the Runge-Kutta iteration.
     */
-   void ExplicitRK_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iRKStep) override;
+    void ExplicitRK_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iRKStep) override;
 
    /*!
-    * \brief Update the solution static const unsigned the explicit Euler scheme.
+    * \brief Update the solution using the explicit Euler scheme.
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container vector with all the solutions.
     * \param[in] config - Definition of the particular problem.
     */
-   void ExplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) override;
+    void ExplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) override;
 
    /*!
-    * \brief Update the solution static const unsigned an implicit Euler scheme.
+    * \brief Update the solution using the implicit Euler scheme.
     * \param[in] geometry - Geometrical definition of the problem.
     * \param[in] solver_container - Container vector with all the solutions.
     * \param[in] config - Definition of the particular problem.
     */
-   void ImplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) override;
+    void ImplicitEuler_Iteration(CGeometry* geometry, CSolver** solver_container, CConfig* config) override;
 
  protected:
    /*!
-  	* \brief Looking for non physical points in the initial solution.
+  	* \brief Look for eventual non physical points in the initial solution.
   	* \param[in] config - Definition of the particular problem.
   	*/
-   void Check_FreeStream_Solution(CConfig* config);
+    void Check_FreeStream_Solution(CConfig* config);
 
    /*!
-    * \brief Looking for coherence in species order definition.
+    * \brief Check coherence in species order definition between the configuration file and the library.
     * \param[in] config - Definition of the particular problem.
     */
-   void Check_FreeStream_Species_Order(CConfig* config);
+    void Check_FreeStream_Species_Order(CConfig* config);
 
    /*!
- 	  * \brief Reading files in case of restart
+ 	  * \brief Read files in case of restart.
  	  * \param[in] geometry - Geometrical definition of the problem.
  	  * \param[in] config - Definition of the particular problem.
  	  */
-   virtual void Load_Restart(CGeometry* geometry, CConfig* config);
+    virtual void Load_Restart(CGeometry* geometry, CConfig* config);
 
    /*!
- 	  * \brief Reading files in case of restart
+ 	  * \brief Read files in case of restart.
  	  * \param[in] geometry - Geometrical definition of the problem.
  	  * \param[in] config - Definition of the particular problem.
  	  */
-   void Read_SU2_Restart_Metadata(CGeometry* geometry, CConfig* config);
+    void Read_SU2_Restart_Metadata(CGeometry* geometry, CConfig* config);
 
 };
 
@@ -394,16 +389,16 @@ public:
   using Vec = Eigen::VectorXd;
 
 protected:
-  su2double Viscosity_Inf;	/*!< \brief Viscosity at the infinity. */
+  su2double Viscosity_Inf;	/*!< \brief Free-stream viscosity. */
 
-  RealVec Xs_i, Xs_j;  /*!< \brief Auxiliary vectors to store mole fractions at node i and j. */
-  RealVec Xs;         /*!< \brief Auxiliary vector to store mole fractions. */
+  RealVec Xs_i,       /*!< \brief Auxiliary vectors to store mole fractions at node i. */
+          Xs_j,       /*!< \brief Auxiliary vectors to store mole fractions at node j. */
+          Xs;         /*!< \brief Auxiliary vector to store mole fractions. */
 
 protected:
   unsigned short RHOS_INDEX_GRAD; /*!< \brief Index for position of mole fractions in primitive gradient. */
 
 public:
-
   /*!
 	 * \brief Default constructor of the class.
 	 */
@@ -423,14 +418,14 @@ public:
 	virtual ~CReactiveNSSolver() {}
 
   /*!
-   * \brief Set gradient primitive variables static const unsigned Green Gauss.
+   * \brief Set the gradient of primitive variables using Green Gauss.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
    void SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* config) override;
 
   /*!
-   * \brief Set gradient primitive variables static const unsigned weighted least squares.
+   * \brief Set the gradient of primitive variables using weighted least squares.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] config - Definition of the particular problem.
    */
@@ -444,7 +439,7 @@ public:
    void SetNondimensionalization(CGeometry* geometry, CConfig* config, unsigned short iMesh) override;
 
   /*!
-   * \brief Preprocessing.
+   * \brief Solver preprocessing. This function in particular sets the primitive variables according to current state in all nodes.
    * \param[in] geometry - Geometrical definition of the problem.
    * \param[in] solver_container - Container vector with all the solutions.
    * \param[in] config - Definition of the particular problem.
@@ -504,7 +499,7 @@ public:
 
 protected:
   /*!
- 	 * \brief Reading files in case of restart
+ 	 * \brief Read files in case of restart.
  	 * \param[in] geometry - Geometrical definition of the problem.
  	 * \param[in] config - Definition of the particular problem.
  	 */
@@ -512,7 +507,7 @@ protected:
 
 private:
   /*!
-   * \brief Compute the diffusive flux along a certain direction
+   * \brief Compute the diffusive flux along a certain direction.
    * \param[in] val_density - Density of the mixture.
    * \param[in] val_alpha - Parameter for artifical diffusion.
    * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.

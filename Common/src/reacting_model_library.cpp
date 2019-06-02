@@ -72,7 +72,7 @@ namespace Framework {
         Ys[iSpecies] = 1.0e-30;
 
       /*--- Check physical value for mass fractions ---*/
-      SU2_Assert(Ys[iSpecies] <= 1.0,std::string("The mass fraction of species number " + std::to_string(iSpecies) + "is greater than 1"));
+      SU2_Assert(Ys[iSpecies] <= 1.0,std::string("The mass fraction of species number " + std::to_string(iSpecies) + " is greater than 1"));
     }
   }
 
@@ -1098,7 +1098,7 @@ namespace Framework {
 
           n_found = 0;
           for(unsigned short iData = 0; iData < 5; ++iData) {
-            if(found_pos[iData] != std::string::n_pos) {
+            if(found_pos[iData] != std::string::npos) {
               n_found++;
               elem_found = iData;
             }

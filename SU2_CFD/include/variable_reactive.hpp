@@ -39,7 +39,8 @@ protected:
   RealVec    dTdU;                /*!< \brief Partial derivative of temperature w.r.t. conserved variables. */
 
   RealVec Ys;               /*!< \brief Auxiliary vector to store mass fractions separately. */
-  RealVec dTdYs, dPdYs;     /*!< \brief Auxiliary vectors for tmperature and pressure derivatives w.r.t partial densities. */
+  RealVec dTdYs,            /*!< \brief Auxiliary vector for temperature derivatives w.r.t partial densities. */
+          dPdYs;            /*!< \brief Auxiliary vector for pressure derivatives w.r.t partial densities. */
 
   /**
    * Mapping between the primitive variable name and its position in the physical data
@@ -82,7 +83,7 @@ public:
   CReactiveEulerVariable();
 
   /*!
-   * \overload Class constructor
+   * \overload Class constructor to initialize dimensions of the problem
    * \param[in] val_nDim - Number of dimensions of the problem.
    * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] val_nSpecies - Number of species in the mixture
@@ -96,10 +97,11 @@ public:
                          unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
-	 * \overload Class constructor
-	 * \param[in] val_density - Value of the flow density (initialization value).
+	 * \overload Class constructor with pressure, temperature, mass fractions and velocity
+	 * \param[in] val_pressure - Value of the flow pressure (initialization value).
+   * \param[in] val_massfrac - Value of mass fractions (initialization value).
 	 * \param[in] val_velocity - Value of the flow velocity (initialization value).
-	 * \param[in] val_temperature - Value of the flow energy (initialization value).
+	 * \param[in] val_temperature - Value of the temperature (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of conserved variables.
    * \param[in] val_nSpecies - Number of species in the mixture
@@ -115,8 +117,8 @@ public:
                          unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
 	/*!
-	 * \overload Class constructor
-	 * \param[in] val_solution - Vector with the flow value (initialization value).
+	 * \overload Class constructor with a complete initial state
+	 * \param[in] val_solution - Vector with the flow values (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] val_nSpecies - Number of species in the mixture
@@ -337,7 +339,7 @@ public:
    */
   inline void SetPrimitive(su2double* val_prim) override {
     SU2_Assert(val_prim != NULL, "The array of primitive variables has not been allocated");
-    std::copy(val_prim,val_prim + nPrimVar,Primitive.begin());
+    std::copy(val_prim, val_prim + nPrimVar, Primitive.begin());
   }
 
   /*!
@@ -639,9 +641,9 @@ public:
   using RealMatrix = Eigen::MatrixXd;
 
 protected:
-  su2double  Laminar_Viscosity;	/*!< \brief Laminar viscosity of the fluid. */
+  su2double  Laminar_Viscosity;	      /*!< \brief Laminar viscosity of the fluid. */
   su2double  Thermal_Conductivity;   /*!< \brief Thermal conductivity of the gas mixture. */
-  RealMatrix Diffusion_Coeffs;    /*!< \brief Binary diffusion coefficients of the mixture. */
+  RealMatrix Diffusion_Coeffs;      /*!< \brief Binary diffusion coefficients of the mixture. */
 
 public:
   static unsigned short RHOS_INDEX_GRAD; /*!< \brief Index for position of mole fractions in primitives gradient. */
@@ -652,7 +654,7 @@ public:
   CReactiveNSVariable(): CReactiveEulerVariable(), Laminar_Viscosity(), Thermal_Conductivity() {}
 
   /*!
-   * \overloaded Class constructor
+   * \overloaded Class constructor to initialize dimension of the problem.
    * \param[in] val_nDim - Number of dimensions of the problem.
    * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] val_nSpecies - Number of species in the mixture
@@ -666,10 +668,12 @@ public:
                       unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
-	 * \overload Class constructor
+	 * \overload Class constructor with pressure, temperature, mass fractions and velocity.
 	 * \param[in] val_pressure - Value of the flow pressure (initialization value).
+   * \param[in] val_massfrac - Value of the mass fractions (initialization value).
 	 * \param[in] val_velocity - Value of the flow velocity (initialization value).
 	 * \param[in] val_temperature - Value of the flow temperature (initialization value).
+   * \param[in] val_viscosity - Value of the flow viscosity (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of conserved variables.
    * \param[in] val_nSpecies - Number of species in the mixture
@@ -680,12 +684,12 @@ public:
    * \param[in] config - Definition of the particular problem.
 	 */
 	CReactiveNSVariable(const su2double val_pressure, const RealVec& val_massfrac, const RealVec& val_velocity,
-                      const su2double val_temperature, unsigned short val_nDim, unsigned short val_nvar,
+                      const su2double val_temperature, const su2double val_viscosity, unsigned short val_nDim, unsigned short val_nvar,
                       unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
                       unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
-	 * \overload Class constructor
+	 * \overload Class constructor with a complete initial state of the flow.
 	 * \param[in] val_solution - Vector with the flow value (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of conserved variables.
