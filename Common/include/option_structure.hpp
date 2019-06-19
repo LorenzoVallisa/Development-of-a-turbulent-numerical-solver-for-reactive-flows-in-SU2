@@ -3434,15 +3434,15 @@ public:
     this->marker = new string[this->size];
     this->mass_fractions = new su2double*[this->size];
     unsigned long i;
-    unsigned short nVals = totalVals/this->size;
+    unsigned short nVals = (totalVals - this->size + 1)/this->size;
     this->nSpecies = nVals - 1;
     for(i = 0; i < this->size; ++i)
       this->mass_fractions[i] = new su2double[this->nSpecies];
 
     for(i = 0; i < this->size; ++i) {
-      this->marker[i].assign(option_value[nVals*i]);
+      this->marker[i].assign(option_value[nVals*i + i]);
       for(unsigned short iSpecies = 0; iSpecies < this->nSpecies; ++iSpecies) {
-        std::istringstream ss_massfrac(option_value[nVals*i + iSpecies + 1]);
+        std::istringstream ss_massfrac(option_value[nVals*i + i + iSpecies + 1]);
         if(!(ss_massfrac >> this->mass_fractions[i][iSpecies]))
           return badValue(option_value, "inlet", this->name);
       }

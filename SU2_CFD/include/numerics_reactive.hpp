@@ -21,6 +21,8 @@ protected:
 
   unsigned short nSpecies; /*!< \brief Number of species in the mixture. */
 
+  su2double mInfty;  /*!< \brief Freestream Mach number used to compute the reference Mach number. */
+
   RealVec Phi_i,
           Phi_j;  /*!< \brief Vectors to describe the variables of the problem used in the AUSM scheme. */
 
@@ -43,9 +45,9 @@ public:
   /*!
    * \brief Default constructor of the class.
    */
-  CUpwReactiveAUSM(): CNumerics(), implicit(), nSpecies(), T_INDEX_PRIM(), VX_INDEX_PRIM(), P_INDEX_PRIM(), RHO_INDEX_PRIM(), H_INDEX_PRIM(),
-                      A_INDEX_PRIM(), RHOS_INDEX_PRIM(), RHO_INDEX_SOL(), RHOVX_INDEX_SOL(), RHOE_INDEX_SOL(), RHOS_INDEX_SOL(),
-                      T_INDEX_GRAD(), VX_INDEX_GRAD(), P_INDEX_GRAD(), T_INDEX_LIM(), VX_INDEX_LIM(), P_INDEX_LIM() {}
+  CUpwReactiveAUSM(): CNumerics(), implicit(), nSpecies(), mInfty(), T_INDEX_PRIM(), VX_INDEX_PRIM(), P_INDEX_PRIM(), RHO_INDEX_PRIM(),
+                      H_INDEX_PRIM(), A_INDEX_PRIM(), RHOS_INDEX_PRIM(), RHO_INDEX_SOL(), RHOVX_INDEX_SOL(), RHOE_INDEX_SOL(),
+                      RHOS_INDEX_SOL(), T_INDEX_GRAD(), VX_INDEX_GRAD(), P_INDEX_GRAD(), T_INDEX_LIM(), VX_INDEX_LIM(), P_INDEX_LIM() {}
 
   /*!
 	 * \brief Constructor of the class.
@@ -107,8 +109,6 @@ protected:
   RealVec Xs,                 /*!< \brief Auxiliary vector for mean mole fractions. */
           Ys;                 /*!< \brief Auxiliary vector for mean mass fractions. */
 
-  RealMatrix Grad_Xs;         /*!< \brief Auxiliary matrix for mean gradient of mole fractions. */
-
   unsigned short T_INDEX_PRIM, VX_INDEX_PRIM,
                  P_INDEX_PRIM, RHO_INDEX_PRIM,
                  H_INDEX_PRIM, A_INDEX_PRIM,
@@ -136,7 +136,7 @@ protected:
   Vec Jd,                       /*!< \brief Auxiliary vector to store S-M solution. */
       Jd_orig;                  /*!< \brief Auxiliary vector to store S-M solution in case of implicit computations. */
 
-  Vec Grad_Xs_norm;            /*!< \brief Auxiliary vector to store normal gradient of mole fractrions in case of implicit computations. */
+  Vec Grad_Xs_norm;            /*!< \brief Auxiliary vector to store normal gradient of mole fractions. */
 
   RealVec Ys_orig,
           Xs_orig;             /*!< \brief Auxiliary vectors to store mean mass and mole fractions for Jacobian. */
@@ -359,9 +359,9 @@ public:
   /*!
    * \brief Default constructor of the class.
    */
-  CSourceReactive(): CNumerics(), implicit(), nSpecies(), T_INDEX_PRIM(), VX_INDEX_PRIM(), P_INDEX_PRIM(), RHO_INDEX_PRIM(), H_INDEX_PRIM(),
-                     A_INDEX_PRIM(), RHOS_INDEX_PRIM(), RHO_INDEX_SOL(), RHOVX_INDEX_SOL(), RHOE_INDEX_SOL(), RHOS_INDEX_SOL(),
-                     T_INDEX_GRAD(), VX_INDEX_GRAD(), P_INDEX_GRAD(), T_INDEX_LIM(), VX_INDEX_LIM(), P_INDEX_LIM() {}
+  CSourceReactive(): CNumerics(), implicit(), nSpecies(), T_INDEX_PRIM(), VX_INDEX_PRIM(), P_INDEX_PRIM(), RHO_INDEX_PRIM(),
+                     H_INDEX_PRIM(), A_INDEX_PRIM(), RHOS_INDEX_PRIM(), RHO_INDEX_SOL(), RHOVX_INDEX_SOL(), RHOE_INDEX_SOL(),
+                     RHOS_INDEX_SOL(), T_INDEX_GRAD(), VX_INDEX_GRAD(), P_INDEX_GRAD(), T_INDEX_LIM(), VX_INDEX_LIM(), P_INDEX_LIM() {}
 
   /*!
    * \brief Constructor of the class.

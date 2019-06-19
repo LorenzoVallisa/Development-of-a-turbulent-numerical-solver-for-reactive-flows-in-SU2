@@ -14,7 +14,7 @@ namespace Framework  {
   class PhysicalChemicalLibrary: public Common::NotCopyable<PhysicalChemicalLibrary<Vector,Matrix>> {
 
   public:
-    typedef Common::ConcreteProvider<PhysicalChemicalLibrary> Provider;
+    typedef Common::ConcreteProvider<PhysicalChemicalLibrary,2> Provider;
     typedef const std::string& Arg1;
     typedef const std::string& Arg2;
 

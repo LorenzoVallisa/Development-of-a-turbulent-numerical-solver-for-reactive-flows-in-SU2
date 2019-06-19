@@ -25,7 +25,7 @@ namespace Framework {
   /*--- Setting gas constant for mixture ---*/
   inline void ReactingModelLibrary::SetRgas(const RealVec& ys) {
     /*--- Check the correct size of vectors ---*/
-    SU2_Assert(ys.size() == nSpecies,"The dimension of vector ys doesn't match nSpecies");
+    SU2_Assert(ys.size() == nSpecies, "The dimension of vector ys doesn't match nSpecies");
 
     SetMassFractions(ys);
     Rgas = std::inner_product(Ys.cbegin(), Ys.cend(), Ri.cbegin(), 0.0);
@@ -44,7 +44,7 @@ namespace Framework {
   /*--- Setting molar fraction for each species ---*/
   void ReactingModelLibrary::SetMolarFractions(const RealVec& xs) {
     /*--- Check the correct size of vectors ---*/
-    SU2_Assert(xs.size() == nSpecies,"The dimension of vector xs doesn't match nSpecies");
+    SU2_Assert(xs.size() == nSpecies, "The dimension of vector xs doesn't match nSpecies");
     Xs = xs;
 
     for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
@@ -52,9 +52,10 @@ namespace Framework {
       if(Xs[iSpecies] < 0.0)
         Xs[iSpecies] = 1.0e-30;
 
-      /*--- Check physical value for mole fractions ---*/
-      SU2_Assert(Xs[iSpecies] <= 1.0, std::string("The molar fraction of species number " +
-                                                   std::to_string(iSpecies) + "is greater than 1"));
+      /*--- Check physical value for mole fractions. NOTE: We add an extra tolerance in case of numerical perturbation for Jacobian
+            or take into account some small instabilities ---*/
+      SU2_Assert(Xs[iSpecies] <= (1.0 + 1.0e-1), std::string("The molar fraction of species number " +
+                                                              std::to_string(iSpecies) + "is too greater than 1"));
     }
   }
 
@@ -63,7 +64,7 @@ namespace Framework {
   /*--- Setting mass fraction for each species ---*/
   void ReactingModelLibrary::SetMassFractions(const RealVec& ys) {
     /*--- Check the correct size of vectors ---*/
-    SU2_Assert(ys.size() == nSpecies,"The dimension of vector ys doesn't match nSpecies");
+    SU2_Assert(ys.size() == nSpecies, "The dimension of vector ys doesn't match nSpecies");
     Ys = ys;
 
     for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
@@ -72,7 +73,8 @@ namespace Framework {
         Ys[iSpecies] = 1.0e-30;
 
       /*--- Check physical value for mass fractions ---*/
-      SU2_Assert(Ys[iSpecies] <= 1.0,std::string("The mass fraction of species number " + std::to_string(iSpecies) + " is greater than 1"));
+      SU2_Assert(Ys[iSpecies] <= (1.0 + 1.0e-1), std::string("The mass fraction of species number " +
+                                                              std::to_string(iSpecies) + " is too greater than 1"));
     }
   }
 
@@ -165,11 +167,11 @@ namespace Framework {
     return sound_speed*sound_speed/(Rgas*temp);
   }
 
-
   //
   //
   /*--- This function computes the frozen sound speed with pressure and density. ---*/
-  inline double ReactingModelLibrary::ComputeFrozenSoundSpeed(const double temp, const RealVec& ys, const double press, const double rho) {
+  inline double ReactingModelLibrary::ComputeFrozenSoundSpeed(const double temp,  const RealVec& ys,
+                                                              const double press, const double rho) {
     double gamma = ComputeFrozenGamma(temp,ys);
     return std::sqrt(gamma*press/rho);
   }
@@ -247,7 +249,7 @@ namespace Framework {
   //
   //
   /*--- This function returns the computed static enthalpy for each species. ---*/
-  inline RealVec ReactingModelLibrary::ComputePartialEnthalpy(const double temp) {
+  RealVec ReactingModelLibrary::ComputePartialEnthalpy(const double temp) {
     SetPartialEnthalpy(temp);
     return Enthalpies;
   }
@@ -302,7 +304,7 @@ namespace Framework {
   //
   //
   /*--- This function returns the computed static enthalpy for each species. ---*/
-  inline double ReactingModelLibrary::ComputePartialEnthalpy(const double temp, unsigned short iSpecies) {
+  double ReactingModelLibrary::ComputePartialEnthalpy(const double temp, unsigned short iSpecies) {
     SetPartialEnthalpy(temp, iSpecies);
     return Enthalpies[iSpecies];
   }
@@ -360,7 +362,7 @@ namespace Framework {
   //
   //
   /*--- Computing molecular viscosity of each species. ---*/
-  inline void ReactingModelLibrary::ComputeViscosities(const double temp) {
+  void ReactingModelLibrary::ComputeViscosities(const double temp) {
     for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
       Viscosities[iSpecies] = MathTools::GetSpline(std::get<T_DATA_SPLINE>(Mu_Spline[iSpecies]),
                                                    std::get<X_DATA_SPLINE>(Mu_Spline[iSpecies]),
@@ -397,7 +399,7 @@ namespace Framework {
   //
   //
   /*--- Computing thermal conductivity of each species ---*/
-  inline void ReactingModelLibrary::ComputeConductivities(const double temp) {
+  void ReactingModelLibrary::ComputeConductivities(const double temp) {
     for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
       Thermal_Conductivities[iSpecies] = MathTools::GetSpline(std::get<T_DATA_SPLINE>(Kappa_Spline[iSpecies]),
                                                               std::get<X_DATA_SPLINE>(Kappa_Spline[iSpecies]),
@@ -508,11 +510,14 @@ namespace Framework {
   ReactingModelLibrary::RealMatrix ReactingModelLibrary::GetGamma(const double rho, const RealVec& val_xs, const RealVec& val_ys,
                                                                   const RealMatrix& val_Dij) {
     /*--- Check the correct size of vectors ---*/
-    SU2_Assert(val_ys.size() == nSpecies,"The dimension of vector val_ys doesn't match nSpecies");
-    SU2_Assert(val_xs.size() == nSpecies,"The dimension of vector val_xs doesn't match nSpecies");
+    SU2_Assert(val_ys.size() == nSpecies, "The dimension of vector val_ys doesn't match nSpecies");
+    SU2_Assert(val_xs.size() == nSpecies, "The dimension of vector val_xs doesn't match nSpecies");
 
     const double sigma = std::accumulate(val_ys.cbegin(), val_ys.cend(), 0.0);
-    double massTot = mMasses[0]*val_xs[0]/(sigma*val_ys[0]);
+    double massTot = 0.0;
+    for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      massTot += val_ys[iSpecies]/mMasses[iSpecies];
+    massTot = 1.0/massTot;
 
     for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
       for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
@@ -520,9 +525,10 @@ namespace Framework {
           Gamma(iSpecies,jSpecies) = -sigma*massTot*val_xs[iSpecies]/(rho*mMasses[jSpecies]*val_Dij(iSpecies,jSpecies));
         else {
           double tmp = 0.0;
-          for(unsigned short kSpecies = 0; kSpecies < nSpecies; ++kSpecies)
-          if(kSpecies != iSpecies)
-            tmp += val_xs[kSpecies]/val_Dij(iSpecies,kSpecies);
+          for(unsigned short kSpecies = 0; kSpecies < nSpecies; ++kSpecies) {
+            if(kSpecies != iSpecies)
+              tmp += val_xs[kSpecies]/val_Dij(iSpecies,kSpecies);
+          }
           Gamma(iSpecies,iSpecies) = sigma*massTot*tmp/(rho*mMasses[iSpecies]);
         }
       }
@@ -646,7 +652,7 @@ namespace Framework {
     Source_Jacobian.setZero();
 
     /*--- Set Kc derivatives ---*/
-    const double epsilon = 1e-6;
+    const double epsilon = 1.0e-6;
     const double RT = R_ungas*temp;
     double temp_pert = temp + epsilon*temp;
     unsigned short iReac, iSpecies, jSpecies;
@@ -717,8 +723,8 @@ namespace Framework {
           if(n_line == 0) {
             std::istringstream curr_line(line);
             curr_line>>nSpecies;
-            SU2_Assert(!curr_line.fail(),"You have to specify the number of species before proceding");
-            SU2_Assert(nSpecies > 0,"The number of species must be greater than zero: you can't simulate anything otherwise");
+            SU2_Assert(!curr_line.fail(), "You have to specify the number of species before proceding");
+            SU2_Assert(nSpecies > 0, "The number of species must be greater than zero: you can't simulate anything otherwise");
             mMasses.reserve(nSpecies);
             Formation_Enthalpies.reserve(nSpecies);
             Diff_Volumes.reserve(nSpecies);
@@ -730,29 +736,29 @@ namespace Framework {
             double curr_mass,curr_enth,curr_vol;
             std::istringstream curr_line(line);
             curr_line>>curr_species;
-            SU2_Assert(!curr_line.fail(),std::string("Empty species field at line " + std::to_string(n_line)));
+            SU2_Assert(!curr_line.fail(), std::string("Empty species field at line " + std::to_string(n_line)));
             /*--- Read molar mass ---*/
             curr_line>>curr_mass;
-            SU2_Assert(!curr_line.fail(),std::string("The molar mass of species " + curr_species + " is missing"));
+            SU2_Assert(!curr_line.fail(), std::string("The molar mass of species " + curr_species + " is missing"));
             mMasses.push_back(curr_mass);
             /*--- Read formation enthalpy ---*/
             curr_line>>curr_enth;
-            SU2_Assert(!curr_line.fail(),std::string("The formation enthalpy of species " + curr_species + " is missing"));
+            SU2_Assert(!curr_line.fail(), std::string("The formation enthalpy of species " + curr_species + " is missing"));
             Formation_Enthalpies.push_back(curr_enth);
             /*--- Read formation enthalpy ---*/
             curr_line>>curr_vol;
-            SU2_Assert(!curr_line.fail(),std::string("The diffusion of species " + curr_species + " is missing"));
+            SU2_Assert(!curr_line.fail(), std::string("The diffusion of species " + curr_species + " is missing"));
             Diff_Volumes.push_back(curr_vol);
             /*--- Insert in the map ---*/
             auto res = Species_Names.insert(std::make_pair(curr_species, n_line - 1));
-            SU2_Assert(res.second == true,std::string("The species " + curr_species + " has already been declared"));
+            SU2_Assert(res.second == true, std::string("The species " + curr_species + " has already been declared"));
             n_line++;
           }
         }
       }
       mixfile.close();
-      SU2_Assert(nSpecies > 0,"The number of species read is equal to zero: impossible");
-      SU2_Assert(Species_Names.size() == nSpecies,"The number of species detected doesn't match nSpecies");
+      SU2_Assert(nSpecies > 0, "The number of species read is equal to zero: impossible");
+      SU2_Assert(Species_Names.size() == nSpecies, "The number of species detected doesn't match nSpecies");
 
       /*--- Resize vector that wil be often used ---*/
       Ys.resize(nSpecies);
@@ -819,7 +825,7 @@ namespace Framework {
           if(n_line == 0) {
             std::istringstream curr_line(line);
             curr_line>>nReactions;
-            SU2_Assert(!curr_line.fail(),"You have to specify the number of reactions before proceding");
+            SU2_Assert(!curr_line.fail(), "You have to specify the number of reactions before proceding");
 
             /*--- Resize and reserve space for vectors ---*/
             Stoich_Coeffs_Reactants.resize(nSpecies,nReactions);
@@ -859,7 +865,7 @@ namespace Framework {
           }
         }
       }
-      SU2_Assert(n_reac_read == nReactions,"The number of reactions detected doesn't match nReactions");
+      SU2_Assert(n_reac_read == nReactions, "The number of reactions detected doesn't match nReactions");
       chemfile.close();
     }
     else {
@@ -875,20 +881,20 @@ namespace Framework {
     /*--- Check correct reaction format ---*/
     auto minor_pos = line.find('<');
     auto major_pos = line.find('>');
-    SU2_Assert(major_pos != std::string::npos,"No reaction in this line");
-    SU2_Assert(line.find('>',major_pos+1),"Already detected > symbol for reactions");
+    SU2_Assert(major_pos != std::string::npos, "No reaction in this line");
+    SU2_Assert(line.find('>',major_pos+1), "Already detected > symbol for reactions");
 
     std::string reactants_side, products_side;
 
     if(is_rev) {
-      SU2_Assert(minor_pos + 2 == major_pos,"Incorrect symbol to detect reactions");
-      SU2_Assert(line.find('<',minor_pos + 1),"Already detected < symbol for reactions");
+      SU2_Assert(minor_pos + 2 == major_pos, "Incorrect symbol to detect reactions");
+      SU2_Assert(line.find('<',minor_pos + 1), "Already detected < symbol for reactions");
       reactants_side = line.substr(0,minor_pos);
     }
     else {
       auto bar_pos = line.find('-');
-      SU2_Assert(bar_pos != std::string::npos,"No reaction in this line");
-      SU2_Assert(bar_pos + 1 == major_pos,"Incorrect symbol to detect reactions");
+      SU2_Assert(bar_pos != std::string::npos, "No reaction in this line");
+      SU2_Assert(bar_pos + 1 == major_pos, "Incorrect symbol to detect reactions");
       reactants_side = line.substr(0,bar_pos);
     }
     products_side = line.substr(major_pos + 1);
@@ -909,15 +915,15 @@ namespace Framework {
     std::istringstream curr_line(line);
     /*--- Reading pre-exponential factor ---*/
     curr_line>>A;
-    SU2_Assert(!curr_line.fail(),"No exponential prefactor after a reaction");
+    SU2_Assert(!curr_line.fail(), "No exponential prefactor after a reaction");
     As.push_back(A);
     /*--- Reading temperature exponent ---*/
     curr_line>>beta;
-    SU2_Assert(!curr_line.fail(),"No temperature exponent after a reaction");
+    SU2_Assert(!curr_line.fail(), "No temperature exponent after a reaction");
     Betas.push_back(beta);
     /*--- Reading temperature activation ---*/
     curr_line>>Ta;
-    SU2_Assert(!curr_line.fail(),"No activation temperature after a reaction");
+    SU2_Assert(!curr_line.fail(), "No activation temperature after a reaction");
     Temps_Activation.push_back(Ta/R_ungas_scal);
   }
 
@@ -941,7 +947,7 @@ namespace Framework {
         /*--- We avoid clearly reading empty lines and comments ---*/
         if(!line.empty() && !std::ispunct(line.at(0))) {
           if(n_line == 0) {
-            SU2_Assert(std::isalpha(line.at(0)),"You have to specify the species");
+            SU2_Assert(std::isalpha(line.at(0)), "You have to specify the species");
             auto it = Species_Names.find(line);
             SU2_Assert(it != Species_Names.end(), "The species is not present in the mixture");
             curr_species = it->first;
@@ -953,20 +959,20 @@ namespace Framework {
 
             /*--- Reading temperature ---*/
             curr_line>>curr_temp;
-            SU2_Assert(!curr_line.fail(),std::string("Empty Temperature field at line " + std::to_string(n_line + 1) +
-                                                     " for species " + curr_species));
+            SU2_Assert(!curr_line.fail(), std::string("Empty Temperature field at line " + std::to_string(n_line + 1) +
+                                                      " for species " + curr_species));
             temp_data.push_back(curr_temp);
 
             /*--- Reading viscosity ---*/
             curr_line>>curr_visc;
-            SU2_Assert(!curr_line.fail(),std::string("Empty Mu field at line " + std::to_string(n_line + 1) +
-                                                     " for species " + curr_species));
+            SU2_Assert(!curr_line.fail(), std::string("Empty Mu field at line " + std::to_string(n_line + 1) +
+                                                      " for species " + curr_species));
             mu_data.push_back(curr_visc);
 
             /*--- Reading conductivity ---*/
             curr_line>>curr_cond;
-            SU2_Assert(!curr_line.fail(),std::string("Empty Kappa field at line " + std::to_string(n_line + 1) +
-                                                     " for species " + curr_species));
+            SU2_Assert(!curr_line.fail(), std::string("Empty Kappa field at line " + std::to_string(n_line + 1) +
+                                                      " for species " + curr_species));
             kappa_data.push_back(curr_cond);
 
             n_line++;
@@ -1010,7 +1016,7 @@ namespace Framework {
         /*--- We clearly avoid reading and empty lines ---*/
         if(!line.empty() && !std::ispunct(line.at(0))) {
           if(n_line == 0) {
-            SU2_Assert(std::isalpha(line.at(0)),"You have to specify the species");
+            SU2_Assert(std::isalpha(line.at(0)), "You have to specify the species");
             auto it = Species_Names.find(line);
             SU2_Assert(it != Species_Names.end(), "The species is not present in the mixture");
             curr_species = it->first;
@@ -1022,26 +1028,26 @@ namespace Framework {
 
             /*--- Reading temperature ---*/
             curr_line>>curr_temp;
-            SU2_Assert(!curr_line.fail(),std::string("Empty Temperature field at line " + std::to_string(n_line + 1) +
-                                                     " for species " + curr_species));
+            SU2_Assert(!curr_line.fail(), std::string("Empty Temperature field at line " + std::to_string(n_line + 1) +
+                                                      " for species " + curr_species));
             temp_data.push_back(curr_temp);
 
             /*--- Reading Cp ---*/
             curr_line>>curr_Cp;
-            SU2_Assert(!curr_line.fail(),std::string("Empty Cp field at line " + std::to_string(n_line + 1) +
-                                                     " for species " + curr_species));
+            SU2_Assert(!curr_line.fail(), std::string("Empty Cp field at line " + std::to_string(n_line + 1) +
+                                                      " for species " + curr_species));
             cp_data.push_back(curr_Cp);
 
             /*--- Reading Enthalpy ---*/
             curr_line>>curr_enth;
-            SU2_Assert(!curr_line.fail(),std::string("Empty Enthalpy field at line " + std::to_string(n_line + 1) +
-                                                     " for species " + curr_species));
+            SU2_Assert(!curr_line.fail(), std::string("Empty Enthalpy field at line " + std::to_string(n_line + 1) +
+                                                      " for species " + curr_species));
             enth_data.push_back(curr_enth);
 
             /*--- Reading Entropy ---*/
             curr_line>>curr_entr;
-            SU2_Assert(!curr_line.fail(),std::string("Empty Entropy field at line " + std::to_string(n_line + 1) +
-                                                     " for species " + curr_species));
+            SU2_Assert(!curr_line.fail(), std::string("Empty Entropy field at line " + std::to_string(n_line + 1) +
+                                                      " for species " + curr_species));
             entr_data.push_back(curr_entr);
 
             n_line++;
@@ -1103,7 +1109,7 @@ namespace Framework {
               elem_found = iData;
             }
           }
-          SU2_Assert(n_found = 1, "Multiple data read on single line");
+          SU2_Assert(n_found == 1, "Multiple data read on single line");
           SU2_Assert(set_data[elem_found] == false, "Detected data has already been read. Check the file content");
           line.erase(0,7);
           Fuel_Data[elem_found] = std::stod(line);

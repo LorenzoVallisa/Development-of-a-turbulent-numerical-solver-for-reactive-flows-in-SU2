@@ -75,6 +75,7 @@ private:
   unsigned short nSpecies;    /*!< \brief Number of species in the mixture.*/
   std::string* Marker_Inlet_MassFrac;  /*!< \brief String list with name of inlet boundary for mass fractions.*/
   su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
+  unsigned short nMarker_Inlet_MassFrac; /*!< \brief Number of inlet markers.*/
   unsigned short nSpecies_Inlet; /*!< \brief Number of species detected at inlet.*/
   su2double rho_s,            /*!< \brief Fuel density.*/
             c_s,              /*!< \brief Specific heat of fuel.*/
@@ -1254,6 +1255,22 @@ public:
   */
   inline unsigned short GetnSpecies_Inlet(void) const {
     return nSpecies_Inlet;
+  }
+
+  /*!
+   * \brief Get number of inlet markers from mass fractions boundary conditions.
+   * \return Number of inlet markers.
+  */
+  inline unsigned short GetnMarker_Inlet_MassFrac(void) const {
+    return nMarker_Inlet_MassFrac;
+  }
+
+  /*!
+   * \brief Get number of inlet markers.
+   * \return Number of inlet markers.
+  */
+  inline unsigned short GetnMarker_Inlet(void) const {
+    return nMarker_Inlet;
   }
 
   /*!

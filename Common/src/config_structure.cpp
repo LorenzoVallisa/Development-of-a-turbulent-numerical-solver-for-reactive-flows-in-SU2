@@ -555,7 +555,7 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   addStringListOption("SPECIES_ORDER", nSpecies, Species_Order);
 
   /*!\brief INLET_MASS_FRAC\n DESCRIPTION: Inlet mass fractions */
-  addInlet_MassFracOption("INLET_MASS_FRAC", nMarker_Inlet, Marker_Inlet_MassFrac, Inlet_MassFrac, nSpecies_Inlet);
+  addInlet_MassFracOption("INLET_MASS_FRAC", nMarker_Inlet_MassFrac, Marker_Inlet_MassFrac, Inlet_MassFrac, nSpecies_Inlet);
 
   /*!\brief REF_DENSITY\n DESCRIPTION: Reference density for adimensionalitazion (1.0 kg/m3 by default) \ingroup Config*/
   addDoubleOption("REF_DENSITY", Density_Ref, 1.0);

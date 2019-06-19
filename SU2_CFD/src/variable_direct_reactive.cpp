@@ -318,7 +318,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
 
   /*--- Checking sum of mass fraction ---*/
   std::copy(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM + nSpecies), Ys.begin());
-  nonPhys = nonPhys || (std::abs(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0) > EPS);
+  nonPhys = nonPhys || (std::abs(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0) > 0.1);
 
   /*--- Rename for convenience ---*/
   rho = U[RHO_INDEX_SOL];    // Density [Kg/m3]
@@ -506,7 +506,7 @@ void CReactiveEulerVariable::CalcdPdU(su2double* V, CConfig* config, su2double* 
     SU2_Assert(dPdU != NULL,"The array to store the derivatives of pressure w.r.t. conserved variables has not been allocated");
 
   /*--- Useful quantities ---*/
-  su2double dim_cp = Cp*config->GetEnergy_Ref();
+  su2double dim_cp = Cp*config->GetGas_Constant_Ref();
   if(US_System)
     dim_cp /= 3.28084*3.28084*5.0/9.0;
   su2double Gamma = library->ComputeFrozenGamma_FromCP(dim_cp, Ys);

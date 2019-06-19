@@ -39,7 +39,7 @@ namespace Framework {
      * \brief Default destructor.
      */
     virtual ~ReactingModelLibrary() {
-      Unsetup();
+      std::cout<<"Library Destroyed."<<std::endl;
     }
 
     /*!
