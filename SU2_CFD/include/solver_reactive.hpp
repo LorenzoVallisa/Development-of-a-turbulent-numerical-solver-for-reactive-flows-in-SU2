@@ -5,7 +5,7 @@
 #include "variable_reactive.hpp"
 
 /*! \class CReactiveEulerSolver
- *  \brief Main class for defining a solver for chemically reacting inviscid flows.
+ *  \brief Main class for defining a solver for multispecies (chemically reacting or not) inviscid flows.
  *  \author G. Orlando.
  */
 class CReactiveEulerSolver: public CSolver {
@@ -31,17 +31,18 @@ protected:
 
   bool  US_System;  /*!< \brief True if using US units. */
 
-  su2double*** CharacPrimVar;  /*!< \brief Value of the characteristic variables at each boundary. */
+  su2double*** CharacPrimVar;  /*!< \brief Value of the characteristic variables at each boundary.
+                                     NOTE: These will be use in case of multiphysics simulations. */
 
-  RealVec   Lower_Limit,   /*!< \brief Lower limit conserved variables. */
-            Upper_Limit;   /*!< \brief Upper limit conserved variables. */
+  RealVec   Lower_Limit,   /*!< \brief Lower limit values for conserved variables. */
+            Upper_Limit;   /*!< \brief Upper limit values for conserved variables. */
 
-  su2double Density_Inf,       /*!< \brief Free stream density. */
-            Pressure_Inf,		  /*!< \brief Free stream pressure. */
-	          Temperature_Inf;   /*!< \brief Translational free stream temperature. */
+  su2double Density_Inf,       /*!< \brief Free-stream density. */
+            Pressure_Inf,		  /*!< \brief Free-stream pressure. */
+	          Temperature_Inf;   /*!< \brief Translational free-stream temperature. */
 
-  RealVec   Velocity_Inf,  /*!< \brief Free stream flow velocity. */
-            MassFrac_Inf;  /*!< \brief Free stream species mass fraction. */
+  RealVec   Velocity_Inf,  /*!< \brief Free-stream flow velocity. */
+            MassFrac_Inf;  /*!< \brief Free-stream species mass fraction. */
 
   RealVec   PrimVar_i,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at point i. */
             PrimVar_j,  /*!< \brief Auxiliary nPrimVarGrad vector for storing primitive at point j. */
@@ -51,17 +52,17 @@ protected:
             Prim_j,       /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at point j. */
             Primitive;    /*!< \brief Auxiliary nPrimVarLim vector for storing primitive at boundary node. */
 
-  RealVec   Primitive_i,    /*!< \brief Auxiliary nPrimVar vector for storing primitive at point i in case of limiting. */
-            Primitive_j,    /*!< \brief Auxiliary nPrimVar vector for storing primitive at point j in case of limiting. */
-            Secondary_i,    /*!< \brief Auxiliary nVar vectors for storing pressure derivatives at point i for limiting in implicit case. */
-            Secondary_j;    /*!< \brief Auxiliary nVar vectors for storing pressure derivatives at point j for limiting in implicit case. */
+  RealVec   Primitive_i,    /*!< \brief Auxiliary nPrimVar vector for storing primitive at point i in case of second order. */
+            Primitive_j,    /*!< \brief Auxiliary nPrimVar vector for storing primitive at point j in case of second order. */
+            Secondary_i,    /*!< \brief Auxiliary nVar vector for storing pressure derivatives at node i for 2nd order in implicit case. */
+            Secondary_j;    /*!< \brief Auxiliary nVar vector for storing pressure derivatives at node j for 2nd order in implicit case. */
 
   RealVec   Buffer_Receive_U, /*!< \brief Auxiliary vector to receive information in case of parallel simulation. */
             Buffer_Send_U;    /*!< \brief Auxiliary vector to send information in case of parallel simulation. */
 
   RealVec   Ys_i,       /*!< \brief Auxiliary vector to store mass fractions at node i. */
             Ys_j,       /*!< \brief Auxiliary vector to store mass fractions at node j. */
-            Ys;         /*!< \brief Auxiliary vector to store mass fractions. */
+            Ys;         /*!< \brief Auxiliary vector to store mass fractions whenever needed. */
 
 protected:
   unsigned short T_INDEX_PRIM, VX_INDEX_PRIM,
@@ -156,6 +157,13 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   void Set_MPI_Solution(CGeometry* geometry, CConfig* config) override;
+
+  /*!
+   * \brief Call MPI to set old solution in case of parallel simulation.
+   * \param[in] geometry - Geometrical definition of the problem.
+   * \param[in] config - Definition of the particular problem.
+   */
+  void Set_MPI_Solution_Old(CGeometry* geometry, CConfig* config) override;
 
   /*!
    * \brief Call MPI to set limiter of primitive variables in case of parallel simulation.
@@ -381,7 +389,7 @@ public:
 };
 
 /*! \class CReactiveNSSolver
- *  \brief Main class for defining a solver for chemically reacting viscous flows.
+ *  \brief Main class for defining a solver for multispecies (chemically reacting or not) viscous flows.
  *  \author G. Orlando.
  */
 class CReactiveNSSolver:public CReactiveEulerSolver {
@@ -519,7 +527,7 @@ protected:
 
 private:
   /*!
-   * \brief Compute the diffusive flux along a certain direction.
+   * \brief Compute the diffusive flux along a certain direction solving Stefan-Maxwell equations.
    * \param[in] val_density - Density of the mixture.
    * \param[in] val_alpha - Parameter for artifical diffusion.
    * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.

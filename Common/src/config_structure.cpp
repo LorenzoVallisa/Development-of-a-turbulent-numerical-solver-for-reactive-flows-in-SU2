@@ -540,7 +540,7 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
 
   /*--- NOTE: New options ---*/
   /*!\brief LIB_NAME \n  DESCRIPTION: Library name for physical-chemical properties */
-  addStringOption("LIB_NAME", Library_Name, "");
+  addStringOption("LIB_NAME", Library_Name, "My_Library");
 
   /*!\brief CONFIG_LIB_FILE \n  DESCRIPTION: Name of file to configure the library */
   addStringOption("CONFIG_LIB_FILE", Config_File_Lib, "");
@@ -586,6 +586,30 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
 
   /*!\brief FUEL_DATA_FILE \n  DESCRIPTION: File where all the physical properties of the fuel are specified */
   addStringOption("FUEL_DATA_FILE", Fuel_File, "");
+
+  /* !\brief IGNITION\n DESCRIPTION: Flag for ignition */
+  addBoolOption("IGNITION", Ignition, false);
+
+  /*!\brief IGNITION_TEMPERATURE\n DESCRIPTION: Ignition Temperature \ingroup Config*/
+  addDoubleOption("IGNITION_TEMPERATURE", Ignition_Temperature, 1700.0);
+
+  /*!\brief IGNITION_ITER\n DESCRIPTION: Number of iterations for ignition \ingroup Config*/
+  addUnsignedLongOption("IGNITION_ITER", Ignition_Iter, 999999);
+
+  /*!\brief FUEL_INDEX\n DESCRIPTION: Index of fuel \ingroup Config*/
+  addUnsignedShortOption("FUEL_INDEX", Fuel_Index, 0);
+
+  /*!\brief OXIDIZER_INDEX\n DESCRIPTION: Index of fuel \ingroup Config*/
+  addUnsignedShortOption("OXIDIZER_INDEX", Oxidizer_Index, 2);
+
+  /*!\brief TEMPERATURE_MAX\n DESCRIPTION: Maximum temperature for secant method \ingroup Config*/
+  addDoubleOption("TEMPERATURE_MAX", Tmax, 6000.0);
+
+  /*!\brief TEMPERATURE_MIN\n DESCRIPTION: Minimum temperature for secant method \ingroup Config*/
+  addDoubleOption("TEMPERATURE_MIN", Tmin, 200.0);
+
+  /* !\brief CLIPPING_TEMPRATURE\n DESCRIPTION: Flag for ignition */
+  addBoolOption("CLIPPING_TEMPRATURE", Clipping_Temp, false);
 
   /*--- NOTE: Already present options ---*/
   /*!\brief REGIME_TYPE \n  DESCRIPTION: Regime type \n OPTIONS: see \link Regime_Map \endlink \ingroup Config*/
@@ -3791,7 +3815,8 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
     }
 
     if ((Kind_Regime == COMPRESSIBLE) && (Kind_Solver != FEM_ELASTICITY) &&
-        (Kind_Solver != HEAT_EQUATION) && (Kind_Solver != WAVE_EQUATION)) {
+        (Kind_Solver != HEAT_EQUATION) && (Kind_Solver != WAVE_EQUATION) &&
+        ((Kind_Solver != REACTIVE_EULER)) && (Kind_Solver != REACTIVE_NAVIER_STOKES)) {
       cout << "Mach number: " << Mach <<"."<< endl;
       cout << "Angle of attack (AoA): " << AoA <<" deg, and angle of sideslip (AoS): " << AoS <<" deg."<< endl;
       if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == ADJ_NAVIER_STOKES) || (Kind_Solver == REACTIVE_NAVIER_STOKES) ||

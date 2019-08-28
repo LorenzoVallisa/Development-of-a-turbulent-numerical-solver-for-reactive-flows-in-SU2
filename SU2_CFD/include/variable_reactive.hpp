@@ -2,11 +2,12 @@
 #define SU2_VARIABLE_REACTIVE
 
 #include "variable_structure.hpp"
-#include "../../Common/include/physical_chemical_library.hpp"
-#include "../../Common/include/su2_assert.hpp"
+#include "../../Common/include/Framework/factory.hpp"
+#include "../../Common/include/Framework/su2_assert.hpp"
 
 #include "../../externals/Eigen/Dense"
 #include <numeric>
+#include <memory>
 
 /*! \class CReactiveEulerVariable
  *  \brief Main class for defining a variable for chemically reacting inviscid flows.
@@ -16,10 +17,7 @@ class CReactiveEulerVariable: public CVariable {
 public:
   typedef std::vector<su2double> RealVec;
   typedef su2double** SU2Matrix;
-  typedef std::shared_ptr<Framework::PhysicalChemicalLibrary<RealVec,Eigen::MatrixXd>> LibraryPtr;
-
-  //template<class Vector, class Matrix>
-  //using LibraryPtr = std::shared_ptr<Framework::PhysicalChemicalLibrary<Vector,Matrix>>;
+  typedef std::shared_ptr<Framework::PhysicalChemicalLibrary> LibraryPtr;
 
 protected:
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
@@ -83,7 +81,7 @@ public:
   CReactiveEulerVariable();
 
   /*!
-   * \overload Class constructor to initialize dimensions of the problem
+   * \overload Class constructor to initialize dimensions of the problem.
    * \param[in] val_nDim - Number of dimensions of the problem.
    * \param[in] val_nvar - Number of variables of the problem.
    * \param[in] val_nSpecies - Number of species in the mixture
@@ -97,7 +95,7 @@ public:
                          unsigned short val_nprimvargrad, unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
-	 * \overload Class constructor with pressure, temperature, mass fractions and velocity
+	 * \overload Class constructor with pressure, temperature, mass fractions and velocity.
 	 * \param[in] val_pressure - Value of the flow pressure (initialization value).
    * \param[in] val_massfrac - Value of mass fractions (initialization value).
 	 * \param[in] val_velocity - Value of the flow velocity (initialization value).
@@ -117,7 +115,7 @@ public:
                          unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
 	/*!
-	 * \overload Class constructor with a complete initial state
+	 * \overload Class constructor with a complete initial state.
 	 * \param[in] val_solution - Vector with the flow values (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of variables of the problem.
@@ -133,7 +131,7 @@ public:
                          unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
-	 * \overload Class constructor
+	 * \overload Class constructor with a complete initial state.
 	 * \param[in] val_solution - Array with the flow value (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of variables of the problem.
@@ -179,7 +177,7 @@ public:
 
   /*!
    * \brief Get the index of velocity along x in primitive variables array
-   * \return Index of velocity along x in primitive variables array
+   * \return Index of x-velocity component in primitive variables array
    */
   inline static const unsigned short GetVX_INDEX_PRIM(void) {
     return VX_INDEX_PRIM;
@@ -235,7 +233,7 @@ public:
 
   /*!
    * \brief Get the index of momentum along x in conserved variables array
-   * \return Index of momentum along x in conserved variables array
+   * \return Index of x-momentum component in conserved variables array
    */
   inline static const unsigned short GetRHOVX_INDEX_SOL(void) {
     return RHOVX_INDEX_SOL;
@@ -481,7 +479,7 @@ public:
   }
 
   /*!
-   * \brief Calculates partial derivative of pressure w.r.t. conserved variables \f$\frac{\partial P}{\partial U}\f$
+   * \brief Compute partial derivative of pressure w.r.t. conserved variables \f$\frac{\partial P}{\partial U}\f$
    * \param[in] V - Actual state
    * \param[in] config - Configuration settings
    * \param[in] dPdU - Array to assign the derivatives
@@ -489,7 +487,7 @@ public:
   void CalcdPdU(su2double* V, CConfig* config, su2double* dPdU) override;
 
   /*!
-   * \brief Calculates partial derivative of temperature w.r.t. conserved variables \f$\frac{\partial T}{\partial U}\f$
+   * \brief Compute partial derivative of temperature w.r.t. conserved variables \f$\frac{\partial T}{\partial U}\f$
    * \param[in] V - Actual state
    * \param[in] config - Configuration settings
    * \param[in] dTdU - Srray to assign the derivatives
@@ -705,7 +703,7 @@ public:
                       unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
   /*!
-	 * \overload Class constructor
+	 * \overload Class constructor with a complete initial state.
 	 * \param[in] val_solution - Pointer to the flow value (initialization value).
 	 * \param[in] val_nDim - Number of dimensions of the problem.
 	 * \param[in] val_nvar - Number of conserved variables.
@@ -766,7 +764,6 @@ public:
   /*!
    * \brief Set the laminar viscosity of the mixture.
    * \param[in] laminarViscosity - value of laminar viscosity to set
-   * \return Laminar viscoisty of the mixture
    */
   inline void SetLaminarViscosity(su2double laminarViscosity) override {
     Laminar_Viscosity = laminarViscosity;
@@ -775,7 +772,6 @@ public:
   /*!
    * \brief Set the thermal conductivity of the mixture.
    * \param[in] thermalConductivity - value of thermal conductivity to set
-   * \return Laminar viscoisty of the mixture
    */
   inline void SetThermalConductivity(su2double thermalConductivity) override {
     Thermal_Conductivity = thermalConductivity;

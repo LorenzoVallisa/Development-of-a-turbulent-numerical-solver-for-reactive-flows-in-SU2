@@ -6,7 +6,7 @@
 
 /*!
  * \class CUpwReactiveAUSM
- * \brief Class for computing convective flux using AUSM method.
+ * \brief Class for computing convective flux using AUSM+-up method for multispecies flows.
  * \author G. Orlando
  */
 class CUpwReactiveAUSM: public CNumerics {
@@ -75,8 +75,8 @@ public:
 };
 
 /*!
- * \class CAvgGradReactive_BOundary
- * \brief Class for computing viscous flux using the average of gradients for a chemically reactive flow.
+ * \class CAvgGradReactive_Boundary
+ * \brief Class for computing viscous flux using the average of gradients for multispecies flows for boundary nodes.
  * \author G. Orlando
  */
 class CAvgGradReactive_Boundary: public CNumerics {
@@ -98,8 +98,8 @@ protected:
   su2double alpha;        /*!< \brief Artificial diffusion coefficient for Stefan-Maxwell equations. */
 
   Vec PrimVar_i,          /*!< \brief Primitive variables at node i. */
-      PrimVar_j;          /*!< \brief Primitive variables at node j. */
-  Vec Mean_PrimVar;       /*!< \brief Mean primitive variables. */
+      PrimVar_j,          /*!< \brief Primitive variables at node j. */
+      Mean_PrimVar;       /*!< \brief Mean primitive variables. */
 
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
 
@@ -133,13 +133,13 @@ protected:
   RealVec hs,                   /*!< \brief Auxiliary vector to store partial enthalpy for species diffusion flux contribution. */
           Cps;                  /*!< \brief Auxiliary vector to store Cp for species diffusion flux Jacobian contribution. */
 
-  Vec Jd,                       /*!< \brief Auxiliary vector to store S-M solution. */
-      Jd_orig;                  /*!< \brief Auxiliary vector to store S-M solution in case of implicit computations. */
+  Vec Jd;                       /*!< \brief Auxiliary vector to store S-M solution. */
 
   Vec Grad_Xs_norm;            /*!< \brief Auxiliary vector to store normal gradient of mole fractions. */
 
-  RealVec Ys_orig,
-          Xs_orig;             /*!< \brief Auxiliary vectors to store mean mass and mole fractions for Jacobian. */
+  Vec Ds_i,                    /*!< \brief Auxiliary vector to store Ramshaw diffusion coefficients at node i. */
+      Ds_j,                    /*!< \brief Auxiliary vector to store Ramshaw diffusion coefficients at node j. */
+      Ds;                      /*!< \brief Auxiliary vector to store average Ramshaw diffusion coefficients. */
 
   unsigned short T_INDEX_AVGGRAD,
                  VX_INDEX_AVGGRAD,
@@ -207,7 +207,7 @@ public:
 
 protected:
   /*!
-   * \brief Compute projection of the viscous fluxes using Ramshaw self-consistent modification
+   * \brief Compute projection of the viscous fluxes using Ramshaw self-consistent modification.
    * \param[in] val_primvar - Primitive variables.
    * \param[in] val_grad_primvar - Gradient of the primitive variables.
    * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
@@ -218,10 +218,10 @@ protected:
    */
   void GetViscousProjFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, su2double* val_normal,
                           const su2double val_viscosity, const su2double val_therm_conductivity,
-                          const RealVec& val_diffusioncoeff, CConfig* config);
+                          const Vec& val_diffusioncoeff, CConfig* config);
 
   /*!
-   * \brief Compute projection of the viscous fluxes solving Stefan-Maxwell equations
+   * \brief Compute projection of the viscous fluxes solving Stefan-Maxwell equations.
    * \param[in] val_primvar - Primitive variables.
    * \param[in] val_grad_primvar - Gradient of the primitive variables.
    * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
@@ -251,7 +251,7 @@ protected:
    * \param[in] config - Definition of the particular problem
   */
   void GetViscousProjJacs(const Vec& val_Mean_PrimVar, const su2double val_laminar_viscosity, const su2double val_thermal_conductivity,
-                          const su2double val_alpha, const Vec& val_grad_xs_norm, const RealMatrix& val_diffusion_coeff,
+                          const su2double val_alpha, const Vec& val_grad_xs_norm, const Vec& val_diffusion_coeff,
                           const su2double val_dist_ij, const su2double val_dS, su2double* val_normal, su2double* val_Proj_Visc_Flux,
                           su2double** val_Proj_Jac_Tensor_i, su2double** val_Proj_Jac_Tensor_j, CConfig* config);
 
@@ -270,7 +270,7 @@ protected:
 
 /*!
  * \class CAvgGradReactive_Flow
- * \brief Class for computing viscous flux using the corrected average gradients for a chemically reactive flow.
+ * \brief Class for computing viscous flux using the corrected average gradients for multispecies flows for internal nodes.
  * \author G. Orlando
  */
 class CAvgGradReactive_Flow: public CAvgGradReactive_Boundary {
@@ -306,7 +306,7 @@ public:
 
 protected:
   /*!
-   * \brief Compute the viscous flow residual using average of gradients method.
+   * \brief Compute the viscous flow residual using corrected average of gradients method.
    * \param[out] val_residual - Pointer to the total residual.
    * \param[out] val_Jacobian_i - Jacobian of the numerical method at node i (implicit computation).
    * \param[out] val_Jacobian_j - Jacobian of the numerical method at node j (implicit computation).
@@ -317,7 +317,7 @@ protected:
 
 /*!
  * \class CSourceReactive
- * \brief Class for computing residual due to chemistry source term.
+ * \brief Class for computing residual term due to chemistry.
  * \author G. Orlando
  */
 class CSourceReactive: public CNumerics {
@@ -384,13 +384,6 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
   void ComputeChemistry(su2double* val_residual, su2double** val_Jacobian_i, CConfig* config) override;
-
-  /*!
-   * \brief Residual for source term integration in case of axisymmetric simulation.
-   * \param[out] val_residual - Pointer to the source residual containing chemistry terms.
-   * \param[in] config - Definition of the particular problem.
-   */
-  //void ComputeResidual_Axisymmetric(su2double* val_residual, CConfig* config) override;
 
 };
 

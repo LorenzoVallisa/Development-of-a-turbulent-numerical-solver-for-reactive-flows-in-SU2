@@ -2027,7 +2027,9 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
                          ( config->GetKind_Solver() == RANS              ) ||
                          ( config->GetKind_Solver() == ADJ_EULER         ) ||
                          ( config->GetKind_Solver() == ADJ_NAVIER_STOKES ) ||
-                         ( config->GetKind_Solver() == ADJ_RANS          )   );
+                         ( config->GetKind_Solver() == ADJ_RANS          ) ||
+                         ( config->GetKind_Solver() == REACTIVE_EULER    ) ||
+                         ( config->GetKind_Solver() == REACTIVE_NAVIER_STOKES ));
   bool fem = (config->GetKind_Solver() == FEM_ELASTICITY);
 
   unsigned short iDim;
@@ -2059,7 +2061,7 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
    index for their particular solution container. ---*/
 
   switch (Kind_Solver) {
-    case EULER : case NAVIER_STOKES: FirstIndex = FLOW_SOL; SecondIndex = NONE; ThirdIndex = NONE; break;
+    case EULER : case NAVIER_STOKES: case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES: FirstIndex = FLOW_SOL; SecondIndex = NONE; ThirdIndex = NONE; break;
     case RANS : FirstIndex = FLOW_SOL; SecondIndex = TURB_SOL; if (transition) ThirdIndex=TRANS_SOL; else ThirdIndex = NONE; break;
     case POISSON_EQUATION: FirstIndex = POISSON_SOL; SecondIndex = NONE; ThirdIndex = NONE; break;
     case WAVE_EQUATION: FirstIndex = WAVE_SOL; SecondIndex = NONE; ThirdIndex = NONE; break;
@@ -2097,6 +2099,16 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
     }
 
     /*--- Add Pressure, Temperature, Cp, Mach to the restart file ---*/
+    /*--- NOTE: Multispecies addition ---*/
+    if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+      iVar_PressCp = nVar_Total; nVar_Total += 2;
+      iVar_MachMean = nVar_Total; nVar_Total += 1;
+    }
+
+    if(Kind_Solver == REACTIVE_NAVIER_STOKES) {
+      iVar_Lam = nVar_Total;
+      nVar_Total += 1;
+    }
 
     if ((Kind_Solver == EULER) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
       iVar_PressCp = nVar_Total; nVar_Total += 3;
@@ -2476,6 +2488,126 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
     }
 
     /*--- Communicate Pressure, Cp, and Mach ---*/
+    /*--- NOTE: Multispecies addition ---*/
+    if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+
+      /*--- First, loop through the mesh in order to find and store the
+       value of the coefficient of pressure at any surface nodes. They
+       will be placed in an auxiliary vector and then communicated like
+       all other volumetric variables. ---*/
+
+      /*--- Loop over this partition to collect the current variable ---*/
+
+      jPoint = 0;
+      for (iPoint = 0; iPoint < geometry->GetnPoint(); iPoint++) {
+
+        /*--- Check for halos & write only if requested ---*/
+
+        if (!Local_Halo[iPoint] || Wrt_Halo) {
+
+          /*--- Load buffers with the pressure, Cp, and mach variables. ---*/
+
+          Buffer_Send_Var[jPoint] = solver[FLOW_SOL]->node[iPoint]->GetPressure();
+          if (compressible){
+            Buffer_Send_Res[jPoint] = solver[FLOW_SOL]->node[iPoint]->GetTemperature();
+          } else{
+            Buffer_Send_Res[jPoint] =  0.0;
+          }
+
+          jPoint++;
+        }
+      }
+
+      /*--- Gather the data on the master node. ---*/
+
+#ifdef HAVE_MPI
+      SU2_MPI::Gather(Buffer_Send_Var, nBuffer_Scalar, MPI_DOUBLE, Buffer_Recv_Var, nBuffer_Scalar, MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
+      SU2_MPI::Gather(Buffer_Send_Res, nBuffer_Scalar, MPI_DOUBLE, Buffer_Recv_Res, nBuffer_Scalar, MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
+#else
+      for (iPoint = 0; iPoint < nBuffer_Scalar; iPoint++) Buffer_Recv_Var[iPoint] = Buffer_Send_Var[iPoint];
+      for (iPoint = 0; iPoint < nBuffer_Scalar; iPoint++) Buffer_Recv_Res[iPoint] = Buffer_Send_Res[iPoint];
+#endif
+
+      /*--- The master node unpacks and sorts this variable by global index ---*/
+
+      if (rank == MASTER_NODE) {
+        jPoint = 0; iVar = iVar_PressCp;
+        for (iProcessor = 0; iProcessor < size; iProcessor++) {
+          for (iPoint = 0; iPoint < Buffer_Recv_nPoint[iProcessor]; iPoint++) {
+
+            /*--- Get global index, then loop over each variable and store ---*/
+
+            iGlobal_Index = Buffer_Recv_GlobalIndex[jPoint];
+            Data[iVar][iGlobal_Index]   = Buffer_Recv_Var[jPoint];
+            Data[iVar+1][iGlobal_Index] = Buffer_Recv_Res[jPoint];
+            jPoint++;
+          }
+
+          /*--- Adjust jPoint to index of next proc's data in the buffers. ---*/
+
+          jPoint = (iProcessor+1)*nBuffer_Scalar;
+        }
+      }
+    }
+
+    /*--- Communicate Mach---*/
+    /*--- NOTE: Multispecies addition ---*/
+    if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+
+      /*--- Loop over this partition to collect the current variable ---*/
+
+      jPoint = 0;
+      for (iPoint = 0; iPoint < geometry->GetnPoint(); iPoint++) {
+
+        /*--- Check for halos & write only if requested ---*/
+
+        if (!Local_Halo[iPoint] || Wrt_Halo) {
+
+          /*--- Load buffers with the temperature and laminar viscosity variables. ---*/
+
+          if (compressible) {
+            Buffer_Send_Var[jPoint] = sqrt(solver[FLOW_SOL]->node[iPoint]->GetVelocity2())/
+            solver[FLOW_SOL]->node[iPoint]->GetSoundSpeed();
+          }
+          if (incompressible) {
+            Buffer_Send_Var[jPoint] = sqrt(solver[FLOW_SOL]->node[iPoint]->GetVelocity2())*config->GetVelocity_Ref()/
+            sqrt(config->GetBulk_Modulus()/(solver[FLOW_SOL]->node[iPoint]->GetDensity()*config->GetDensity_Ref()));
+          }
+          jPoint++;
+        }
+      }
+
+      /*--- Gather the data on the master node. ---*/
+
+#ifdef HAVE_MPI
+      SU2_MPI::Gather(Buffer_Send_Var, nBuffer_Scalar, MPI_DOUBLE, Buffer_Recv_Var, nBuffer_Scalar, MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
+#else
+      for (iPoint = 0; iPoint < nBuffer_Scalar; iPoint++) Buffer_Recv_Var[iPoint] = Buffer_Send_Var[iPoint];
+#endif
+
+      /*--- The master node unpacks and sorts this variable by global index ---*/
+
+      if (rank == MASTER_NODE) {
+        jPoint = 0; iVar = iVar_MachMean;
+        for (iProcessor = 0; iProcessor < size; iProcessor++) {
+          for (iPoint = 0; iPoint < Buffer_Recv_nPoint[iProcessor]; iPoint++) {
+
+            /*--- Get global index, then loop over each variable and store ---*/
+
+            iGlobal_Index = Buffer_Recv_GlobalIndex[jPoint];
+            Data[iVar][iGlobal_Index]   = Buffer_Recv_Var[jPoint];
+            jPoint++;
+          }
+
+          /*--- Adjust jPoint to index of next proc's data in the buffers. ---*/
+
+          jPoint = (iProcessor+1)*nBuffer_Scalar;
+        }
+      }
+    }
+
+
+    /*--- Communicate Pressure, Cp, and Mach ---*/
 
     if ((Kind_Solver == EULER) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
 
@@ -2588,6 +2720,56 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
 
             iGlobal_Index = Buffer_Recv_GlobalIndex[jPoint];
             Data[iVar][iGlobal_Index]   = Buffer_Recv_Var[jPoint];
+            jPoint++;
+          }
+
+          /*--- Adjust jPoint to index of next proc's data in the buffers. ---*/
+
+          jPoint = (iProcessor+1)*nBuffer_Scalar;
+        }
+      }
+    }
+
+    /*--- Laminar Viscosity ---*/
+    /*--- NOTE: Multispecies addition ---*/
+    if (Kind_Solver == REACTIVE_NAVIER_STOKES) {
+
+      /*--- Loop over this partition to collect the current variable ---*/
+
+      jPoint = 0;
+      for (iPoint = 0; iPoint < geometry->GetnPoint(); iPoint++) {
+
+        /*--- Check for halos & write only if requested ---*/
+
+        if (!Local_Halo[iPoint] || Wrt_Halo) {
+
+          /*--- Load buffers with the temperature and laminar viscosity variables. ---*/
+
+          Buffer_Send_Res[jPoint] = solver[FLOW_SOL]->node[iPoint]->GetLaminarViscosity();
+
+          jPoint++;
+        }
+      }
+
+      /*--- Gather the data on the master node. ---*/
+
+#ifdef HAVE_MPI
+      SU2_MPI::Gather(Buffer_Send_Res, nBuffer_Scalar, MPI_DOUBLE, Buffer_Recv_Res, nBuffer_Scalar, MPI_DOUBLE, MASTER_NODE, MPI_COMM_WORLD);
+#else
+      for (iPoint = 0; iPoint < nBuffer_Scalar; iPoint++) Buffer_Recv_Res[iPoint] = Buffer_Send_Res[iPoint];
+#endif
+
+      /*--- The master node unpacks and sorts this variable by global index ---*/
+
+      if (rank == MASTER_NODE) {
+        jPoint = 0; iVar = iVar_Lam;
+        for (iProcessor = 0; iProcessor < size; iProcessor++) {
+          for (iPoint = 0; iPoint < Buffer_Recv_nPoint[iProcessor]; iPoint++) {
+
+            /*--- Get global index, then loop over each variable and store ---*/
+
+            iGlobal_Index = Buffer_Recv_GlobalIndex[jPoint];
+            Data[iVar][iGlobal_Index] = Buffer_Recv_Res[jPoint];
             jPoint++;
           }
 
@@ -3759,6 +3941,12 @@ void COutput::SetRestart(CConfig *config, CGeometry *geometry, CSolver **solver,
         restart_file << "\t\"Pressure\"\t\"Temperature\"\t\"Pressure_Coefficient\"\t\"Mach\"";
       } else
         restart_file << "\t\"Pressure\"\t\"Temperature\"\t\"C<sub>p</sub>\"\t\"Mach\"";
+    }
+    /*--- NOTE: Multispecies addition ---*/
+    if(Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES) {
+      restart_file << "\t\"Pressure\"\t\"Temperature\"\t\"Mach\"";
+      if(Kind_Solver == REACTIVE_NAVIER_STOKES)
+        restart_file << "\t\"<greek>m</greek>\"";
     }
 
     if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
@@ -5463,7 +5651,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
 
           break;
 
-        /*--- NOTE: New options ---*/
+        /*--- NOTE: New functions ---*/
         case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
           if(!DualTime_Iteration) {
             ConvHist_file[0] << begin << direct_coeff << flow_resid;
@@ -5474,7 +5662,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
           if(DualTime_Iteration || !Unsteady) {
             std::cout.precision(6);
             std::cout.setf(std::ios::fixed, std::ios::floatfield);
-            std::cout.width(13);
+            std::cout.width(14);
             std::cout<<std::log10(solver_container[val_iZone][FinestMesh][FLOW_SOL]->GetRes_RMS(0));
             if(nDim == 2) {
               std::cout.width(14);
@@ -5490,7 +5678,6 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
 
           break;
 
-        /*--- NOTE: Already present options ---*/
         case RANS :
 
           if (!DualTime_Iteration) {
@@ -10178,7 +10365,7 @@ void COutput::SetResult_Files_Parallel(CSolver ****solver_container,
       cout << "Loading solution output data locally on each rank." << endl;
 
     switch (config[iZone]->GetKind_Solver()) {
-      case EULER : case NAVIER_STOKES: case RANS :
+      case EULER : case NAVIER_STOKES: case RANS : case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
         LoadLocalData_Flow(config[iZone], geometry[iZone][MESH_0], solver_container[iZone][MESH_0], iZone);
         break;
       case ADJ_EULER : case ADJ_NAVIER_STOKES : case ADJ_RANS :
@@ -10309,7 +10496,7 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
    in this zone for output. ---*/
 
   switch (config->GetKind_Solver()) {
-    case EULER : case NAVIER_STOKES: FirstIndex = FLOW_SOL; SecondIndex = NONE; break;
+    case EULER : case NAVIER_STOKES: case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES: FirstIndex = FLOW_SOL; SecondIndex = NONE; break;
     case RANS : FirstIndex = FLOW_SOL; SecondIndex = TURB_SOL; break;
     default: SecondIndex = NONE; break;
   }
@@ -10463,11 +10650,23 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
       nVar_Par += 1;
       Variable_Names.push_back("Pressure");
     }
+    /*--- NOTE: Multispecies addition ---*/
+    if(Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES) {
+      nVar_Par += 2;
+      Variable_Names.push_back("Temperature");
+      Variable_Names.push_back("Mach");
+    }
+    else {
+      nVar_Par += 3;
+      Variable_Names.push_back("Temperature");
+      Variable_Names.push_back("Pressure_Coefficient");
+      Variable_Names.push_back("Mach");
+    }
 
-    nVar_Par += 3;
-    Variable_Names.push_back("Temperature");
-    Variable_Names.push_back("Pressure_Coefficient");
-    Variable_Names.push_back("Mach");
+    if(Kind_Solver == REACTIVE_NAVIER_STOKES) {
+      nVar_Par += 1;
+      Variable_Names.push_back("Laminar_Viscosity");
+    }
 
     /*--- Add Laminar Viscosity, Skin Friction, Heat Flux, & yPlus to the restart file ---*/
 
@@ -10669,7 +10868,8 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
         if (compressible) {
           Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetPressure(); iVar++;
           Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetTemperature(); iVar++;
-          Local_Data[jPoint][iVar] = (solver[FLOW_SOL]->node[iPoint]->GetPressure() - RefPressure)*factor*RefAreaCoeff; iVar++;
+          if(Kind_Solver != REACTIVE_EULER && Kind_Solver != REACTIVE_NAVIER_STOKES)
+            Local_Data[jPoint][iVar] = (solver[FLOW_SOL]->node[iPoint]->GetPressure() - RefPressure)*factor*RefAreaCoeff; iVar++;
           Local_Data[jPoint][iVar] = sqrt(solver[FLOW_SOL]->node[iPoint]->GetVelocity2())/
           solver[FLOW_SOL]->node[iPoint]->GetSoundSpeed(); iVar++;
         }
@@ -10680,22 +10880,23 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
           sqrt(config->GetBulk_Modulus()/(solver[FLOW_SOL]->node[iPoint]->GetDensity()*config->GetDensity_Ref())); iVar++;
         }
 
-        if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+        if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS) || Kind_Solver == REACTIVE_NAVIER_STOKES) {
 
           /*--- Load data for the laminar viscosity. ---*/
 
           Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(); iVar++;
 
           /*--- Load data for the skin friction, heat flux, and y-plus. ---*/
-
-          Local_Data[jPoint][iVar] = Aux_Frict_x[iPoint]; iVar++;
-          Local_Data[jPoint][iVar] = Aux_Frict_y[iPoint]; iVar++;
-          if (geometry->GetnDim() == 3) {
-            Local_Data[jPoint][iVar] = Aux_Frict_z[iPoint];
-            iVar++;
+          if(Kind_Solver != REACTIVE_NAVIER_STOKES) {
+            Local_Data[jPoint][iVar] = Aux_Frict_x[iPoint]; iVar++;
+            Local_Data[jPoint][iVar] = Aux_Frict_y[iPoint]; iVar++;
+            if (geometry->GetnDim() == 3) {
+              Local_Data[jPoint][iVar] = Aux_Frict_z[iPoint];
+              iVar++;
+            }
+            Local_Data[jPoint][iVar] = Aux_Heat[iPoint]; iVar++;
+            Local_Data[jPoint][iVar] = Aux_yPlus[iPoint]; iVar++;
           }
-          Local_Data[jPoint][iVar] = Aux_Heat[iPoint]; iVar++;
-          Local_Data[jPoint][iVar] = Aux_yPlus[iPoint]; iVar++;
 
         }
 
@@ -10706,9 +10907,10 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
         }
 
         /*--- Load data for the distance to the nearest sharp edge. ---*/
-
-        if (config->GetWrt_SharpEdges()) {
-          Local_Data[jPoint][iVar] = geometry->node[iPoint]->GetSharpEdge_Distance(); iVar++;
+        if(Kind_Solver != REACTIVE_NAVIER_STOKES && Kind_Solver != REACTIVE_EULER) {
+          if (config->GetWrt_SharpEdges()) {
+            Local_Data[jPoint][iVar] = geometry->node[iPoint]->GetSharpEdge_Distance(); iVar++;
+          }
         }
 
         /*--- New variables can be loaded to the Local_Data structure here,

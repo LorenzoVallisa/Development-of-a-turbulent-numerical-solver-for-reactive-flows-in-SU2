@@ -754,7 +754,7 @@ void CMultiGridIntegration::NonDimensional_Parameters(CGeometry **geometry, CSol
 
       break;
 
-    // Reactive part addition
+    /*--- NOTE: Reactive part addition ---*/
     case RUNTIME_REACTIVE_SYS:
       /*--- Evaluate convergence monitor ---*/
       if (config->GetConvCriteria() == RESIDUAL) {

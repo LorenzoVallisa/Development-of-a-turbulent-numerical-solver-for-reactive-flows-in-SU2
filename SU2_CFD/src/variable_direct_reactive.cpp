@@ -22,6 +22,7 @@ unsigned short CReactiveNSVariable::RHOS_INDEX_GRAD = CReactiveNSVariable::P_IND
 //
 //
 CReactiveEulerVariable::CReactiveEulerVariable(): CVariable(), nSpecies(), nPrimVarLim(), US_System(false), Cp() {
+  /*--- Set to zero some recurrent variables of elementary type ---*/
   nPrimVar = 0;
   nPrimVarGrad = 0;
   nSecondaryVar = 0;
@@ -180,12 +181,15 @@ CReactiveEulerVariable::CReactiveEulerVariable(const RealVec& val_solution, unsi
   SU2_Assert(Solution != NULL,"The array Solution has not been allocated");
   SU2_Assert(Solution_Old != NULL,"The array Solution_Old has not been allocated");
 
-  std::copy(val_solution.cbegin(), val_solution.cend(), Solution);
-  std::copy(val_solution.cbegin(), val_solution.cend(), Solution_Old);
+  unsigned short iVar;
+  for(iVar = 0; iVar < nVar; ++iVar) {
+    Solution[iVar] = val_solution[iVar];
+    Solution_Old[iVar] = val_solution[iVar];
+  }
 
   bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
   if (dual_time) {
-    for(unsigned short iVar = 0; iVar < nVar; ++iVar) {
+    for(iVar = 0; iVar < nVar; ++iVar) {
       Solution_time_n[iVar] = val_solution[iVar];
       Solution_time_n1[iVar] = val_solution[iVar];
     }
@@ -210,12 +214,15 @@ CReactiveEulerVariable::CReactiveEulerVariable(su2double* val_solution, unsigned
   SU2_Assert(Solution_Old != NULL,"The array Solution_Old has not been allocated");
   SU2_Assert(val_solution != NULL,"The array to initialize Solution and Solution_Old has not been allocated");
 
-  std::copy(val_solution, val_solution + val_nvar, Solution);
-  std::copy(val_solution, val_solution + val_nvar, Solution_Old);
+  unsigned short iVar;
+  for(iVar = 0; iVar < nVar; ++iVar) {
+    Solution[iVar] = val_solution[iVar];
+    Solution_Old[iVar] = val_solution[iVar];
+  }
 
   bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
   if (dual_time) {
-    for(unsigned short iVar = 0; iVar < nVar; ++iVar) {
+    for(iVar = 0; iVar < nVar; ++iVar) {
       Solution_time_n[iVar] = val_solution[iVar];
       Solution_time_n1[iVar] = val_solution[iVar];
     }
@@ -247,6 +254,8 @@ CReactiveEulerVariable::~CReactiveEulerVariable() {
 bool CReactiveEulerVariable::SetPrimVar(CConfig* config) {
   /*--- Convert conserved to primitive variables ---*/
   bool nonPhys = Cons2PrimVar(config, Solution, Primitive.data());
+
+  /*--- Check for non physical solutions. NOTE: The first global iteration is taken into account by the solver class ---*/
   if(nonPhys && config->GetExtIter() > 0) {
     std::copy(Solution_Old, Solution_Old + nVar, Solution);
     bool nonPhys_old = Cons2PrimVar(config, Solution, Primitive.data());
@@ -324,21 +333,23 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   rho = U[RHO_INDEX_SOL];    // Density [Kg/m3]
   rhoE = U[RHOE_INDEX_SOL];   // Density*total energy per unit of mass [J/m3]
 
-  /*--- Assign mixture velocity ---*/
-  for(iDim = 0; iDim < nDim; ++iDim)
+  /*--- Assign mixture velocity and compute squared velocity ---*/
+  sqvel = 0.0;
+  for(iDim = 0; iDim < nDim; ++iDim) {
     V[VX_INDEX_PRIM + iDim] = U[RHOVX_INDEX_SOL + iDim]/rho;
-  sqvel = std::inner_product(V + VX_INDEX_PRIM, V + (VX_INDEX_PRIM + nDim), V + VX_INDEX_PRIM, 0.0);
+    sqvel += V[VX_INDEX_PRIM + iDim]*V[VX_INDEX_PRIM + iDim];
+  }
 
   /*--- Set temperature clipping values ---*/
-  Tmin   = 200.0/config->GetTemperature_Ref();;
-  Tmax   = 6.0e4/config->GetTemperature_Ref();;
+  Tmin   = config->GetTemperatureMin()/config->GetTemperature_Ref();
+  Tmax   = config->GetTemperatureMax()/config->GetTemperature_Ref();
 
   /*--- Set temperature secant algorithm paramters ---*/
   NRtol    = 1.0e-6;    // Tolerance for the Secant method
   Btol     = 1.0e-4;    // Tolerance for the Bisection method
   maxNIter = 7;        // Maximum Secant method iterations
   maxBIter = 32;        // Maximum Bisection method iterations
-  NRconvg = false;
+  NRconvg  = false;
 
   /*--- Translational-Rotational Temperature ---*/
   const su2double Rgas = library->ComputeRgas(Ys)/config->GetGas_Constant_Ref();
@@ -346,41 +357,77 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   const su2double C2 = 1.0/Rgas;
 
   /*--- Pick initial state and start algorithm ---*/
+  const su2double old_temp = V[T_INDEX_PRIM];
   T = V[T_INDEX_PRIM];
   Told = T + 1.0;
   for(iIter = 0; iIter < maxNIter; ++iIter) {
-    /*--- Execute a secant root-finding method to find T ---*/
-    su2double dim_temp, dim_temp_old;
-    dim_temp = T*config->GetTemperature_Ref();
-    dim_temp_old = Told*config->GetTemperature_Ref();
-    if(US_System) {
-      dim_temp *= 5.0/9.0;
-      dim_temp_old *= 5.0/9.0;
-    }
-    hs_old = library->ComputeEnthalpy(dim_temp_old, Ys)/config->GetEnergy_Ref();
-    hs = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
-    if(US_System) {
-      hs_old *= 3.28084*3.28084;
-      hs *= 3.28084*3.28084;
-    }
+    try {
+      /*--- Execute a secant root-finding method to find T ---*/
+      su2double dim_temp, dim_temp_old;
+      dim_temp = T*config->GetTemperature_Ref();
+      dim_temp_old = Told*config->GetTemperature_Ref();
+      if(US_System) {
+        dim_temp *= 5.0/9.0;
+        dim_temp_old *= 5.0/9.0;
+      }
+      hs_old = library->ComputeEnthalpy(dim_temp_old, Ys)/config->GetEnergy_Ref();
+      hs = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
+      if(US_System) {
+        hs_old *= 3.28084*3.28084;
+        hs *= 3.28084*3.28084;
+      }
 
-    f = T - C1 - C2*hs;
-    df = T - Told + C2*(hs_old-hs);
-    Tnew = T - f*(T-Told)/df;
+      f = T - C1 - C2*hs;
+      df = T - Told + C2*(hs_old-hs);
+      Tnew = T - f*(T-Told)/df;
 
-    /*--- Check for convergence ---*/
-    if(std::abs(Tnew - T) < NRtol) {
-      NRconvg = true;
-      break;
+      /*--- Check for convergence ---*/
+      if(std::abs(Tnew - T) < NRtol) {
+        NRconvg = true;
+        break;
+      }
+      else {
+        Told = T;
+        T = Tnew;
+      }
     }
-    else {
-      Told = T;
-      T = Tnew;
+    catch(const std::out_of_range& e) {
+      /*--- Print error message ---*/
+      std::cout<<e.what()<<" Trying with bisection method."<<std::endl;
+
+      /*--- Execute bisection method ---*/
+      su2double Ta = Tmin;
+      su2double Tb = Tmax;
+      for(iIter = 0; iIter < 10000; ++iIter) {
+        T = (Ta + Tb)/2.0;
+        su2double dim_temp = T*config->GetTemperature_Ref();;
+        if(US_System)
+          dim_temp *= 5.0/9.0;
+        hs = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
+        if(US_System)
+          hs *= 3.28084*3.28084;
+        f = T - C1 - C2*hs;
+
+        if(std::abs(f) < Btol) {
+          NRconvg = true;
+          break;
+        }
+        else {
+          if(f > 0)
+            Ta = T;
+          else
+            Tb = T;
+       }
+     }
+     if(NRconvg)
+        break;
+     else
+        throw std::runtime_error("Convergence not achieved for bisection method after catching out of range");
     }
   }
 
   /*--- If the secant method has converged, assign the value of T.
-        Otherwise execute a bisection root-finding method ---*/
+        Otherwise, if no exception has been caught, execute a bisection root-finding method ---*/
   if(NRconvg)
     V[T_INDEX_PRIM] = T;
   else {
@@ -415,6 +462,11 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
       throw std::runtime_error("Convergence not achieved for bisection method");
   }
 
+  /*--- Avoid too large variation in temperature ---*/
+  if(config->GetExtIter() > 0 && config->GetClipping_Temp())
+     V[T_INDEX_PRIM] = std::min(std::max(V[T_INDEX_PRIM],0.95*old_temp),1.05*old_temp);
+
+  /*--- Check if the solution found is inside the limits, otherwise set non physical point ---*/
   if(V[T_INDEX_PRIM] < Tmin) {
     V[T_INDEX_PRIM] = Tmin;
     nonPhys = true;
@@ -727,6 +779,7 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
   Thermal_Conductivity = library->ComputeLambda(dim_temp, Ys)/config->GetConductivity_Ref();
   if(US_System)
     Thermal_Conductivity *= 0.12489444444;
+  /*--- Compute binary diffusion coefficents. NOTE: The empirical formula employed in the library should return it in cm2/s ---*/
   Diffusion_Coeffs = library->GetDij_SM(dim_temp, dim_press)/(config->GetVelocity_Ref()*config->GetLength_Ref()*1.0e4);
   if(US_System)
     Diffusion_Coeffs *= 3.28084*3.28084;

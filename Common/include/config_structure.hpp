@@ -87,6 +87,14 @@ private:
   su2double* Velocity_Dir_Inflow;     /*!< \brief Inflow velocity direction.*/
   unsigned short nSpecies_Inflow; /*!< \brief Number of species detected at inflow.*/
   std::string Fuel_File;  /*!< \brief Name of the file with all fuel data.*/
+  bool Ignition; /*!< \brief Flag to say if ignition is desired.*/
+  unsigned long Ignition_Iter; /*!< \brief Number of iterations with ignition.*/
+  unsigned short Fuel_Index;  /*!< \brief Index of fuel in the mixture.*/
+  unsigned short Oxidizer_Index;  /*!< \brief Index of oxidizer in the mixture.*/
+  su2double Ignition_Temperature;  /*!< \brief Desired ignition temperature.*/
+  su2double Tmax; /*!< \brief Maximum temperature for secant method for computing temperature from conserved variables.*/
+  su2double Tmin; /*!< \brief Minimum temperature for secant method for computing temperature from conserved variables.*/
+  bool Clipping_Temp; /*!< \brief Flag to say if clipping temperature is desired.*/
 
   /*--- NOTE: Already present information to be read from config ---*/
   SU2_Comm SU2_Communicator; /*!< \brief MPI communicator of SU2.*/
@@ -1349,6 +1357,68 @@ public:
   */
   inline std::string GetFuelData_File(void) const {
     return Fuel_File;
+  }
+
+  /*!
+   * \brief Check if ignition is desired or not.
+  */
+  inline bool GetIgnition(void) const {
+    return Ignition;
+  }
+
+  /*!
+   * \brief Get the number of iterations with temperature spark.
+   * \return The number of iterations with ignition.
+  */
+  inline unsigned long GetIgnitionIter(void) const {
+    return Ignition_Iter;
+  }
+
+  /*!
+   * \brief Get the ignition temperature.
+   * \return The ignition temperature.
+  */
+  inline su2double GetIgnitionTemperature(void) const {
+    return Ignition_Temperature;
+  }
+
+  /*!
+   * \brief Get the index of fuel.
+   * \return TIndex of fuel.
+  */
+  inline unsigned short GetFuelIndex(void) const {
+    return Fuel_Index;
+  }
+
+  /*!
+   * \brief Get the index of oxidizer.
+   * \return TIndex of fuel.
+  */
+  inline unsigned short GetOxidizerIndex(void) const {
+    return Oxidizer_Index;
+  }
+
+  /*!
+   * \brief Get the maximum temperature for secant method.
+   * \return The maximum temperature.
+  */
+  inline su2double GetTemperatureMax(void) const {
+    return Tmax;
+  }
+
+  /*!
+   * \brief Get the minimum temperature for secant method.
+   * \return The minimum temperature.
+  */
+  inline su2double GetTemperatureMin(void) const {
+    return Tmin;
+  }
+
+  /*!
+   * \brief Check if clipping temperature passing from conserved to primitive is desired or not.
+  */
+  inline bool GetClipping_Temp(void) const {
+    return Clipping_Temp;
   }
 
   /*--- NOTE: ALready present functions ---*/

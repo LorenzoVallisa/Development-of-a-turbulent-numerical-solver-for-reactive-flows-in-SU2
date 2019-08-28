@@ -34,6 +34,7 @@
 #include "../include/driver_structure.hpp"
 #include "../include/definition_structure.hpp"
 
+/*--- NOTE: New header files included ---*/
 #include "../include/solver_reactive.hpp"
 #include "../include/numerics_reactive.hpp"
 
@@ -697,6 +698,7 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
   spalart_allmaras, neg_spalart_allmaras, menter_sst, transition,
   template_solver, disc_adj;
 
+  /*--- NOTE: bools for multispecies flows ---*/
   bool reactive_euler, reactive_ns;
 
   /*--- Initialize some useful booleans ---*/
@@ -733,7 +735,7 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
     case DISC_ADJ_EULER: euler = true; disc_adj = true; break;
     case DISC_ADJ_NAVIER_STOKES: ns = true; disc_adj = true; break;
     case DISC_ADJ_RANS: ns = true; turbulent = true; disc_adj = true; break;
-    //Reactive simultions additions
+    /*--- NOTE: Multispecies simultions additions ---*/
     case REACTIVE_EULER:
       reactive_euler = true;
       break;
@@ -786,7 +788,7 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
       }
     }
 
-    // NOTE: Reactive part addition
+    /*--- NOTE: multispecies part addition ---*/
     if(reactive_euler) {
       solver_container[iMGlevel][FLOW_SOL] = new CReactiveEulerSolver(geometry[iMGlevel], config, iMGlevel);
       solver_container[iMGlevel][FLOW_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
@@ -872,6 +874,7 @@ void CDriver::Solver_Postprocessing(CSolver ***solver_container, CGeometry **geo
   spalart_allmaras, neg_spalart_allmaras, menter_sst, transition,
   template_solver, disc_adj;
 
+  /*--- NOTE: bools for multispecies simulations ---*/
   bool reactive_euler, reactive_ns;
 
   /*--- Initialize some useful booleans ---*/
@@ -905,7 +908,8 @@ void CDriver::Solver_Postprocessing(CSolver ***solver_container, CGeometry **geo
     case DISC_ADJ_EULER: euler = true; disc_adj = true; break;
     case DISC_ADJ_NAVIER_STOKES: ns = true; disc_adj = true; break;
     case DISC_ADJ_RANS: ns = true; turbulent = true; disc_adj = true; break;
-    //Reactive part additions
+
+    /*--- NOTE: Multispecies part additions ---*/
     case REACTIVE_EULER:
       reactive_euler = true;
       break;
@@ -949,6 +953,7 @@ void CDriver::Solver_Postprocessing(CSolver ***solver_container, CGeometry **geo
       delete solver_container[iMGlevel][FLOW_SOL];
     }
 
+    /*--- NOTE: Deallocation for multispecies simulations ---*/
     if (reactive_euler || reactive_ns) {
       delete solver_container[iMGlevel][FLOW_SOL];
     }
@@ -985,6 +990,7 @@ void CDriver::Integration_Preprocessing(CIntegration **integration_container,
   bool euler, adj_euler, ns, adj_ns, turbulent, adj_turb, poisson, wave, fem,
       heat, template_solver, transition, disc_adj;
 
+  /*--- NOTE: bools for multispecies simulations ---*/
   bool reactive_euler, reactive_ns;
 
   /*--- Initialize some useful booleans ---*/
@@ -1016,7 +1022,7 @@ void CDriver::Integration_Preprocessing(CIntegration **integration_container,
     case DISC_ADJ_EULER : euler = true; disc_adj = true; break;
     case DISC_ADJ_NAVIER_STOKES: ns = true; disc_adj = true; break;
     case DISC_ADJ_RANS : ns = true; turbulent = true; disc_adj = true; break;
-    //Reactive part addtions
+    /*--- NOTE: Multispecies part addtions ---*/
     case REACTIVE_EULER:
       reactive_euler = true;
       break;
@@ -1038,6 +1044,7 @@ void CDriver::Integration_Preprocessing(CIntegration **integration_container,
   if (heat) integration_container[HEAT_SOL] = new CSingleGridIntegration(config);
   if (fem) integration_container[FEA_SOL] = new CStructuralIntegration(config);
 
+  /*--- NOTE: Allocate multigrid iteration class for multispecies simualtions ---*/
   if(reactive_euler || reactive_ns)
     integration_container[FLOW_SOL] = new CMultiGridIntegration(config);
 
@@ -1055,6 +1062,7 @@ void CDriver::Integration_Postprocessing(CIntegration **integration_container,
   bool euler, adj_euler, ns, adj_ns, turbulent, adj_turb, poisson, wave, fem,
       heat, template_solver, transition, disc_adj;
 
+  /*--- NOTE: bools for multispecies flows ---*/
   bool reactive_euler, reactive_ns;
 
   /*--- Initialize some useful booleans ---*/
@@ -1086,7 +1094,7 @@ void CDriver::Integration_Postprocessing(CIntegration **integration_container,
     case DISC_ADJ_EULER : euler = true; disc_adj = true; break;
     case DISC_ADJ_NAVIER_STOKES: ns = true; disc_adj = true; break;
     case DISC_ADJ_RANS : ns = true; turbulent = true; disc_adj = true; break;
-    // Reactive part additions
+    /*--- NOTE: Multispecies part additions ---*/
     case REACTIVE_EULER:
       reactive_euler = true;
       break;
@@ -1107,6 +1115,7 @@ void CDriver::Integration_Postprocessing(CIntegration **integration_container,
   if (heat) delete integration_container[HEAT_SOL];
   if (fem) delete integration_container[FEA_SOL];
 
+  /*--- NOTE: Deallocate integration class in case of multispecies simulations ---*/
   if (reactive_euler || reactive_ns)
     delete integration_container[FLOW_SOL];
 
@@ -1134,6 +1143,7 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
   nVar_Wave             = 0,
   nVar_Heat             = 0;
 
+  /*--- NOTE: Index to save the number of variables in case of multispecies simulations ---*/
   unsigned short nVar_Reactive = 0;
 
   su2double *constants = NULL;
@@ -1150,6 +1160,7 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
   transition,
   template_solver;
 
+  /*--- NOTE: bools for multispecies simulations ---*/
   bool reactive_euler, reactive_ns;
 
   bool compressible = (config->GetKind_Regime() == COMPRESSIBLE);
@@ -1180,7 +1191,7 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
     case ADJ_EULER : euler = true; adj_euler = true; break;
     case ADJ_NAVIER_STOKES : ns = true; turbulent = (config->GetKind_Turb_Model() != NONE); adj_ns = true; break;
     case ADJ_RANS : ns = true; turbulent = true; adj_ns = true; adj_turb = (!config->GetFrozen_Visc()); break;
-    // Reactive part additions
+    /*--- NOTE: Multispecies part additions ---*/
     case REACTIVE_EULER:
       reactive_euler = true;
       break;
@@ -1215,6 +1226,7 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
   if (fem)        nVar_FEM = solver_container[MESH_0][FEA_SOL]->GetnVar();
   if (heat)        nVar_Heat = solver_container[MESH_0][HEAT_SOL]->GetnVar();
 
+  /*--- NOTE: Retrive number of variables of multispecies simulations ---*/
   if(reactive_euler || reactive_ns)
     nVar_Reactive = solver_container[MESH_0][FLOW_SOL]->GetnVar();
 
@@ -1459,7 +1471,7 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
 
   }
 
-  /*--- Solver definition for the Reactive Euler and Navier-Stokes problems ---*/
+  /*--- NOTE: Solver definition for the Reactive Euler and Navier-Stokes problems ---*/
   if(reactive_euler || reactive_ns) {
     /*--- Definition of the convective scheme for each equation and mesh level ---*/
     switch (config->GetKind_ConvNumScheme_Flow()) {
@@ -1489,9 +1501,9 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
           case AUSM:
             for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
               numerics_container[iMGlevel][FLOW_SOL][CONV_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
-                                                                                           CReactiveEulerSolver::GetLibrary());
+                                                                                       CReactiveEulerSolver::GetLibrary());
               numerics_container[iMGlevel][FLOW_SOL][CONV_BOUND_TERM] = new CUpwReactiveAUSM(nDim, nVar_Reactive, config,
-                                                                                                 CReactiveEulerSolver::GetLibrary());
+                                                                                             CReactiveEulerSolver::GetLibrary());
             }
             break;
 
@@ -1511,17 +1523,17 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
     /*--- Definition of the viscous scheme for each equation and mesh level ---*/
     for(iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel)
       numerics_container[iMGlevel][FLOW_SOL][VISC_TERM] = new CAvgGradReactive_Flow(nDim, nVar_Reactive, config,
-                                                                                        CReactiveNSSolver::GetLibrary());
+                                                                                     CReactiveNSSolver::GetLibrary());
 
     /*--- Definition of the boundary condition method ---*/
     for(iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel)
       numerics_container[iMGlevel][FLOW_SOL][VISC_BOUND_TERM] = new CAvgGradReactive_Boundary(nDim, nVar_Reactive, config,
-                                                                                                  CReactiveNSSolver::GetLibrary());
+                                                                                               CReactiveNSSolver::GetLibrary());
 
     /*--- Defining Source Terms --*/
     for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
       numerics_container[iMGlevel][FLOW_SOL][SOURCE_FIRST_TERM] = new CSourceReactive(nDim, nVar_Reactive, config,
-                                                                                          CReactiveEulerSolver::GetLibrary());
+                                                                                      CReactiveEulerSolver::GetLibrary());
       numerics_container[iMGlevel][FLOW_SOL][SOURCE_SECOND_TERM] = new CSourceNothing(nDim, nVar_Reactive, config);
     }
 
@@ -1915,6 +1927,7 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
   transition,
   template_solver;
 
+  /*--- NOTE: bools for multispecies simulations ---*/
   bool reactive_euler, reactive_ns;
 
   bool compressible = (config->GetKind_Regime() == COMPRESSIBLE);
@@ -1944,7 +1957,7 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
     case ADJ_EULER : euler = true; adj_euler = true; break;
     case ADJ_NAVIER_STOKES : ns = true; turbulent = (config->GetKind_Turb_Model() != NONE); adj_ns = true; break;
     case ADJ_RANS : ns = true; turbulent = true; adj_ns = true; adj_turb = (!config->GetFrozen_Visc()); break;
-    //Reactive part additions
+    /*--- NOTE: Multispecies part additions ---*/
     case REACTIVE_EULER:
       reactive_euler = true;
       break;
@@ -2073,7 +2086,7 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
 
   }
 
-  /*--- Solver definition for the Potential, Euler, Navier-Stokes problems ---*/
+  /*--- NOTE: Deallocation of classes that comute fluxes for multispecies simualation ---*/
   if(reactive_euler || reactive_ns) {
     /*--- Definition of the convective scheme for each equation and mesh level ---*/
     for (iMGlevel = 0; iMGlevel <= config->GetnMGLevels(); ++iMGlevel) {
@@ -2355,7 +2368,7 @@ void CDriver::Iteration_Preprocessing() {
       iteration_container[iZone] = new CDiscAdjMeanFlowIteration(config_container[iZone]);
     break;
 
-    //Reactive part additions
+    /*--- NOTE: Multispecies part additions ---*/
     case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
       if (rank == MASTER_NODE)
         std::cout << ": Euler/Navier-Stokes/RANS fluid iteration." << std::endl;
@@ -2713,11 +2726,11 @@ void CDriver::PreprocessExtIter(unsigned long ExtIter) {
     }
   }
 
-  if(!fsi &&
-      (config_container[ZONE_0]->GetKind_Solver() == REACTIVE_EULER ||
-       config_container[ZONE_0]->GetKind_Solver() == REACTIVE_NAVIER_STOKES)) {
-  for (iZone = 0; iZone < nZone; ++iZone)
-    solver_container[iZone][MESH_0][FLOW_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
+  /*--- NOTE: Set initial condition in case of restart multispecies simulation ---*/
+  if(!fsi && (config_container[ZONE_0]->GetKind_Solver() == REACTIVE_EULER ||
+              config_container[ZONE_0]->GetKind_Solver() == REACTIVE_NAVIER_STOKES)) {
+    for(iZone = 0; iZone < nZone; ++iZone)
+      solver_container[iZone][MESH_0][FLOW_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
                                                                        config_container[iZone], ExtIter);
   }
 
@@ -2779,7 +2792,7 @@ bool CDriver::Monitor(unsigned long ExtIter) {
     case ADJ_EULER: case ADJ_NAVIER_STOKES: case ADJ_RANS:
     case DISC_ADJ_EULER: case DISC_ADJ_NAVIER_STOKES: case DISC_ADJ_RANS:
       StopCalc = integration_container[ZONE_0][ADJFLOW_SOL]->GetConvergence(); break;
-    //Reactive part additions
+    /*--- NOTE: Multispecies part additions ---*/
     case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
       StopCalc = integration_container[ZONE_0][FLOW_SOL]->GetConvergence();
       break;
@@ -3654,6 +3667,7 @@ void CFluidDriver::ResetConvergence() {
         integration_container[iZone][ADJTURB_SOL]->SetConvergence(false);
       break;
 
+    /*--- NOTE: Check convergence in case of multispecies simulations ---*/
     case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
       integration_container[ZONE_0][FLOW_SOL]->SetConvergence(false);
       break;

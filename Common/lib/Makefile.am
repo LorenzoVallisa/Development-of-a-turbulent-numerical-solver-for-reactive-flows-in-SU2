@@ -74,10 +74,10 @@ lib_sources = \
   ../include/option_structure.hpp \
   ../include/primal_grid_structure.hpp \
   ../include/primal_grid_structure.inl \
-  ../include/reacting_model_library.hpp \
-  ../include/spline.hpp \
-  ../include/su2_assert.hpp \
-  ../include/utility.hpp \
+  ../include/Framework/reacting_model_library.hpp \
+  ../include/Tools/spline.hpp \
+  ../include/Framework/su2_assert.hpp \
+  ../include/Tools/utility.hpp \
   ../include/vector_structure.hpp \
   ../include/vector_structure.inl \
   ../include/matrix_structure.hpp \
@@ -96,10 +96,10 @@ lib_sources = \
   ../src/config_structure.cpp \
   ../src/dual_grid_structure.cpp \
   ../src/geometry_structure.cpp \
-  ../src/reacting_model_library.cpp \
-  ../src/spline.cpp \
-  ../src/su2_assert.cpp \
-  ../src/utility.cpp \
+  ../src/Framework/reacting_model_library.cpp \
+  ../src/Tools/spline.cpp \
+  ../src/Framework/su2_assert.cpp \
+  ../src/Tools/utility.cpp \
   ../src/grid_adaptation_structure.cpp \
   ../src/grid_movement_structure.cpp \
   ../src/linear_solvers_structure.cpp \

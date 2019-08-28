@@ -195,6 +195,7 @@ enum ENUM_SOLVER {
   DISC_ADJ_EULER = 35,
   DISC_ADJ_RANS = 36,
   DISC_ADJ_NAVIER_STOKES = 37,
+  /*--- NOTE: Multispecies additions ---*/
   REACTIVE_EULER = 38, /*!< \brief Definition of the Reactive Euler solver. */
   REACTIVE_NAVIER_STOKES = 39 /*!< \brief Definition of the Reactive Navier-Stokes solver. */
 };
@@ -217,7 +218,7 @@ static const map<string, ENUM_SOLVER> Solver_Map = CCreateMap<string, ENUM_SOLVE
 ("FLUID_STRUCTURE_INTERACTION", FLUID_STRUCTURE_INTERACTION)
 
 ("TEMPLATE_SOLVER", TEMPLATE_SOLVER)
-// Reactive simulation addition
+/*--- NOTE: Reactive simulation addition ---*/
 ("REACTIVE_EULER", REACTIVE_EULER)
 ("REACTIVE_NAVIER_STOKES", REACTIVE_NAVIER_STOKES);
 
@@ -355,6 +356,7 @@ enum RUNTIME_TYPE {
   RUNTIME_FEA_SYS = 20,		/*!< \brief One-physics case, the code is solving the FEA equation. */
   RUNTIME_HEAT_SYS = 21,		/*!< \brief One-physics case, the code is solving the heat equation. */
   RUNTIME_TRANS_SYS = 22,			/*!< \brief One-physics case, the code is solving the turbulence model. */
+  /*--- NOTE: Multispecies addition ---*/
   RUNTIME_REACTIVE_SYS = 23  /*!< \brief One-physics case, the code is solving the reacting model. */
 };
 
@@ -876,12 +878,16 @@ static const map<string, TURBO_PERFORMANCE_TYPE> TurboPerformance_Map = CCreateM
 enum INLET_TYPE {
   TOTAL_CONDITIONS = 1,		/*!< \brief User specifies total pressure, total temperature, and flow direction. */
   MASS_FLOW = 2,           /*!< \brief User specifies density and velocity (mass flow). */
-  INPUT_FILE = 3           /*!< \brief User specifies an input file. */
+  INPUT_FILE = 3,           /*!< \brief User specifies an input file. */
+  /*--- NOTE: New insertion ---*/
+  TEMPERATURE_IMPOSE = 4   /*!< \brief User specifies temperature and velocity (mass flow). */
 };
 static const map<string, INLET_TYPE> Inlet_Map = CCreateMap<string, INLET_TYPE>
 ("TOTAL_CONDITIONS", TOTAL_CONDITIONS)
 ("MASS_FLOW", MASS_FLOW)
-("INPUT_FILE", INPUT_FILE);
+("INPUT_FILE", INPUT_FILE)
+/*--- NOTE: New insertion ---*/
+("TEMPERATURE_IMPOSE", TEMPERATURE_IMPOSE);
 
 /*!
  * \brief types engine inflow boundary treatments

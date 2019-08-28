@@ -519,7 +519,7 @@ void CMeanFlowIteration::Iterate(COutput *output,
     case RANS: case DISC_ADJ_RANS:
       config_container[val_iZone]->SetGlobalParam(RANS, RUNTIME_FLOW_SYS, ExtIter); break;
 
-    // Reactive simulations additions
+    /*--- NOTE: Reactive simulations additions ---*/
     case REACTIVE_EULER:
       config_container[val_iZone]->SetGlobalParam(REACTIVE_EULER, RUNTIME_REACTIVE_SYS, ExtIter);
       break;
