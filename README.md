@@ -1,72 +1,48 @@
------------------------------------------------------------
-  SU2 (ver. 5.0.0 "Raven"): The Open-Source CFD Code
------------------------------------------------------------
+# PACS Project (8 CFU): Development of a laminar numerical solver for reactive flows
 
-Computational analysis tools have revolutionized the way we design aerospace systems, but most established codes are proprietary, unavailable, or prohibitively expensive for many users. The SU2 team is changing this, making computational analysis and design freely available as open-source software and involving everyone in its creation and development. 
+In this project the capability to simulate multispecies flows (both reactive and not) has been added to the SU2 Suite; in order to reach this goal these main files that rely on physics have been added: numerics_reactive.hpp, solver_reactive.hpp and variable_reactive.hpp (in the include folder of SU2_CFD directory) and numerics_direct_reactive.cpp, solver_direct_reactive.cpp and variable_direct_reactive.cpp (in the src folder of SU2_CFD directory).
+In the solver files we mainly adapted the routines that execute loop for computing fluxes, imposing boundary conditions, obtaining gradients through Green-Gauss or Least-Sqaures and solving linear system.
+In the variable files we added two classes (CReactiveEulerVariable and CReactiveNSVariable) for storing the state in case of Euler or Navier-Stokes simulations respectively, while in the numerics files we added classes for computing convective, diffusive and source residuals.
 
-For an overview of the technical details in SU2, please see the following AIAA Journal article:
+Moreover the original files config_structure, driver_structure, integration_time, integration_structure and output_structure have been modified accordingly in order to make the software interact correctly with this new kind of problem and all additions are segnalated by a comment with the word NOTE.
+The file option_structure.hpp has been enriched with the class COptionInlet_MassFrac in order to read mass fractions at inlet which have the difficulty that they are known only at run-time besides some other flags to indicate that we are solving a multispecies problem: even in this case these new variables are denoted by a comment with NOTE.  
 
-"SU2: An open-source suite for multiphysics simulation and design," AIAA Journal, 54(3):828-846, 2016. http://arc.aiaa.org/doi/10.2514/1.J053813
+Eventually in the directory Common we added two subfolders for the include part and two subfolder for the src part: in Framework we implemented the library that computes the physical and chemical properties and the factory through we call it besides some useful exceptions, while in Tools there is an implementation of cubic spline for computing transport and thermodynamic properties and the routines needed to read the reactions from a textfile.
 
-[![Build Status](https://travis-ci.org/su2code/SU2.svg?branch=develop)](https://travis-ci.org/su2code/SU2)
+**Installation** \
+\
+In order to execute this version of the code it is required a C++ compiler with c++11 standard. For installation please refer to the following stages:
+  1. cd /path/to/SU2
+  2. ./bootstrap
+  3. ./configure --prefix=/path/to/install/SU2 CXXFLAGS="-O3" LIBS="-lstdc++fs" --enable-mpi --with-cxx=/path/to/mpicxx
+  4. make -j 8 install
 
-----------------------------------------------------------
-  SU2 INTRODUCTION 
-----------------------------------------------------------
+ As it can be easily noticed it is required to know the location of the MPI compiler; in case it is not available also a simple build is possible substituting step 3 and 4 as it follows:
+  3. ./configure --prefix=/path/to/install/SU2 CXXFLAGS="-O3" LIBS="-lstdc++fs"
+  4. make
+  5. make install
 
-SU2 is a suite of open-source software tools written in C++ for the numerical solution of partial differential equations (PDE) and performing PDE constrained optimization. 
+The --prefix option defines the location that the executables will be installed (in a folder named bin/ within your chosen install location from –prefix) and so it requires user access. If the --prefix option is not specified, the code will be installed in /usr/local/bin, which may require admin access.
 
-The primary applications are computational fluid dynamics and aerodynamic shape optimization, but has been extended to treat more general equations such as electrodynamics and chemically reacting flows. 
+Make sure to note the SU2_RUN and SU2_HOME environment variables displayed at the conclusion of configure. It is recommended that you add the SU2_RUN and SU2_HOME variables to your ~/.bashrc file and update your PATH variable to include the install location ($SU2_RUN, specified by --prefix).
 
-You will find more information and the latest news in:
-   - GitHub:    https://github.com/su2code
-   - CFD-online http://www.cfd-online.com/Forums/su2/
-   - Twitter:   https://twitter.com/su2code
+**Execution** \
+\
+In order to run the software is necessary a file in cfg format with options for a particular problem specified.
+The syntax to run a simulation is
 
----------------------------------------------------
-  SU2 INSTALLATION
----------------------------------------------------
+SU2_CFD your_config_file.cfg
 
-To build SU2 from the source code, just open a terminal and run the './configure', 'make', and 'make install' commands in the root directory of the source distribution. You can provide an install location using the prefix option to configure. If there are issues with autotool version requirements, run the ./bootstrap script provided in the root directory in order to build local versions of the tools and reset the makefiles (before trying configure/make/make install again). Please note that more detailed instructions on the configure and build processes can be found within the INSTALL file.
+or in case MPI is available
 
-----------------------------------------------------------
-  SU2 PATH SETUP 
-----------------------------------------------------------
+mpirun -n 8 SU2_CFD your_config_file.cfg
 
-SU2 is built using a typical configure/make/make install process. When make install is complete, please be sure to add the $SU2_HOME and $SU2_RUN environment variables, and update your $PATH with $SU2_RUN. 
+In this case the software does not return a file to be postprocessed but it is required to launch
 
-For example, add these lines to your .bashrc file:
+mpirun -n 8 SU2_SOL your_config_file.cfg
 
-- export SU2_RUN="your_prefix/bin"
-- export SU2_HOME="/path/to/SU2vX.X.X/"
-- export PATH=$PATH:$SU2_RUN
-- export PYTHONPATH=$SU2_RUN:$PYTHONPATH
+in order to obtain it.
 
-$SU2_RUN should point to the folder where all binaries and python scripts were installed. This is the prefix you set with the --prefix option to configure. Note that the bin/ directory is automatically added to your prefix path.
-
-$SU2_HOME should point to the root directory of the source code distribution, i.e., /path/to/SU2vX.X.X/.
-
-Thanks for building, and happy optimizing!
-
-- The SU2 Development Team
-
-----------------------------------------------------------
-  SU2 DEVELOPERS
-----------------------------------------------------------
-
-SU2 is being developed by individuals and organized teams all around the world. 
-
-The SU2 Lead Developers are:
-
-   - Dr. Francisco Palacios (Francisco.D.Palacios@boeing.com)
-   - Dr. Thomas D. Economon (economon@stanford.edu)
-
-and the most active groups developing SU2 are:
-
-   - Prof. Juan J. Alonso's group at Stanford University.
-   - Prof. Piero Colonna's group at Delft University of Technology.
-   - Prof. Nicolas R. Gauger's group at Kaiserslautern University of Technology.
-   - Prof. Alberto Guardone's group at Polytechnic University of Milan.
-   - Prof. Rafael Palacios' group at Imperial College London.
-   - Prof. Edwin van der Weide's group at the University of Twente.
-   - Prof. Vincent Terrapon's group at the University of Liege.
+SU2 is capable of outputting solution files that can be visualized in a number of formats, including ParaView (.vtk) and Tecplot (.dat for ASCII, .plt for binary).
+For a PDE analysis (direct solution), these files might look like the following:
+  flow.dat or flow.vtk: full volume flow solution.

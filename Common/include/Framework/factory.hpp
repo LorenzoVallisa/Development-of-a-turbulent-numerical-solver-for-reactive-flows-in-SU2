@@ -7,6 +7,7 @@
 
 #include <stdexcept>
 #include <sstream>
+#include <memory>
 
 /*!
  * This namespace provides a factory class to load run-time the library that
@@ -35,19 +36,17 @@ namespace Common {
     /*
      * \brief Factory destrcutor
     */
-    virtual ~Factory() {
-      delete my_library;
-    }
+    ~Factory() {}
 
     /*
-     * \brief Get the library
+     * \brief Get the library pointer and pass it to the solver shared pointer
     */
-    Base* GetLibraryPtr(void) const {
+    std::shared_ptr<Base> GetLibraryPtr(void) const {
       return my_library;
     }
 
   private:
-    Base* my_library; /*!< \brief Pointer to Base in order to access concrete version. */
+    std::shared_ptr<Base> my_library; /*!< \brief Pointer to Base in order to access concrete version. */
 
   }; /*--- End of class Factory ---*/
 
@@ -57,7 +56,7 @@ namespace Common {
   template<class Base>
   Factory<Base>::Factory(const std::string& lib_name, const std::string& config_name, const std::string& lib_path) {
     if(lib_name.compare("My_Library") == 0)
-      my_library = new Framework::ReactingModelLibrary(config_name, lib_path);
+      my_library = std::make_shared<Framework::ReactingModelLibrary>(config_name, lib_path);
     else
       throw std::out_of_range("The library wanted is not present in the factory");
   }

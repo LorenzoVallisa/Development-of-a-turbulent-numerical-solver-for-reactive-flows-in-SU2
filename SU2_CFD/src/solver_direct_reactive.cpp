@@ -68,8 +68,9 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
 
   /*--- Load library ---*/
   if(iMesh == MESH_0) {
-    library = LibraryPtr(Common::Factory<Framework::PhysicalChemicalLibrary>(config->GetLibraryName(), config->GetConfigLibFile(),
-                                                                             config->GetLibraryPath()).GetLibraryPtr());
+    Common::Factory<Framework::PhysicalChemicalLibrary> fact(config->GetLibraryName(), config->GetConfigLibFile(),
+                                                             config->GetLibraryPath());
+    library = LibraryPtr(fact.GetLibraryPtr());
     library->Setup();
   }
   nSpecies = library->GetnSpecies();
