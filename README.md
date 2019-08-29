@@ -17,7 +17,7 @@ In order to execute this version of the code it is required a C++ compiler with 
   3. ./configure --prefix=/path/to/install/SU2 CXXFLAGS="-O3" LIBS="-lstdc++fs" --enable-mpi --with-cxx=/path/to/mpicxx
   4. make -j 8 install
 
- As it can be easily noticed it is required to know the location of the MPI compiler; in case it is not available also a simple build is possible substituting step 3 and 4 as it follows:
+ As it can be easily noticed it is required to know the location of the MPI compiler; in case it is not available also a simple build is possible substituting step 3 and 4 as it follows:\
   3. ./configure --prefix=/path/to/install/SU2 CXXFLAGS="-O3" LIBS="-lstdc++fs"\
   4. make\
   5. make install\
