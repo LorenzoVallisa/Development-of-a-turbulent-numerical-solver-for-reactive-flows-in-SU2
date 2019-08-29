@@ -50,7 +50,7 @@ if BUILD_REVERSE
 bin_PROGRAMS += ../bin/SU2_CFD_AD
 endif
 
-noinst_LIBRARIES= 
+noinst_LIBRARIES=
 
 if BUILD_NORMAL
 noinst_LIBRARIES+= libSU2Core.a
@@ -66,14 +66,17 @@ libSU2Core_sources = \
   ../include/iteration_structure.hpp \
   ../include/numerics_structure.hpp \
   ../include/numerics_structure.inl \
+  ../include/numerics_reactive.hpp \
   ../include/output_structure.hpp \
   ../include/solver_structure.hpp \
   ../include/solver_structure.inl \
+  ../include/solver_reactive.hpp \
   ../include/SU2_CFD.hpp \
   ../include/transport_model.hpp \
   ../include/transport_model.inl \
   ../include/variable_structure.hpp \
   ../include/variable_structure.inl \
+  ../include/variable_reactive.hpp \
   ../include/transfer_structure.hpp \
   ../include/transfer_structure.inl \
   ../src/definition_structure.cpp \
@@ -92,6 +95,7 @@ libSU2Core_sources = \
   ../src/numerics_direct_heat.cpp \
   ../src/numerics_direct_mean.cpp \
   ../src/numerics_direct_mean_inc.cpp \
+  ../src/numerics_direct_reactive.cpp \
   ../src/numerics_direct_transition.cpp \
   ../src/numerics_direct_turbulent.cpp \
   ../src/numerics_direct_wave.cpp \
@@ -114,6 +118,7 @@ libSU2Core_sources = \
   ../src/solver_direct_heat.cpp \
   ../src/solver_direct_mean.cpp \
   ../src/solver_direct_mean_inc.cpp \
+  ../src/solver_direct_reactive.cpp \
   ../src/solver_direct_transition.cpp \
   ../src/solver_direct_turbulent.cpp \
   ../src/solver_direct_wave.cpp \
@@ -131,6 +136,7 @@ libSU2Core_sources = \
   ../src/variable_direct_heat.cpp \
   ../src/variable_direct_mean.cpp \
   ../src/variable_direct_mean_inc.cpp \
+  ../src/variable_direct_reactive.cpp \
   ../src/variable_direct_transition.cpp \
   ../src/variable_direct_turbulent.cpp \
   ../src/variable_direct_wave.cpp \
@@ -143,7 +149,7 @@ su2_cfd_sources = \
   ../src/SU2_CFD.cpp
 
 libSU2Core_cxx_flags = -fPIC
-libSU2Core_libadd = 
+libSU2Core_libadd =
 
 su2_cfd_cxx_flags =
 su2_cfd_ldadd =

@@ -74,6 +74,10 @@ lib_sources = \
   ../include/option_structure.hpp \
   ../include/primal_grid_structure.hpp \
   ../include/primal_grid_structure.inl \
+  ../include/Framework/reacting_model_library.hpp \
+  ../include/Tools/spline.hpp \
+  ../include/Framework/su2_assert.hpp \
+  ../include/Tools/utility.hpp \
   ../include/vector_structure.hpp \
   ../include/vector_structure.inl \
   ../include/matrix_structure.hpp \
@@ -92,6 +96,10 @@ lib_sources = \
   ../src/config_structure.cpp \
   ../src/dual_grid_structure.cpp \
   ../src/geometry_structure.cpp \
+  ../src/Framework/reacting_model_library.cpp \
+  ../src/Tools/spline.cpp \
+  ../src/Framework/su2_assert.cpp \
+  ../src/Tools/utility.cpp \
   ../src/grid_adaptation_structure.cpp \
   ../src/grid_movement_structure.cpp \
   ../src/linear_solvers_structure.cpp \
@@ -156,4 +164,3 @@ libSU2_AD_a_SOURCES = $(lib_sources)
 libSU2_AD_a_CXXFLAGS = @REVERSE_CXX@ ${lib_cxxflags}
 libSU2_AD_a_LIBADD =  ${lib_ldadd}
 endif
-

@@ -194,7 +194,10 @@ enum ENUM_SOLVER {
   TEMPLATE_SOLVER = 30,                 /*!< \brief Definition of template solver. */
   DISC_ADJ_EULER = 35,
   DISC_ADJ_RANS = 36,
-  DISC_ADJ_NAVIER_STOKES = 37
+  DISC_ADJ_NAVIER_STOKES = 37,
+  /*--- NOTE: Multispecies additions ---*/
+  REACTIVE_EULER = 38, /*!< \brief Definition of the Reactive Euler solver. */
+  REACTIVE_NAVIER_STOKES = 39 /*!< \brief Definition of the Reactive Navier-Stokes solver. */
 };
 /* BEGIN_CONFIG_ENUMS */
 static const map<string, ENUM_SOLVER> Solver_Map = CCreateMap<string, ENUM_SOLVER>
@@ -214,7 +217,11 @@ static const map<string, ENUM_SOLVER> Solver_Map = CCreateMap<string, ENUM_SOLVE
 ("DISC_ADJ_NAVIERSTOKES", DISC_ADJ_EULER)
 ("FLUID_STRUCTURE_INTERACTION", FLUID_STRUCTURE_INTERACTION)
 
-("TEMPLATE_SOLVER", TEMPLATE_SOLVER);
+("TEMPLATE_SOLVER", TEMPLATE_SOLVER)
+/*--- NOTE: Reactive simulation addition ---*/
+("REACTIVE_EULER", REACTIVE_EULER)
+("REACTIVE_NAVIER_STOKES", REACTIVE_NAVIER_STOKES);
+
 
 
 /*!
@@ -311,13 +318,17 @@ enum ENUM_KIND_NONDIM {
   DIMENSIONAL = 0,			    /*!< \brief Dimensional simulation. */
   FREESTREAM_PRESS_EQ_ONE = 1, /*!< \brief Non-dimensional simulation. */
   FREESTREAM_VEL_EQ_MACH = 2, /*!< \brief Non-dimensional simulation. */
-  FREESTREAM_VEL_EQ_ONE = 3 /*!< \brief Non-dimensional simulation. */
+  FREESTREAM_VEL_EQ_ONE = 3, /*!< \brief Non-dimensional simulation. */
+  /*--- NOTE: New options ---*/
+  REFERENCE = 4 /*!< \brief Non-dimensional simulation with specified values. */
 };
 static const map<string, ENUM_KIND_NONDIM> NonDim_Map = CCreateMap<string, ENUM_KIND_NONDIM>
 ("DIMENSIONAL", DIMENSIONAL)
 ("FREESTREAM_PRESS_EQ_ONE", FREESTREAM_PRESS_EQ_ONE)
 ("FREESTREAM_VEL_EQ_MACH", FREESTREAM_VEL_EQ_MACH)
-("FREESTREAM_VEL_EQ_ONE", FREESTREAM_VEL_EQ_ONE);
+("FREESTREAM_VEL_EQ_ONE", FREESTREAM_VEL_EQ_ONE)
+/*--- NOTE: New options ---*/
+("REFERENCE", REFERENCE);
 
 /*!
  * \brief different system of measurements
@@ -345,6 +356,8 @@ enum RUNTIME_TYPE {
   RUNTIME_FEA_SYS = 20,		/*!< \brief One-physics case, the code is solving the FEA equation. */
   RUNTIME_HEAT_SYS = 21,		/*!< \brief One-physics case, the code is solving the heat equation. */
   RUNTIME_TRANS_SYS = 22,			/*!< \brief One-physics case, the code is solving the turbulence model. */
+  /*--- NOTE: Multispecies addition ---*/
+  RUNTIME_REACTIVE_SYS = 23  /*!< \brief One-physics case, the code is solving the reacting model. */
 };
 
 const int FLOW_SOL = 0;		/*!< \brief Position of the mean flow solution in the solver container array. */
@@ -865,12 +878,16 @@ static const map<string, TURBO_PERFORMANCE_TYPE> TurboPerformance_Map = CCreateM
 enum INLET_TYPE {
   TOTAL_CONDITIONS = 1,		/*!< \brief User specifies total pressure, total temperature, and flow direction. */
   MASS_FLOW = 2,           /*!< \brief User specifies density and velocity (mass flow). */
-  INPUT_FILE = 3           /*!< \brief User specifies an input file. */
+  INPUT_FILE = 3,           /*!< \brief User specifies an input file. */
+  /*--- NOTE: New insertion ---*/
+  TEMPERATURE_IMPOSE = 4   /*!< \brief User specifies temperature and velocity (mass flow). */
 };
 static const map<string, INLET_TYPE> Inlet_Map = CCreateMap<string, INLET_TYPE>
 ("TOTAL_CONDITIONS", TOTAL_CONDITIONS)
 ("MASS_FLOW", MASS_FLOW)
-("INPUT_FILE", INPUT_FILE);
+("INPUT_FILE", INPUT_FILE)
+/*--- NOTE: New insertion ---*/
+("TEMPERATURE_IMPOSE", TEMPERATURE_IMPOSE);
 
 /*!
  * \brief types engine inflow boundary treatments
@@ -878,7 +895,7 @@ static const map<string, INLET_TYPE> Inlet_Map = CCreateMap<string, INLET_TYPE>
 enum ENGINE_INFLOW_TYPE {
   FAN_FACE_MACH = 1,	         /*!< \brief User specifies fan face mach number. */
   FAN_FACE_MDOT = 2,           /*!< \brief User specifies Static pressure. */
-  FAN_FACE_PRESSURE = 3        /*!< \brief User specifies Static pressure. */
+  FAN_FACE_PRESSURE = 3,        /*!< \brief User specifies Static pressure. */
 };
 static const map<string, ENGINE_INFLOW_TYPE> Engine_Inflow_Map = CCreateMap<string, ENGINE_INFLOW_TYPE>
 ("FAN_FACE_MACH", FAN_FACE_MACH)
@@ -1761,8 +1778,8 @@ public:
   }
 
   ~COptionDoubleArray() {
-     if(def  != NULL) delete [] def; 
-     if(vals != NULL) delete [] vals; 
+     if(def  != NULL) delete [] def;
+     if(vals != NULL) delete [] vals;
   };
   string SetValue(vector<string> option_value) {
     // Check that the size is correct
@@ -1849,12 +1866,12 @@ class COptionShortList : public COptionBase {
   short * & field; // Reference to the feildname
   string name; // identifier for the option
   unsigned short & size;
-  
+
 public:
   COptionShortList(string option_field_name, unsigned short & list_size,  short * & option_field) : field(option_field), size(list_size) {
     this->name = option_field_name;
   }
-  
+
   ~COptionShortList() {};
   string SetValue(vector<string> option_value) {
     // The size is the length of option_value
@@ -1865,7 +1882,7 @@ public:
       return "";
     }
     this->size = option_size;
-    
+
     // Parse all of the options
     short * vals = new  short[option_size];
     for (unsigned long i  = 0; i < option_size; i++) {
@@ -1880,7 +1897,7 @@ public:
     this->field = vals;
     return "";
   }
-  
+
   void SetDefault() {
     this->size = 0; // There is no default value for list
   }
@@ -2062,7 +2079,7 @@ public:
     this->disc_adjoint = this->disc_adjoint_def;
     this->restart = this->restart_def;
   }
-  
+
 };
 
 class COptionDVParam : public COptionBase {
@@ -2078,7 +2095,7 @@ public:
   }
 
   ~COptionDVParam() {};
-  
+
   string SetValue(vector<string> option_value) {
     if ((option_value.size() == 1) && (option_value[0].compare("NONE") == 0)) {
       this->nDV = 0;
@@ -2324,20 +2341,20 @@ class COptionFFDDef : public COptionBase {
   unsigned short & nFFD;
   su2double ** & CoordFFD;
   string * & FFDTag;
-  
+
 public:
   COptionFFDDef(string option_field_name, unsigned short & nFFD_field, su2double** & coordFFD_field, string* & FFDTag_field) : nFFD(nFFD_field), CoordFFD(coordFFD_field), FFDTag(FFDTag_field) {
     this->name = option_field_name;
   }
-  
+
   ~COptionFFDDef() {};
-  
+
   string SetValue(vector<string> option_value) {
     if ((option_value.size() == 1) && (option_value[0].compare("NONE") == 0)) {
       this->nFFD = 0;
       return "";
     }
-    
+
     // Cannot have ; at the beginning or the end
     if (option_value[0].compare(";") == 0) {
       string newstring;
@@ -2351,8 +2368,8 @@ public:
       newstring.append(": may not have ending semicolon");
       return newstring;
     }
-    
-    
+
+
     // use the ";" token to determine the number of design variables
     // This works because semicolon is not one of the delimiters in tokenize string
     this->nFFD = 0;
@@ -2361,35 +2378,35 @@ public:
         this->nFFD++;
       }
     }
-    
+
     // One more design variable than semicolon
     this->nFFD++;
-    
+
     this->CoordFFD = new su2double*[this->nFFD];
     for (unsigned short iFFD = 0; iFFD < this->nFFD; iFFD++) {
       this->CoordFFD[iFFD] = new su2double[25];
     }
-    
+
     this->FFDTag = new string[this->nFFD];
-    
+
     unsigned short nCoordFFD = 0;
     stringstream ss;
     unsigned int i = 0;
-    
+
     for (unsigned short iFFD = 0; iFFD < this->nFFD; iFFD++) {
-      
+
       nCoordFFD = 25;
-      
+
       for (unsigned short iCoordFFD = 0; iCoordFFD < nCoordFFD; iCoordFFD++) {
-        
+
         ss << option_value[i] << " ";
-        
+
         if (iCoordFFD == 0) ss >> this->FFDTag[iFFD];
         else ss >> this->CoordFFD[iFFD][iCoordFFD-1];
-        
+
         i++;
       }
-      
+
       if (iFFD < (this->nFFD-1)) {
         if (option_value[i].compare(";") != 0) {
           string newstring;
@@ -2399,39 +2416,39 @@ public:
         }
         i++;
       }
-      
+
     }
-    
+
     // Need to return something...
     return "";
   }
-  
+
   void SetDefault() {
     this->nFFD = 0;
     this->CoordFFD = NULL;
     this->FFDTag = NULL;
   }
-  
+
 };
 
 class COptionFFDDegree : public COptionBase {
   string name;
   unsigned short & nFFD;
   unsigned short ** & DegreeFFD;
-  
+
 public:
   COptionFFDDegree(string option_field_name, unsigned short & nFFD_field, unsigned short** & degreeFFD_field) : nFFD(nFFD_field), DegreeFFD(degreeFFD_field) {
     this->name = option_field_name;
   }
-  
+
   ~COptionFFDDegree() {};
-  
+
   string SetValue(vector<string> option_value) {
     if ((option_value.size() == 1) && (option_value[0].compare("NONE") == 0)) {
       this->nFFD = 0;
       return "";
     }
-    
+
     // Cannot have ; at the beginning or the end
     if (option_value[0].compare(";") == 0) {
       string newstring;
@@ -2445,8 +2462,8 @@ public:
       newstring.append(": may not have ending semicolon");
       return newstring;
     }
-    
-    
+
+
     // use the ";" token to determine the number of design variables
     // This works because semicolon is not one of the delimiters in tokenize string
     this->nFFD = 0;
@@ -2455,29 +2472,29 @@ public:
         this->nFFD++;
       }
     }
-    
+
     // One more design variable than semicolon
     this->nFFD++;
-    
+
     this->DegreeFFD = new unsigned short*[this->nFFD];
     for (unsigned short iFFD = 0; iFFD < this->nFFD; iFFD++) {
       this->DegreeFFD[iFFD] = new unsigned short[3];
     }
-    
+
     unsigned short nDegreeFFD = 0;
     stringstream ss;
     unsigned int i = 0;
-    
+
     for (unsigned short iFFD = 0; iFFD < this->nFFD; iFFD++) {
-      
+
       nDegreeFFD = 3;
-      
+
       for (unsigned short iDegreeFFD = 0; iDegreeFFD < nDegreeFFD; iDegreeFFD++) {
         ss << option_value[i] << " ";
         ss >> this->DegreeFFD[iFFD][iDegreeFFD];
         i++;
       }
-      
+
       if (iFFD < (this->nFFD-1)) {
         if (option_value[i].compare(";") != 0) {
           string newstring;
@@ -2487,18 +2504,18 @@ public:
         }
         i++;
       }
-      
+
     }
-    
+
     // Need to return something...
     return "";
   }
-  
+
   void SetDefault() {
     this->nFFD = 0;
     this->DegreeFFD = NULL;
   }
-  
+
 };
 
 // Class where the option is represented by (String, su2double, string, su2double, ...)
@@ -2878,7 +2895,7 @@ public:
   }
 
   ~COptionExhaust() {};
-  
+
   string SetValue(vector<string> option_value) {
 
     unsigned short totalVals = option_value.size();
@@ -2916,7 +2933,7 @@ public:
       if (!(ss_2nd >> this->ptotal[i]))
         return badValue(option_value, "exhaust fixed", this->name);
     }
-    
+
     return "";
   }
 
@@ -2926,7 +2943,7 @@ public:
     this->ptotal = NULL;
     this->size = 0; // There is no default value for list
   }
-  
+
 };
 
 class COptionPeriodic : public COptionBase {
@@ -3265,7 +3282,7 @@ class COptionActDisk : public COptionBase {
   su2double ** & press_jump;
   su2double ** & temp_jump;
   su2double ** & omega;
-  
+
 public:
   COptionActDisk(const string name,
                  unsigned short & nMarker_ActDiskInlet, unsigned short & nMarker_ActDiskOutlet, string * & Marker_ActDiskInlet, string * & Marker_ActDiskOutlet,
@@ -3274,7 +3291,7 @@ public:
   press_jump(ActDisk_PressJump), temp_jump(ActDisk_TempJump), omega(ActDisk_Omega) {
     this->name = name;
   }
-  
+
   ~COptionActDisk() {};
   string SetValue(vector<string> option_value) {
     const int mod_num = 8;
@@ -3283,7 +3300,7 @@ public:
       this->SetDefault();
       return "";
     }
-    
+
     if (totalVals % mod_num != 0) {
       string newstring;
       newstring.append(this->name);
@@ -3291,13 +3308,13 @@ public:
       this->SetDefault();
       return newstring;
     }
-    
+
     unsigned short nVals = totalVals / mod_num;
     this->inlet_size = nVals;
     this->outlet_size = nVals;
     this->marker_inlet = new string[this->inlet_size];
     this->marker_outlet = new string[this->outlet_size];
-    
+
     this->press_jump = new su2double*[this->inlet_size];
     this->temp_jump = new su2double*[this->inlet_size];
     this->omega = new su2double*[this->inlet_size];
@@ -3306,9 +3323,9 @@ public:
       this->temp_jump[i] = new su2double[2];
       this->omega[i] = new su2double[2];
     }
-    
+
     string tname = "actuator disk";
-    
+
     for (int i = 0; i < this->inlet_size; i++) {
       this->marker_inlet[i].assign(option_value[mod_num*i]);
       this->marker_outlet[i].assign(option_value[mod_num*i+1]);
@@ -3348,4 +3365,105 @@ public:
     this->temp_jump = NULL;
     this->omega = NULL;
   }
+};
+
+//NOTE: Added new option for inlet mass fractions
+/*!
+ * \brief New option for inlet mass fractions.
+ */
+class COptionInlet_MassFrac: public COptionBase {
+private:
+  std::string name; /*!< \brief Name of the field identifier. */
+  unsigned short& size;  /*!< \brief Number of inlet markers. */
+  std::string*& marker;  /*!< \brief Name of the boundary identifier. */
+  su2double**& mass_fractions;  /*!< \brief Mass fractions. */
+  unsigned short& nSpecies;  /*!< \brief Number of species. */
+
+public:
+  /*!
+	 * \brief Constructor of the class.
+   * \param[in] option_field_name - Name of the option in the configuration file
+   * \param[in] nMarker_Inlet - Number of inlet markers
+   * \param[in] Marker_Inlet - Name of inlet boundary
+   * \param[in] MassFrac_Inlet - Mass fractions at inlet
+	 */
+  COptionInlet_MassFrac(std::string option_field_name, unsigned short& nMarker_Inlet, std::string* & Marker_Inlet,
+                        su2double**& MassFrac_Inlet, unsigned short& nS): name(option_field_name), size(nMarker_Inlet),
+                        marker(Marker_Inlet), mass_fractions(MassFrac_Inlet), nSpecies(nS) {}
+
+  /*!
+	 * \brief Class destructor.
+   */
+  ~COptionInlet_MassFrac() {}
+
+  /*!
+	 * \brief Get string with all data.
+   * \param[in] option_value - Data to be stored
+   */
+  std::string SetValue(std::vector<std::string> option_value) {
+    /*--- Get the total number of data ---*/
+    unsigned short totalVals = option_value.size();
+    if(totalVals == 1 && (option_value[0].compare("NONE") == 0)) {
+      this->size = 0;
+      this->marker = NULL;
+      this->mass_fractions = NULL;
+      this->nSpecies = 0;
+      return "";
+    }
+
+    /*--- Use semicolon to determine the correct size:
+          this can work because semicolon is not one of the delimiters in tokenize string ---*/
+    /*--- Cannot have ; at the beginning or the end ---*/
+    if(option_value[0].compare(";") == 0) {
+      std::string newstring;
+      newstring.append(this->name);
+      newstring.append(": may not have beginning semicolon");
+      return newstring;
+    }
+    if(option_value[option_value.size()-1].compare(";") == 0) {
+      std::string newstring;
+      newstring.append(this->name);
+      newstring.append(": may not have ending semicolon");
+      return newstring;
+    }
+
+    /*--- Start parsing the string ---*/
+    this->size = 0;
+    for(unsigned int i = 0; i < static_cast<unsigned int>(totalVals); ++i) {
+      if(option_value[i].compare(";") == 0)
+        this->size++;
+    }
+
+    /*--- One more than ; ---*/
+    this->size++;
+
+    this->marker = new string[this->size];
+    this->mass_fractions = new su2double*[this->size];
+    unsigned long i;
+    unsigned short nVals = (totalVals - this->size + 1)/this->size;
+    this->nSpecies = nVals - 1;
+    for(i = 0; i < this->size; ++i)
+      this->mass_fractions[i] = new su2double[this->nSpecies];
+
+    for(i = 0; i < this->size; ++i) {
+      this->marker[i].assign(option_value[nVals*i + i]);
+      for(unsigned short iSpecies = 0; iSpecies < this->nSpecies; ++iSpecies) {
+        std::istringstream ss_massfrac(option_value[nVals*i + i + iSpecies + 1]);
+        if(!(ss_massfrac >> this->mass_fractions[i][iSpecies]))
+          return badValue(option_value, "inlet", this->name);
+      }
+    }
+
+    return "";
+  }
+
+  /*!
+	 * \brief Set default values.
+   */
+  void SetDefault(void) {
+    this->marker = NULL;
+    this->mass_fractions = NULL;
+    this->size = 0; // There is no default value for list
+  }
+
 };

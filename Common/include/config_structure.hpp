@@ -67,8 +67,36 @@ using namespace std;
 
 class CConfig {
 private:
-  string Library_Name; /*!< Name of library for physical-chemical options.*/
+  /*--- NOTE: New information to be read from config ---*/
+  std::string  Library_Name;           /*!< \brief Name of library for physical-chemical options.*/
+  std::string  Config_File_Lib;        /*!< \brief Name of the file to configure the library.*/
+  std::string  Library_Path;           /*!< \brief Name of the library to look for files to configure the library.*/
+  std::string* Species_Order;          /*!< \brief String list to check the coherence in species order declaration.*/
+  unsigned short nSpecies;    /*!< \brief Number of species in the mixture.*/
+  std::string* Marker_Inlet_MassFrac;  /*!< \brief String list with name of inlet boundary for mass fractions.*/
+  su2double** Inlet_MassFrac; /*!< \brief Inlet mass fractions for each boundary.*/
+  unsigned short nMarker_Inlet_MassFrac; /*!< \brief Number of inlet markers.*/
+  unsigned short nSpecies_Inlet; /*!< \brief Number of species detected at inlet.*/
+  su2double rho_s,            /*!< \brief Fuel density.*/
+            c_s,              /*!< \brief Specific heat of fuel.*/
+            h_pf,             /*!< \brief Pyrolisis enthalpy of fuel.*/
+            kappa_s,          /*!< \brief Fuel thermal conductivity.*/
+            T_0;              /*!< \brief Fuel temperature far from surface.*/
+  std::string* Marker_Inflow_MassFrac;  /*!< \brief String list with name of inflow boundary for mass fractions.*/
+  su2double** Inflow_MassFrac; /*!< \brief Inflow mass fractions for each boundary.*/
+  su2double* Velocity_Dir_Inflow;     /*!< \brief Inflow velocity direction.*/
+  unsigned short nSpecies_Inflow; /*!< \brief Number of species detected at inflow.*/
+  std::string Fuel_File;  /*!< \brief Name of the file with all fuel data.*/
+  bool Ignition; /*!< \brief Flag to say if ignition is desired.*/
+  unsigned long Ignition_Iter; /*!< \brief Number of iterations with ignition.*/
+  unsigned short Fuel_Index;  /*!< \brief Index of fuel in the mixture.*/
+  unsigned short Oxidizer_Index;  /*!< \brief Index of oxidizer in the mixture.*/
+  su2double Ignition_Temperature;  /*!< \brief Desired ignition temperature.*/
+  su2double Tmax; /*!< \brief Maximum temperature for secant method for computing temperature from conserved variables.*/
+  su2double Tmin; /*!< \brief Minimum temperature for secant method for computing temperature from conserved variables.*/
+  bool Clipping_Temp; /*!< \brief Flag to say if clipping temperature is desired.*/
 
+  /*--- NOTE: Already present information to be read from config ---*/
   SU2_Comm SU2_Communicator; /*!< \brief MPI communicator of SU2.*/
   int rank;
   unsigned short Kind_SU2; /*!< \brief Kind of SU2 software component.*/
@@ -851,6 +879,17 @@ private:
   // List and Array options should also be able to be specified with the string "NONE" indicating that there
   // are no elements. This allows the option to be present in a config file but left blank.
 
+  /*--- NOTE: New option for inlet mass fraction ---*/
+  void addInlet_MassFracOption(const std::string& name, unsigned short& nMarker_Inlet, std::string*& Marker_Inlet_MassFrac,
+                               su2double**& MassFractions, unsigned short& nSpecies_Inlet) {
+    /*--- Check if this filed already exists in the configuration file ---*/
+    assert(option_map.find(name) == option_map.end());
+    all_options.insert(std::pair<std::string, bool>(name, true));
+    COptionBase* val = new COptionInlet_MassFrac(name, nMarker_Inlet, Marker_Inlet_MassFrac, MassFractions, nSpecies_Inlet);
+    option_map.insert(pair<std::string, COptionBase*>(name, val));
+  }
+
+  //NOTE: Already present functions ---*/
   /*!<\brief addDoubleOption creates a config file parser for an option with the given name whose
    value can be represented by a su2double.*/
 
@@ -1177,11 +1216,212 @@ public:
   bool TokenizeString(string & str, string & option_name,
                       vector<string> & option_value);
 
-/*!
- * \brief Get library name for physical-chemical properties.
- */
-  string GetLibraryName(void);
+  /*--- NOTE: New functions ---*/
+  /*!
+   * \brief Get library name for physical-chemical properties.
+   * \return Name of library.
+  */
+  inline std::string GetLibraryName(void) const {
+    return Library_Name;
+  }
 
+  /*!
+   * \brief Get library's configuration file name for physical-chemical properties.
+   * \return Name of library's configuration file.
+  */
+  inline std::string GetConfigLibFile(void) const {
+    return Config_File_Lib;
+  }
+
+  /*!
+   * \brief Get library path for physical-chemical properties.
+   * \return Name of library path.
+  */
+  inline std::string GetLibraryPath(void) const {
+    return Library_Path;
+  }
+
+  /*!
+   * \brief Get number of species involved.
+   * \return Number of species.
+  */
+  inline unsigned short GetnSpecies(void) const {
+    return nSpecies;
+  }
+
+  /*!
+   * \brief Get the order of species involved.
+   * \return Pointer to list with all species in mixture.
+  */
+  inline std::string* GetSpeciesOrder(void) const {
+    return Species_Order;
+  }
+
+  /*!
+   * \brief Get number of species detected at inlet.
+   * \return Number of species at inlet.
+  */
+  inline unsigned short GetnSpecies_Inlet(void) const {
+    return nSpecies_Inlet;
+  }
+
+  /*!
+   * \brief Get number of inlet markers from mass fractions boundary conditions.
+   * \return Number of inlet markers.
+  */
+  inline unsigned short GetnMarker_Inlet_MassFrac(void) const {
+    return nMarker_Inlet_MassFrac;
+  }
+
+  /*!
+   * \brief Get number of inlet markers.
+   * \return Number of inlet markers.
+  */
+  inline unsigned short GetnMarker_Inlet(void) const {
+    return nMarker_Inlet;
+  }
+
+  /*!
+   * \brief Get mass fraction for a desired inlet boundary
+   * \param[in] val_index - Index corresponding to the inlet boundary.
+   * \return Inlet mass fractions.
+  */
+  su2double* GetInlet_MassFrac(std::string val_index) const;
+
+  /*!
+   * \brief Get fuel density.
+   * \return Fuel density.
+  */
+  inline su2double GetDensity_Fuel(void) const {
+    return rho_s;
+  }
+
+  /*!
+   * \brief Get fuel specific heat.
+   * \return Fuel specific heat.
+  */
+  inline su2double GetSpecificHeat_Fuel(void) const {
+    return c_s;
+  }
+
+  /*!
+   * \brief Get fuel enthalpy.
+   * \return Fuel enthalpy.
+  */
+  inline su2double GetEnthalpy_Fuel(void) const {
+    return h_pf;
+  }
+
+  /*!
+   * \brief Get fuel thermal conductivity.
+   * \return Fuel thermal conductivity.
+  */
+  inline su2double GetConductivity_Fuel(void) const {
+    return kappa_s;
+  }
+
+  /*!
+   * \brief Get fuel temperature far from the surface
+   * \return Far fuel temperature.
+  */
+  inline su2double GetTemperature_Fuel(void) const {
+    return T_0;
+  }
+
+  /*!
+   * \brief Get mass fraction for a desired inflow boundary
+   * \param[in] val_index - Index corresponding to the inflow boundary.
+   * \return Inflow mass fractions.
+  */
+  su2double* GetInflow_MassFrac(std::string val_index) const;
+
+  /*!
+   * \brief Get number of species detected at inflow.
+   * \return Number of species at inflow.
+  */
+  inline unsigned short GetnSpecies_Inflow(void) const {
+    return nSpecies_Inflow;
+  }
+
+  /*!
+   * \brief Get fuel mass flow.
+   * \return Inflow mass flow.
+  */
+  inline su2double* GetVelocityDir_Inflow(void) const {
+    return Velocity_Dir_Inflow;
+  }
+
+  /*!
+   * \brief Get the file with all fuel properties
+   * \return The name of the file with physicla data of fuel.
+  */
+  inline std::string GetFuelData_File(void) const {
+    return Fuel_File;
+  }
+
+  /*!
+   * \brief Check if ignition is desired or not.
+  */
+  inline bool GetIgnition(void) const {
+    return Ignition;
+  }
+
+  /*!
+   * \brief Get the number of iterations with temperature spark.
+   * \return The number of iterations with ignition.
+  */
+  inline unsigned long GetIgnitionIter(void) const {
+    return Ignition_Iter;
+  }
+
+  /*!
+   * \brief Get the ignition temperature.
+   * \return The ignition temperature.
+  */
+  inline su2double GetIgnitionTemperature(void) const {
+    return Ignition_Temperature;
+  }
+
+  /*!
+   * \brief Get the index of fuel.
+   * \return TIndex of fuel.
+  */
+  inline unsigned short GetFuelIndex(void) const {
+    return Fuel_Index;
+  }
+
+  /*!
+   * \brief Get the index of oxidizer.
+   * \return TIndex of fuel.
+  */
+  inline unsigned short GetOxidizerIndex(void) const {
+    return Oxidizer_Index;
+  }
+
+  /*!
+   * \brief Get the maximum temperature for secant method.
+   * \return The maximum temperature.
+  */
+  inline su2double GetTemperatureMax(void) const {
+    return Tmax;
+  }
+
+  /*!
+   * \brief Get the minimum temperature for secant method.
+   * \return The minimum temperature.
+  */
+  inline su2double GetTemperatureMin(void) const {
+    return Tmin;
+  }
+
+  /*!
+   * \brief Check if clipping temperature passing from conserved to primitive is desired or not.
+  */
+  inline bool GetClipping_Temp(void) const {
+    return Clipping_Temp;
+  }
+
+  /*--- NOTE: ALready present functions ---*/
   /*!
    * \brief Get reference origin for moment computation.
    * \param[in] val_marker - the marker we are monitoring.

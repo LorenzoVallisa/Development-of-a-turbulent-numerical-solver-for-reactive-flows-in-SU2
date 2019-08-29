@@ -33,8 +33,6 @@
 
 #pragma once
 
-inline string CConfig::GetLibraryName(void) {return Library_Name;}
-
 inline su2double CConfig::GetHTP_Axis(unsigned short val_index) { return HTP_Axis[val_index]; }
 
 inline su2double CConfig::GetCFL_AdaptParam(unsigned short val_index) { return CFL_AdaptParam[val_index]; }

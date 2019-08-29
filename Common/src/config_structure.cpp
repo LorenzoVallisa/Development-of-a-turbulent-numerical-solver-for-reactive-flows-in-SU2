@@ -388,6 +388,14 @@ void CConfig::SetPointersNull(void) {
   Aeroelastic_plunge  = NULL;
   Aeroelastic_pitch   = NULL;
   MassFrac_FreeStream = NULL;
+  /*---NOTE: New additions ---*/
+  Species_Order = NULL;
+  Marker_Inlet_MassFrac = NULL;
+  Inlet_MassFrac = NULL;
+  Marker_Inflow_MassFrac = NULL;
+  Inflow_MassFrac = NULL;
+  Velocity_Dir_Inflow = NULL;
+  /*---NOTE: Already present ---*/
   Velocity_FreeStream = NULL;
 
   RefOriginMoment     = NULL;
@@ -530,9 +538,80 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\par CONFIG_CATEGORY: Problem Definition \ingroup Config */
   /*--- Options related to problem definition and partitioning ---*/
 
+  /*--- NOTE: New options ---*/
   /*!\brief LIB_NAME \n  DESCRIPTION: Library name for physical-chemical properties */
-  addStringOption("LIB_NAME",Library_Name,"");
+  addStringOption("LIB_NAME", Library_Name, "My_Library");
 
+  /*!\brief CONFIG_LIB_FILE \n  DESCRIPTION: Name of file to configure the library */
+  addStringOption("CONFIG_LIB_FILE", Config_File_Lib, "");
+
+  /*!\brief LIB_PATH \n  DESCRIPTION: Path where to look for files specified in Config_File_Lib */
+  addStringOption("LIB_PATH", Library_Path, "");
+
+  /*!\brief FREESTREAM_MASS_FRAC\n DESCRIPTION: Free-stream mass fractions */
+  addDoubleListOption("FREESTREAM_MASS_FRAC", nSpecies, MassFrac_FreeStream);
+
+  /*!\brief SPECIES_ORDER\n DESCRIPTION: Species order in the mixture */
+  addStringListOption("SPECIES_ORDER", nSpecies, Species_Order);
+
+  /*!\brief INLET_MASS_FRAC\n DESCRIPTION: Inlet mass fractions */
+  addInlet_MassFracOption("INLET_MASS_FRAC", nMarker_Inlet_MassFrac, Marker_Inlet_MassFrac, Inlet_MassFrac, nSpecies_Inlet);
+
+  /*!\brief REF_DENSITY\n DESCRIPTION: Reference density for adimensionalitazion (1.0 kg/m3 by default) \ingroup Config*/
+  addDoubleOption("REF_DENSITY", Density_Ref, 1.0);
+
+  /*!\brief REF_TEMPERATURE\n DESCRIPTION: Reference temperature for adimensionalitazion (298.15 K by default) \ingroup Config*/
+  addDoubleOption("REF_TEMPERATURE", Temperature_Ref, 298.15);
+
+  /*!\brief REF_PRESSURE\n DESCRIPTION: Reference pressure for adimensionalitazion (101325.0 Pa by default) \ingroup Config*/
+  addDoubleOption("REF_PRESSURE", Pressure_Ref, 101325.0);
+
+  /*!\brief FUEL_DENSITY\n DESCRIPTION: Fuel density (960.0 kg/m3 by default) \ingroup Config*/
+  addDoubleOption("FUEL_DENSITY", rho_s, 960.0);
+
+  /*!\brief FUEL_SPECIFIC_HEAT\n DESCRIPTION: Fuel specific heat (2860.0 J/kg*K by default) \ingroup Config*/
+  addDoubleOption("FUEL_SPECIFIC_HEAT", c_s, 2860.0);
+
+  /*!\brief FUEL_ENTHALPY\n DESCRIPTION: Fuel enthalpy (1100000.0 J/kg by default) \ingroup Config*/
+  addDoubleOption("FUEL_ENTHALPY", h_pf, 1100000.0);
+
+  /*!\brief FUEL_CONDUCTIVITY\n DESCRIPTION: Fuel thermal conductivity (0.217 W/m*K by default) \ingroup Config*/
+  addDoubleOption("FUEL_CONDUCTIVITY", kappa_s, 0.217);
+
+  /*!\brief FUEL_TEMPERATURE\n DESCRIPTION: Fuel temperature far from surface (300.0 K by default) \ingroup Config*/
+  addDoubleOption("FUEL_TEMPERATURE", T_0, 300.0);
+
+  /*!\brief INFLOW_MASS_FRAC\n DESCRIPTION: Inflow mass fractions */
+  addInlet_MassFracOption("INFLOW_MASS_FRAC", nMarker_EngineInflow, Marker_Inflow_MassFrac, Inflow_MassFrac, nSpecies_Inflow);
+
+  /*!\brief FUEL_DATA_FILE \n  DESCRIPTION: File where all the physical properties of the fuel are specified */
+  addStringOption("FUEL_DATA_FILE", Fuel_File, "");
+
+  /* !\brief IGNITION\n DESCRIPTION: Flag for ignition */
+  addBoolOption("IGNITION", Ignition, false);
+
+  /*!\brief IGNITION_TEMPERATURE\n DESCRIPTION: Ignition Temperature \ingroup Config*/
+  addDoubleOption("IGNITION_TEMPERATURE", Ignition_Temperature, 1700.0);
+
+  /*!\brief IGNITION_ITER\n DESCRIPTION: Number of iterations for ignition \ingroup Config*/
+  addUnsignedLongOption("IGNITION_ITER", Ignition_Iter, 999999);
+
+  /*!\brief FUEL_INDEX\n DESCRIPTION: Index of fuel \ingroup Config*/
+  addUnsignedShortOption("FUEL_INDEX", Fuel_Index, 0);
+
+  /*!\brief OXIDIZER_INDEX\n DESCRIPTION: Index of fuel \ingroup Config*/
+  addUnsignedShortOption("OXIDIZER_INDEX", Oxidizer_Index, 2);
+
+  /*!\brief TEMPERATURE_MAX\n DESCRIPTION: Maximum temperature for secant method \ingroup Config*/
+  addDoubleOption("TEMPERATURE_MAX", Tmax, 6000.0);
+
+  /*!\brief TEMPERATURE_MIN\n DESCRIPTION: Minimum temperature for secant method \ingroup Config*/
+  addDoubleOption("TEMPERATURE_MIN", Tmin, 200.0);
+
+  /* !\brief CLIPPING_TEMPRATURE\n DESCRIPTION: Flag for ignition */
+  addBoolOption("CLIPPING_TEMPRATURE", Clipping_Temp, false);
+
+  /*--- NOTE: Already present options ---*/
   /*!\brief REGIME_TYPE \n  DESCRIPTION: Regime type \n OPTIONS: see \link Regime_Map \endlink \ingroup Config*/
   addEnumOption("REGIME_TYPE", Kind_Regime, Regime_Map, COMPRESSIBLE);
 
@@ -689,8 +768,15 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   /*!\par CONFIG_CATEGORY: Reference Conditions \ingroup Config*/
   /*--- Options related to reference values for nondimensionalization ---*/
 
-  Length_Ref = 1.0; //<---- NOTE: this should be given an option or set as a const
+  Length_Ref = 1.0; //<----  this should be given an option or set as a const
+  /*--- NOTE: New options ---*/
+  /*!\brief REF_LENGTH\n DESCRIPTION: Reference length for adimensionalitazion (1.0 m by default) \ingroup Config*/
+  addDoubleOption("REF_LENGTH", Length_Ref, 1.0);
 
+  /*!\brief INFLOW_VELOCITY_DIR\n DESCRIPTION: Inflow velocity direction (this must be a unit vector) */
+  addDoubleArrayOption("INFLOW_VELOCITY_DIR", 3, Velocity_Dir_Inflow, default_vel_inf);
+
+  /*--- NOTE: Already present ---*/
   /*!\brief REF_ORIGIN_MOMENT_X\n DESCRIPTION: X Reference origin for moment computation \ingroup Config*/
   addDoubleListOption("REF_ORIGIN_MOMENT_X", nRefOriginMoment_X, RefOriginMoment_X);
   /*!\brief REF_ORIGIN_MOMENT_Y\n DESCRIPTION: Y Reference origin for moment computation \ingroup Config*/
@@ -1065,7 +1151,7 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
 
   /*!\brief CONV_NUM_METHOD_ADJFLOW
    *  \n DESCRIPTION: Convective numerical method for the adjoint solver.
-   *  \n OPTIONS:  See \link Upwind_Map \endlink , \link Centered_Map \endlink. Note: not all methods are guaranteed to be implemented for the adjoint solver. \ingroup Config */
+   *  \n OPTIONS:  See \link Upwind_Map \endlink , \link Centered_Map \endlink.  not all methods are guaranteed to be implemented for the adjoint solver. \ingroup Config */
   addConvectOption("CONV_NUM_METHOD_ADJFLOW", Kind_ConvNumScheme_AdjFlow, Kind_Centered_AdjFlow, Kind_Upwind_AdjFlow);
   /*!\brief SPATIAL_ORDER_ADJFLOW
    *  \n DESCRIPTION: Spatial numerical order integration \n OPTIONS: See \link SpatialOrder_Map \endlink \n DEFAULT: SECOND_ORDER \ingroup Config*/
@@ -2763,6 +2849,9 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
       (Kind_Turb_Model != NONE))
     Kind_Solver = RANS;
 
+  if (Kind_Solver == EULER || Kind_Solver == REACTIVE_EULER)
+    Kind_Turb_Model = NONE;
+
   Kappa_1st_Flow = Kappa_Flow[0];
   Kappa_2nd_Flow = Kappa_Flow[1];
   Kappa_4th_Flow = Kappa_Flow[2];
@@ -2942,6 +3031,7 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
   Viscous = (( Kind_Solver == NAVIER_STOKES          ) ||
              ( Kind_Solver == ADJ_NAVIER_STOKES      ) ||
              ( Kind_Solver == RANS                   ) ||
+             ( Kind_Solver == REACTIVE_NAVIER_STOKES ) ||
              ( Kind_Solver == ADJ_RANS               ) );
 
   /*--- To avoid boundary intersections, let's add a small constant to the planes. ---*/
@@ -3675,9 +3765,15 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible Euler equations." << endl;
         if (Kind_Regime == INCOMPRESSIBLE) cout << "Incompressible Euler equations." << endl;
         break;
+      case REACTIVE_EULER:
+        if (Kind_Regime == COMPRESSIBLE) cout << "Compressible reacting flow Euler equations." << endl;
+        break;
       case NAVIER_STOKES: case DISC_ADJ_NAVIER_STOKES:
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible Laminar Navier-Stokes' equations." << endl;
         if (Kind_Regime == INCOMPRESSIBLE) cout << "Incompressible Laminar Navier-Stokes' equations." << endl;
+        break;
+      case REACTIVE_NAVIER_STOKES:
+        if (Kind_Regime == COMPRESSIBLE) cout << "Compressible reacting flow Navier-Stokes equations." << endl;
         break;
       case RANS: case DISC_ADJ_RANS:
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible RANS equations." << endl;
@@ -3719,10 +3815,11 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
     }
 
     if ((Kind_Regime == COMPRESSIBLE) && (Kind_Solver != FEM_ELASTICITY) &&
-        (Kind_Solver != HEAT_EQUATION) && (Kind_Solver != WAVE_EQUATION)) {
+        (Kind_Solver != HEAT_EQUATION) && (Kind_Solver != WAVE_EQUATION) &&
+        ((Kind_Solver != REACTIVE_EULER)) && (Kind_Solver != REACTIVE_NAVIER_STOKES)) {
       cout << "Mach number: " << Mach <<"."<< endl;
       cout << "Angle of attack (AoA): " << AoA <<" deg, and angle of sideslip (AoS): " << AoS <<" deg."<< endl;
-      if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == ADJ_NAVIER_STOKES) ||
+      if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == ADJ_NAVIER_STOKES) || (Kind_Solver == REACTIVE_NAVIER_STOKES) ||
           (Kind_Solver == RANS) || (Kind_Solver == ADJ_RANS))
         cout << "Reynolds number: " << Reynolds <<". Reference length "  << Length_Reynolds << "." << endl;
       if (Fixed_CL_Mode) cout << "Fixed CL mode, target value: " << Target_CL << "." << endl;
@@ -5402,6 +5499,32 @@ CConfig::~CConfig(void) {
     delete [] Inlet_Velocity;
   }
 
+  /*--- NOTE: new deletions ---*/
+  if(MassFrac_FreeStream != NULL)
+    delete[] MassFrac_FreeStream;
+
+  if(Species_Order != NULL)
+    delete[] Species_Order;
+
+  if(Marker_Inlet_MassFrac != NULL)
+    delete[] Marker_Inlet_MassFrac;
+
+  if(Inlet_MassFrac != NULL) {
+    for(iMarker = 0; iMarker < nMarker_Inlet; ++iMarker)
+      delete[] Inlet_MassFrac[iMarker];
+    delete[] Inlet_MassFrac;
+  }
+
+  if(Marker_Inflow_MassFrac != NULL)
+    delete[] Marker_Inflow_MassFrac;
+
+  if(Inflow_MassFrac != NULL) {
+    for(iMarker = 0; iMarker < nMarker_EngineInflow; ++iMarker)
+      delete[] Inflow_MassFrac[iMarker];
+    delete[] Inflow_MassFrac;
+  }
+
+  /*--- NOTE: already present ---*/
   if (Riemann_FlowDir != NULL) {
     for (iMarker = 0; iMarker < nMarker_Riemann; iMarker++)
       delete [] Riemann_FlowDir[iMarker];
@@ -5640,6 +5763,8 @@ unsigned short CConfig::GetContainerPosition(unsigned short val_eqsystem) {
     case RUNTIME_ADJFLOW_SYS:   return ADJFLOW_SOL;
     case RUNTIME_ADJTURB_SYS:   return ADJTURB_SOL;
     case RUNTIME_MULTIGRID_SYS: return 0;
+    // simulation addition
+    case RUNTIME_REACTIVE_SYS:  return FLOW_SOL;
   }
   return 0;
 }
@@ -5676,6 +5801,14 @@ void CConfig::SetGlobalParam(unsigned short val_solver,
       break;
     case NAVIER_STOKES:
       if (val_system == RUNTIME_FLOW_SYS) {
+        SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,
+                              Kind_Upwind_Flow, Kind_SlopeLimit_Flow,
+                              SpatialOrder_Flow);
+        SetKind_TimeIntScheme(Kind_TimeIntScheme_Flow);
+      }
+      break;
+    case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
+      if (val_system == RUNTIME_REACTIVE_SYS) {
         SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,
                               Kind_Upwind_Flow, Kind_SlopeLimit_Flow,
                               SpatialOrder_Flow);
@@ -5786,6 +5919,24 @@ void CConfig::SetGlobalParam(unsigned short val_solver,
   }
 }
 
+/*--- NOTE: New function to compute inlet mass fractions ---*/
+su2double* CConfig::GetInlet_MassFrac(std::string val_marker) const {
+  unsigned short iMarker_Inlet;
+  for(iMarker_Inlet = 0; iMarker_Inlet < nMarker_Inlet; ++iMarker_Inlet)
+    if(Marker_Inlet_MassFrac[iMarker_Inlet] == val_marker)
+      break;
+  return Inlet_MassFrac[iMarker_Inlet];
+}
+
+su2double* CConfig::GetInflow_MassFrac(std::string val_marker) const {
+  unsigned short iMarker_Inflow;
+  for(iMarker_Inflow = 0; iMarker_Inflow < nMarker_EngineInflow; ++iMarker_Inflow)
+    if(Marker_Inflow_MassFrac[iMarker_Inflow] == val_marker)
+      break;
+  return Inflow_MassFrac[iMarker_Inflow];
+}
+
+/*--- NOTE: Old functions ---*/
 su2double* CConfig::GetPeriodicRotCenter(string val_marker) {
   unsigned short iMarker_PerBound;
   for (iMarker_PerBound = 0; iMarker_PerBound < nMarker_PerBound; iMarker_PerBound++)

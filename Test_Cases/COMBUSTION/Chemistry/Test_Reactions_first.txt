@@ -1,0 +1,16 @@
+//Number of reactions
+2
+
+//Units
+CGS
+
+//Reactions
+C4H6_1.0 + 3.5O2_1.0 => 4CO + 3H2O
+2.90e+13 0 30000.0
+
+CO_1.0 + 0.5O2_0.5 <=> CO2_1.0
+3.98e+14 0 40000.0
+
+Available Backward Rate reaction 2: 5.00e+08 0 40000.0
+
+STOP
