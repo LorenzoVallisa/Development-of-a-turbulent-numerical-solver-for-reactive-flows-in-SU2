@@ -48,6 +48,12 @@ namespace Framework {
      */
     void Unsetup(void) override;
 
+    //MANGOTURB
+    /*!
+     * \brief This function computes the omega_i_r double tensor species-reactions term.
+     */
+    void SetSourceTerm(const double temp, const double rho, const RealVec& ys);
+
     /*!
      * \brief Get the index of a species.
      * \param[in] name_species - Name of the desired species
@@ -591,7 +597,55 @@ namespace Framework {
     */
     void ReadExtraData_BackwardExponent(std::string line);
 
+    //MANGOTURB
+    /*!
+      * \brief Tensor of derivative of source term for the r-th reaction w.r.t. density of the i-th species.
+      * \param[in] temp - Dimensional temperature read form the node on which the iteration is running
+      * \param[in] rho - Dimensioanl density read form the node on which the iteration is running
+    */
+    void Set_DfrDrhos(const double temp, const double rho);
+
+    //MANGOTURB
+    /*!
+      * \brief Source term for -th species is built by a weight through PaSR contant method.
+      * \param[in] iSpecies - Species of which i want to build the source term
+      * \param[in] omega_turb - Solution of turbolent problem, needed for closures
+      * \param[in] C_mu - Turbolent parameter needed for closure
+      * \param[out] k - Weight used to build turbolent source term for every species
+    */
+    double GetMassProductionTerm(const unsigend short iSpecies, const double omega_turb,const double C_mu);
+
+    //MANGOTURB
+    /*!
+      * \brief Assemble the PaSR constant for the turbolence model.
+      * \param[in] iReac - Reaction
+      * \param[in] omega_turb - Solution of turbolent problem, needed for closures
+      * \param[in] C_mu - Turbolent parameter needed for closure
+      * \param[out] k - Weight used to build turbolent source term for every species
+    */
+    double AssemblePaSRConstant(const unsigned short iReac,const double omega_turb,const double C_mu);
+
+    //MANGOTURB
+    /*!
+      * \brief Compute the smallest reaction time for each reaction among all species.
+      * \param[in] iReac - Reaction
+      * \param[out] tau_c_r - Return smallest reaction time for r-th reaction among all species involved into reaction
+    */
+    double GetTimeCombustion_r(const unsigned short iReac);
+
+
   protected:
+
+    //MANGOTURB
+    Eigen::MatrixXd omega_i_r; /*!< \brief Matrix storing every species-reactions combination. */
+
+    //MAGNOTURB
+    Eigen::MatrixXd Df_rDrho_i; /*!< \brief Matrix storing derivative of source term per reaction f_r w.r.t every species. */
+
+    //PUTODINERO
+    std::array<double,nReactions> PaSRConstant; /*!< \brief PaSR constant for each reaction. */
+
+
 
     std::map<std::string,unsigned short> Species_Names;  /*!< \brief Names of species in the mixture. */
 

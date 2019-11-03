@@ -1219,6 +1219,31 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
     dim_rho *= 3.28084*3.28084*3.28084/0.0685218;
   }
 
+  // MANGOTURB
+   /*--- Initializing double tensor species-reactions through library method ---*/
+   library -> SetSourceTerm(dim_temp, dim_rho, Ys);
+
+   /*--- Initializing double tensor derivative of reaction source term w.r.t. species through library method ---*/
+   library -> Set_DfrDrhos(dim_temp, dim_rho);
+
+   if (config->GetKind_Turb_Model() == SST){
+
+     omega.resize(Ys.size(),0);
+
+     /*--- Turbolent source term for every species ---*/
+     for (iSpecies = 0; iSpecies < nSpecies; iSpecies++)
+        omega[iSpecies] = library -> GetMassProductionTerm(iSpecies,omega_turb,C_mu);
+
+    }
+   else
+   {
+
+     omega = library->GetMassProductionTerm();
+
+   }
+   //SONQUI
+
+
   /*--- Get non-equilibrium chemistry source term from library ---*/
   omega = library->GetMassProductionTerm(dim_temp, dim_rho, Ys);
 

@@ -92,6 +92,113 @@ namespace Framework {
     std::transform(Xs.begin(), Xs.end(), Xs.begin(), std::bind1st(std::multiplies<double>(),massTot));
   }
 
+  //MANGOTURB
+  //
+  //
+  /* This function computes the omega_i_r double tensor species-reactions term. */
+  void ReactingModelLibrary::SetSourceTerm(const double temp, const double rho, const RealVec& ys){
+
+    /*--- Set tensor's values to zero ---*/
+    omega_i_r.setZero(ys.size(),nReactions);
+
+    /*--- Set forward and backward reaction rates ---*/
+    SetReactionRates(temp, rho, ys);
+
+    /*--- Assemble each tensor component  ---*/
+    for(unsigned short iReac = 0; iReac < nReactions; ++iReac) {
+      for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+        omege_i_r[iSpecies][iReac] = 1.0e-3*mMasses[iSpecies]*(Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac))*
+        (Forward_Rates[iReac] - Backward_Rates[iReac]);
+      }
+    }
+  }
+
+
+
+  //MANGOTURB
+  //
+  //
+  /* Tensor of derivative of source term for the r-th reaction w.r.t. density of the i-th species . */
+  void ReactingModelLibrary::Set_DfrDrhos(const double temp, const double rho){
+
+    /*--- Setting tensor values to zero---*/
+    Df_rDrho_i.setZero(Ys.size(),nReactions);
+
+    for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+      for (iReac = 0; iReac < nReactions; ++iReac){
+        if(Ys[jSpecies] > 1.0e-10)
+        Df_rDrho_i(jSpecies,iReac) =(Forward_Rates[iReac]*Stoich_Coeffs_Reactants_Exp(iReac,jSpecies) -
+        Backward_Rates[iReac]*Stoich_Coeffs_Products_Exp(iReac,jSpecies))/(rho*Ys[jSpecies]);
+      }
+    }
+  }
+
+
+  //MANGOTURB
+  //
+  //
+  /* Source term for -th species is built by a weight through PaSR contant method . */
+  double ReactingModelLibrary::GetMassProductionTerm( const unsigend short iSpecies, const double omega_turb,const double C_mu){
+
+    double omega_ith;
+
+    /*--- Assembling i-th species source production term ---*/
+    for (iReac = 0; iReac < nReactions ; iReac++)
+    omega_ith += (AssemblePaSRConstant(iReac,omega_turb,C_mu))*omega_i_r[iSpecies][iReac];
+
+    return omega_ith;
+
+  }
+
+
+  //MANGOTURB
+  //
+  //
+  /* Assemble the PaSR constant for the turbolence model . */
+  double ReactingModelLibrary::AssemblePaSRConstant(const unsigned short iReac,const double omega_turb,const double C_mu){
+
+    double k_th;
+
+    /*--- Assmebling mixing time due to turbolence ---*/
+    double tau_mix =  1/(C_mu*omega_turb);
+
+    /*--- Assembling slowest combustion time for r reaction---*/
+    dobule tau_comb_r = GetTimeCombustion_r(ireac);
+
+    k_th = tau_comb_r/(tau_comb_r + tau_mix);
+
+    /*--- Saving value for future purposes ---*/
+    PaSRConstant[iReac] = k_th;
+
+    return k_th;
+
+  }
+
+  //MANGOTURB
+  //
+  //
+  /* Compute the smallest reaction time for each reaction among all species. */
+  double ReactingModelLibrary::GetTimeCombustion_r(const unsigned short iReac){
+
+    std::forward_list<unsigned short> Index_list
+    std::forward_list<double> iReac_species;
+
+    /*--- Searching for species taking part into iReac reaction ---*/
+    for(unsigned short iSpecies = 0; iSpecies < nSpecies; iSpecies++){
+      if(Stoich_Coeffs_Products(iSpecies,iReac) || Stoich_Coeffs_Reactants(iSpecies,iReac))
+      Index_list.push_front(iSpecies);
+    }
+
+    for(const auto it : Index_list)
+      iReac_species.push_front(Df_rDrho_i(it,iReac)*mMasses[it]);
+
+    return -1/(*std::max_element(iReac_species.begin(),iReac_species.end()));
+
+  }
+
+
+
+
   //
   //
   /*--- This function returns the molar fractions from mass fractions. ---*/

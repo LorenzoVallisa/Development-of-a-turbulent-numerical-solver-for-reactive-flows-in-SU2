@@ -2713,6 +2713,12 @@ void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver
     /*--- Load the volume of the dual mesh cell ---*/
     numerics->SetVolume(geometry->node[iPoint]->GetVolume());
 
+    //MANGOTURB
+    /*--- Load turbolent variables for source closure ---*/
+    if (config->GetKind_Turb_Model() == SST){
+      numerics->SetOmegaParam(solver_container[TURB_SOL]->node[iPoint]->GetSolution(1));
+    }
+
     /*--- Compute the source residual ---*/
     numerics->ComputeChemistry(Res_Sour, Jacobian_i, config);
 

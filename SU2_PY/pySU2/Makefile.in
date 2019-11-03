@@ -126,7 +126,10 @@ target_triplet = @target@
 @BUILD_TECIO_TRUE@am__append_1 = ${abs_top_builddir}/externals/tecio/libtecio.a
 subdir = SU2_PY/pySU2
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/cgns.m4 \
+	$(top_srcdir)/m4/codi.m4 $(top_srcdir)/m4/compiler.m4 \
+	$(top_srcdir)/m4/metis.m4 $(top_srcdir)/m4/parmetis.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -165,6 +168,8 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CGNS_INCLUDE = @CGNS_INCLUDE@
+CGNS_LIB = @CGNS_LIB@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CXX = @CXX@
@@ -197,6 +202,10 @@ LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
+
+#External includes
+METIS_INCLUDE = -I${abs_top_srcdir}/externals/metis/include
+METIS_LIB = @METIS_LIB@
 MKDIR_P = @MKDIR_P@
 MUTATIONPP_CXX = @MUTATIONPP_CXX@
 MUTATIONPP_LD = @MUTATIONPP_LD@
@@ -208,6 +217,8 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
+PARMETIS_INCLUDE = -I${abs_top_srcdir}/externals/parmetis/include
+PARMETIS_LIB = @PARMETIS_LIB@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 RANLIB = @RANLIB@
 REVERSE_CXX = @REVERSE_CXX@
@@ -215,6 +226,9 @@ REVERSE_LIBS = @REVERSE_LIBS@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
+SU2_CGNS_CPPFLAGS = @SU2_CGNS_CPPFLAGS@
+SU2_METIS_CPPFLAGS = @SU2_METIS_CPPFLAGS@
+SU2_PARMETIS_CPPFLAGS = @SU2_PARMETIS_CPPFLAGS@
 SZIP_CXX = @SZIP_CXX@
 SZIP_LD = @SZIP_LD@
 VERSION = @VERSION@
@@ -302,10 +316,6 @@ PY_LIB = -lpython2.7 \
 SWIG_INCLUDE = ${PY_INCLUDE}
 SUBDIR_EXEC = ${bindir}
 EXTRA_CC_FLAGS = -fPIC -O3
-
-#External includes
-METIS_INCLUDE = -I${abs_top_srcdir}/externals/metis/include
-PARMETIS_INCLUDE = -I${abs_top_srcdir}/externals/parmetis/include
 TECIO_INCLUDE = -I${abs_top_srcdir}/externals/tecio/include
 
 #External libraries (METIS_LIB and PARMETIS_LIB are already defined)
