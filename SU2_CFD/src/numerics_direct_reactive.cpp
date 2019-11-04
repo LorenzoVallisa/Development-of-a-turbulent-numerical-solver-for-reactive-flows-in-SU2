@@ -1241,7 +1241,6 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
      omega = library->GetMassProductionTerm();
 
    }
-   //SONQUI
 
 
   /*--- Get non-equilibrium chemistry source term from library ---*/
@@ -1281,9 +1280,22 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
       val_Jacobian_i[RHOE_INDEX_SOL][iVar] = 0.0;
     }
 
-    /*--- Jacobian from partial densities equations.
-          NOTE: We need to invert the sign because we want the derivatives of a residual that will be ADDED to the total one ---*/
-    source_jac = library->GetSourceJacobian(dim_temp, dim_rho);
+    //MANGOTURB
+    /*--- Setting derivative of backward and forward rates w.r.t. Temperature ---*/
+    library->Set_BackFor_Contr(dim_temp, dim_rho);
+
+    if (config->GetKind_Turb_Model() == SST){
+
+      source_jac = library-> GetTurbSourceJacobian();
+
+    }
+    else
+    {
+
+      source_jac = library->GetSourceJacobian();
+
+    }
+
     su2double fixed;
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
       fixed = source_jac(iSpecies,0)*config->GetTime_Ref()*config->GetTemperature_Ref()/config->GetDensity_Ref();

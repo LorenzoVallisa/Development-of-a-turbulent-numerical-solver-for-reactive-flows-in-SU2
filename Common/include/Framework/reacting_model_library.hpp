@@ -633,6 +633,36 @@ namespace Framework {
     */
     double GetTimeCombustion_r(const unsigned short iReac);
 
+    //MAGNOTURB
+    /*!
+    * \brief This function computes the omega term in laminar case.
+    * \param[out] tau_c_r - Return smallest reaction time for r-th reaction among all species involved into reaction
+    */
+    Eigen::VectorXd GetMassProductionTerm(void);
+
+    //MAGNOTURB
+    /*!
+    * \brief Set derivative of backward and forward rates w.r.t. Temperature.
+    * \param[in] temp - Temperature at the node
+    * \param[in] rho - Density at the node
+    * \param[out] dk/dT - Return derivative of backward and forward rates w.r.t. Temperature
+    */
+    void Set_BackFor_Contr(const double temp, const double rho);
+
+    //MANGOTURB
+    /*!
+    * \brief Compute part of the turbolent Jacobian associated to source term (only species chemical reactions).
+    * \param[out] temp - PArt of jacobian tensor (Missing the transformation operator from compound derivative split)
+    */
+    RealMatrix GetTurbSourceJacobian(void);
+
+    //MANGOTURB
+    /*!
+    * \brief Compute part of Jacobian in laminar case associated to source term(only species chemical reactions).
+    * \param[out] temp - Part of jacobian tensor (Missing the transformation operator from compound derivative split)
+    */
+    RealMatrix GetSourceJacobian(void);
+
 
   protected:
 
@@ -642,8 +672,11 @@ namespace Framework {
     //MAGNOTURB
     Eigen::MatrixXd Df_rDrho_i; /*!< \brief Matrix storing derivative of source term per reaction f_r w.r.t every species. */
 
-    //PUTODINERO
+    //MAGNOTURB
     std::array<double,nReactions> PaSRConstant; /*!< \brief PaSR constant for each reaction. */
+
+    //MAGNOTURB
+    std::array<std::array<su2double,2>,nReactions> ForBack_rates; /*!< \brief Auxiliary template to store back/forth reaction coefficients derivative w.r.t. Temperature. */
 
 
 

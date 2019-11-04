@@ -174,6 +174,18 @@ namespace Framework {
 
   }
 
+  //MAGNOTURB
+  //
+  //
+  /* This function computes the omega term in laminar case. */
+  Eigen::VectorXd ReactingModelLibrary::GetMassProductionTerm(void) {
+
+    Eigen::VectorXd omega = omega_i_r.rowwise().sum();
+
+    return omega;
+
+  }
+
   //MANGOTURB
   //
   //
@@ -195,6 +207,125 @@ namespace Framework {
     return -1/(*std::max_element(iReac_species.begin(),iReac_species.end()));
 
   }
+
+  //MANGOTURB
+  //
+  //
+  /*--- Set derivative of backward and forward rates w.r.t. Temperature ---*/
+  void ReactingModelLibrary::Set_BackFor_Contr(const double temp, const double rho){
+
+    /*--- Set Kc derivatives ---*/
+    const double epsilon = 1.0e-6;
+    double temp_pert = temp + epsilon*temp;
+    const double RT = R_ungas*temp_pert;
+    const double lnRT = std::log(R_ungas_atm*temp_pert);
+    unsigned short iReac, iSpecies, jSpecies;
+    double Kc_pert;
+
+    for(iReac = 0; iReac < nReactions; ++iReac) {
+      if(Available_Backward_Rate.count(iReac) == 0) {
+        if(Backward_Rates[iReac] > 0.0) {
+          double dG = 0.0;
+          double dnu = 0.0;
+          for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+            double dcoeff = Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac);
+            if(dcoeff != 0.0) {
+              dG += dcoeff*
+              (MathTools::GetSpline(std::get<T_DATA_SPLINE>(Enth_Spline[iSpecies]),std::get<X_DATA_SPLINE>(Enth_Spline[iSpecies]),
+              std::get<Y_DATA_SPLINE>(Enth_Spline[iSpecies]),temp_pert) - temp_pert*
+              MathTools::GetSpline(std::get<T_DATA_SPLINE>(Entr_Spline[iSpecies]),std::get<X_DATA_SPLINE>(Entr_Spline[iSpecies]),
+              std::get<Y_DATA_SPLINE>(Entr_Spline[iSpecies]),temp_pert));
+              dnu += dcoeff;
+            }
+          }
+          double lnKc_pert = -dG/RT - dnu*lnRT;
+          Kc_pert = std::exp(lnKc_pert);
+        }
+        else
+        Kc_pert = Kc[iReac];
+      }
+      else {
+        double kf_pert = As[iReac]*std::pow(temp_pert,Betas[iReac])*std::exp(-Temps_Activation[iReac]/temp_pert);
+        double kb_pert = As_back[iReac]*std::pow(temp_pert,Betas_back[iReac])*std::exp(-Temps_Activation_back[iReac]/temp_pert);
+        Kc_pert = kf_pert/kb_pert;
+      }
+      Kc_Derivatives[iReac] = (Kc_pert - Kc[iReac])/(temp_pert - temp);
+    }
+
+    /*--- Compute Backward and Forward derivative composed terms ---*/
+    for(iReac = 0; iReac < nReactions; ++iReac) {
+      double tmp = (Betas[iReac] + Temps_Activation[iReac]/temp)/temp;
+      double for_contr = Forward_Rates[iReac]*tmp;
+      double back_contr;
+      if(Available_Backward_Rate.count(iReac) == 0)
+      back_contr = Backward_Rates[iReac]*(tmp - Kc_Derivatives[iReac]/Kc[iReac]);
+      else
+      back_contr = Backward_Rates[iReac]*(Betas_back[iReac] + Temps_Activation_back[iReac]/temp)/temp;
+      ForBack_rates[iReac][0]=back_contr;
+      ForBack_rates[iReac][1]=for_contr;
+    }
+  }
+
+  //MANGOTURB
+  //
+  //
+  /*--- Compute Jacobian in case of turbolence ---*/
+  RealMatrix ReactingModelLibrary::GetTurbSourceJacobian(void){
+
+    RealMatrix source_turb_jacobian(Ys.size(),Ys.size()+1);
+
+    for(unsigned short iReac=0; iReac < nReactions; iReac++ ) {
+      for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+        /*--- Derivatives with respect to temperature ---*/
+        double fixed_contr =  1.0e-3*mMasses[iSpecies]*
+        (Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac));
+
+        source_turb_jacobian(iSpecies,0) += fixed_contr*(ForBack_rates[iReac][1] - ForBack_rates[iReac][0])*PaSRConstant[iReac];
+
+        /*--- Derivatives with respect to partial densitiy ---*/
+        for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+          if(Ys[jSpecies] > 1.0e-10)
+          source_turb_jacobian(iSpecies,jSpecies + 1) += fixed_contr*
+          PaSRConstant[iReac]*(Df_rDrho_i(jSpecies,iReac)*mMasses(jSpecies));
+        }
+      }
+    }
+
+    return source_turb_jacobian;
+
+  }
+
+  //MANGOTURB
+  //
+  //
+  /*--- Compute Jacobian in laminar case ---*/
+  RealMatrix ReactingModelLibrary::GetSourceJacobian(void) {
+
+    RealMatrix source_jacobian(Ys.size(),Ys.size()+1);
+
+    for(unsigned short iReac=0; iReac < nReactions; iReac++ ) {
+      for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+        /*--- Derivatives with respect to temperature ---*/
+        double fixed_contr =  1.0e-3*mMasses[iSpecies]*
+        (Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac));
+
+        source_jacobian(iSpecies,0) += fixed_contr*(ForBack_rates[iReac][1] - ForBack_rates[iReac][0]);
+
+        /*--- Derivatives with respect to partial densitiy ---*/
+        for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+          if(Ys[jSpecies] > 1.0e-10)
+          source_jacobian(iSpecies,jSpecies + 1) += fixed_contr*
+          (Forward_Rates[iReac]*Stoich_Coeffs_Reactants_Exp(iReac,jSpecies) -
+          Backward_Rates[iReac]*Stoich_Coeffs_Products_Exp(iReac,jSpecies))/(rho*Ys[jSpecies]);
+        }
+      }
+    }
+
+    return source_jacobian;
+
+  }
+
+
 
 
 
