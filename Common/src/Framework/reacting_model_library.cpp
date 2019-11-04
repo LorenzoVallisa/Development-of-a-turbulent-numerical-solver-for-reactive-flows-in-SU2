@@ -107,7 +107,7 @@ namespace Framework {
     /*--- Assemble each tensor component  ---*/
     for(unsigned short iReac = 0; iReac < nReactions; ++iReac) {
       for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-        omege_i_r[iSpecies][iReac] = 1.0e-3*mMasses[iSpecies]*(Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac))*
+        omega_i_r(iSpecies,iReac) = 1.0e-3*mMasses[iSpecies]*(Stoich_Coeffs_Products(iSpecies,iReac) - Stoich_Coeffs_Reactants(iSpecies,iReac))*
         (Forward_Rates[iReac] - Backward_Rates[iReac]);
       }
     }
@@ -124,6 +124,8 @@ namespace Framework {
     /*--- Setting tensor values to zero---*/
     Df_rDrho_i.setZero(Ys.size(),nReactions);
 
+    unsigned short jSpecies,iReac;
+
     for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
       for (iReac = 0; iReac < nReactions; ++iReac){
         if(Ys[jSpecies] > 1.0e-10)
@@ -138,13 +140,13 @@ namespace Framework {
   //
   //
   /* Source term for -th species is built by a weight through PaSR contant method . */
-  double ReactingModelLibrary::GetMassProductionTerm( const unsigend short iSpecies, const double omega_turb,const double C_mu){
+  double ReactingModelLibrary::GetMassProductionTerm( const unsigned short iSpecies, const double omega_turb,const double C_mu){
 
     double omega_ith;
 
     /*--- Assembling i-th species source production term ---*/
-    for (iReac = 0; iReac < nReactions ; iReac++)
-    omega_ith += (AssemblePaSRConstant(iReac,omega_turb,C_mu))*omega_i_r[iSpecies][iReac];
+    for (unsigned short iReac = 0; iReac < nReactions ; iReac++)
+    omega_ith += (AssemblePaSRConstant(iReac,omega_turb,C_mu))*omega_i_r(iSpecies,iReac);
 
     return omega_ith;
 
@@ -158,12 +160,13 @@ namespace Framework {
   double ReactingModelLibrary::AssemblePaSRConstant(const unsigned short iReac,const double omega_turb,const double C_mu){
 
     double k_th;
+    PaSRConstant.resize(nReactions);
 
     /*--- Assmebling mixing time due to turbolence ---*/
     double tau_mix =  1/(C_mu*omega_turb);
 
     /*--- Assembling slowest combustion time for r reaction---*/
-    dobule tau_comb_r = GetTimeCombustion_r(ireac);
+    double tau_comb_r = GetTimeCombustion_r(iReac);
 
     k_th = tau_comb_r/(tau_comb_r + tau_mix);
 
@@ -192,7 +195,7 @@ namespace Framework {
   /* Compute the smallest reaction time for each reaction among all species. */
   double ReactingModelLibrary::GetTimeCombustion_r(const unsigned short iReac){
 
-    std::forward_list<unsigned short> Index_list
+    std::forward_list<unsigned short> Index_list;
     std::forward_list<double> iReac_species;
 
     /*--- Searching for species taking part into iReac reaction ---*/
@@ -213,6 +216,8 @@ namespace Framework {
   //
   /*--- Set derivative of backward and forward rates w.r.t. Temperature ---*/
   void ReactingModelLibrary::Set_BackFor_Contr(const double temp, const double rho){
+
+    ForBack_rates.resize(nReactions);
 
     /*--- Set Kc derivatives ---*/
     const double epsilon = 1.0e-6;
@@ -283,10 +288,10 @@ namespace Framework {
         source_turb_jacobian(iSpecies,0) += fixed_contr*(ForBack_rates[iReac][1] - ForBack_rates[iReac][0])*PaSRConstant[iReac];
 
         /*--- Derivatives with respect to partial densitiy ---*/
-        for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+        for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
           if(Ys[jSpecies] > 1.0e-10)
           source_turb_jacobian(iSpecies,jSpecies + 1) += fixed_contr*
-          PaSRConstant[iReac]*(Df_rDrho_i(jSpecies,iReac)*mMasses(jSpecies));
+          PaSRConstant[iReac]*(Df_rDrho_i(jSpecies,iReac)*mMasses[jSpecies]);
         }
       }
     }
@@ -299,8 +304,8 @@ namespace Framework {
   //
   //
   /*--- Compute Jacobian in laminar case ---*/
-  RealMatrix ReactingModelLibrary::GetSourceJacobian(void) {
-
+  RealMatrix ReactingModelLibrary::GetSourceJacobian(const double rho){
+    
     RealMatrix source_jacobian(Ys.size(),Ys.size()+1);
 
     for(unsigned short iReac=0; iReac < nReactions; iReac++ ) {
@@ -312,7 +317,7 @@ namespace Framework {
         source_jacobian(iSpecies,0) += fixed_contr*(ForBack_rates[iReac][1] - ForBack_rates[iReac][0]);
 
         /*--- Derivatives with respect to partial densitiy ---*/
-        for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+        for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
           if(Ys[jSpecies] > 1.0e-10)
           source_jacobian(iSpecies,jSpecies + 1) += fixed_contr*
           (Forward_Rates[iReac]*Stoich_Coeffs_Reactants_Exp(iReac,jSpecies) -

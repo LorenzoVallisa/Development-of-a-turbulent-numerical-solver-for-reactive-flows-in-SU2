@@ -452,23 +452,6 @@ namespace Framework  {
     */
     virtual RealVec GetRhoUdiff(const double temp, const double rho, const RealVec& ys) = 0;
 
-    /*!
-     * Return the mass production/destruction terms [kg m^-3 s^-1] in chemical
-     * non-equilibrium based on Arrhenius's formula.
-     * \param[in] temp - the mixture temperature
-     * \param[in] rho - the mixture density
-     * \param[in] ys - the species mass fractions
-     * \return Mass production terms
-    */
-    virtual RealVec GetMassProductionTerm(const double temp, const double rho, const RealVec& ys) = 0;
-
-    /*!
-     * Compute the Jacobian of source chemistry. NOTE: It requires SetReactionRates call
-     * \param[in] temp - the mixture temperature
-     * \param[in] rho - the mixture density
-     * \return Source Jacobian
-     */
-     virtual RealMatrix GetSourceJacobian(const double temp, const double rho) = 0;
 
     /*!
      * \brief Return the effective diffusion coefficients to solve Stefan-Maxwell equation using Sutton algorithm
@@ -506,6 +489,65 @@ namespace Framework  {
      * \param[in] f_name - File with the fuel data to be read
      */
     virtual void ReadDataFuel(const std::string& f_nmae) = 0;
+
+    //MANGOTURB
+    /*!
+     * \brief This function computes the omega_i_r double tensor species-reactions term.
+     */
+    virtual void SetSourceTerm(const double temp, const double rho, const RealVec& ys) = 0;
+
+    //MANGOTURB
+    /*!
+      * \brief Tensor of derivative of source term for the r-th reaction w.r.t. density of the i-th species.
+      * \param[in] temp - Dimensional temperature read form the node on which the iteration is running
+      * \param[in] rho - Dimensioanl density read form the node on which the iteration is running
+    */
+    virtual void Set_DfrDrhos(const double temp, const double rho) = 0;
+
+    //MANGOTURB
+    /*!
+      * \brief Source term for -th species is built by a weight through PaSR contant method.
+      * \param[in] iSpecies - Species of which i want to build the source term
+      * \param[in] omega_turb - Solution of turbolent problem, needed for closures
+      * \param[in] C_mu - Turbolent parameter needed for closure
+      * \param[out] k - Weight used to build turbolent source term for every species
+    */
+    virtual double GetMassProductionTerm(const unsigned short iSpecies, const double omega_turb,const double C_mu) = 0;
+
+    //MAGNOTURB
+    /*!
+    * \brief This function computes the omega term in laminar case.
+    * \param[out] tau_c_r - Return smallest reaction time for r-th reaction among all species involved into reaction
+    */
+    virtual Eigen::VectorXd GetMassProductionTerm(void)=0;
+
+    //MAGNOTURB
+    /*!
+    * \brief Set derivative of backward and forward rates w.r.t. Temperature.
+    * \param[in] temp - Temperature at the node
+    * \param[in] rho - Density at the node
+    * \param[out] dk/dT - Return derivative of backward and forward rates w.r.t. Temperature
+    */
+    virtual void Set_BackFor_Contr(const double temp, const double rho)=0;
+
+    //MANGOTURB
+    /*!
+    * \brief Compute part of the turbolent Jacobian associated to source term (only species chemical reactions).
+    * \param[out] temp - PArt of jacobian tensor (Missing the transformation operator from compound derivative split)
+    */
+    virtual RealMatrix GetTurbSourceJacobian(void)=0;
+
+    //MANGOTURB
+    /*!
+    * \brief Compute part of Jacobian in laminar case associated to source term(only species chemical reactions).
+    * \param[out] temp - Part of jacobian tensor (Missing the transformation operator from compound derivative split)
+    */
+    virtual RealMatrix GetSourceJacobian(const double rho)=0;
+
+
+
+
+
 
   protected:
 

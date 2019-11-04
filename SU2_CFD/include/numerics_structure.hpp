@@ -66,6 +66,10 @@ protected:
   su2double *Enthalpy_formation;
   su2double Prandtl_Lam;        /*!< \brief Laminar Prandtl's number. */
   su2double Prandtl_Turb;    /*!< \brief Turbulent Prandtl's number. */
+  //MANGOTURB
+  su2double C_mu;  /*!< \brief Turbulent constant. */
+  //MANGOTURB
+  su2double omega_turb; /*!< \brief Auxiliary variable needed for chemistry source closure. */
 
 public:
 
@@ -285,6 +289,15 @@ public:
    * \param[in] val_u_j - Value of the conservative variable at point j.
    */
   void SetConservative(su2double *val_u_i, su2double *val_u_j);
+
+  //MANGOTURB
+  /*!
+   * \brief Add turbolent closure for chemistry source term
+   * \param[out] omega - solution of turbolent problem closure
+   */
+  void SetOmegaParam(su2double omega){
+    omega_turb = omega;
+  }
 
   /*!
    * \brief Set the value of the conservative variables withour reconstruction.

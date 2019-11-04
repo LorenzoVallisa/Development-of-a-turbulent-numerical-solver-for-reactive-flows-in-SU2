@@ -1238,13 +1238,11 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
    else
    {
 
-     omega = library->GetMassProductionTerm();
+     omega.resize(Ys.size(),0);
+
+     Eigen::VectorXd::Map(&omega[0],Ys.size())= library->GetMassProductionTerm();
 
    }
-
-
-  /*--- Get non-equilibrium chemistry source term from library ---*/
-  omega = library->GetMassProductionTerm(dim_temp, dim_rho, Ys);
 
   /*--- Set to zero the source residual for safety ---*/
   std::fill(val_residual, val_residual + nVar, 0.0);
@@ -1292,7 +1290,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
     else
     {
 
-      source_jac = library->GetSourceJacobian();
+      source_jac = library->GetSourceJacobian(dim_rho);
 
     }
 

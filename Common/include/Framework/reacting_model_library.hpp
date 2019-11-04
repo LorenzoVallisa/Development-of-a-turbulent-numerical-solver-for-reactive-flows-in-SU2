@@ -7,6 +7,7 @@
 #include <map>
 #include <set>
 #include <tuple>
+#include <forward_list>
 
 namespace Framework {
 
@@ -47,12 +48,6 @@ namespace Framework {
      * \brief Unsetups the data of the library.
      */
     void Unsetup(void) override;
-
-    //MANGOTURB
-    /*!
-     * \brief This function computes the omega_i_r double tensor species-reactions term.
-     */
-    void SetSourceTerm(const double temp, const double rho, const RealVec& ys);
 
     /*!
      * \brief Get the index of a species.
@@ -463,23 +458,6 @@ namespace Framework {
     */
     RealVec GetRhoUdiff(const double temp, const double rho, const RealVec& ys) override;
 
-   /*!
-    * Return the mass production/destruction terms [kg m^-3 s^-1] in chemical
-    * non-equilibrium based on Arrhenius's formula.
-    * \param[in] temp - the mixture temperature
-    * \param[in] rho - the mixture density
-    * \param[in] ys - the species mass fractions
-    * \return Mass production terms
-    */
-    RealVec GetMassProductionTerm(const double temp, const double rho, const RealVec& ys) override;
-
-    /*!
-     * Compute the Jacobian of source chemistry. NOTE: It requires SetReactionRates call
-     * \param[in] temp - the mixture temperature
-     * \param[in] rho - the mixture density
-     * \return Contribution to source derivatives with respect to mixture density and partial densitiies
-     */
-    RealMatrix GetSourceJacobian(const double temp, const double rho) override;
 
     /*!
      * \brief Return the effective diffusion coefficients to solve Stefan-Maxwell equation
@@ -603,7 +581,7 @@ namespace Framework {
       * \param[in] temp - Dimensional temperature read form the node on which the iteration is running
       * \param[in] rho - Dimensioanl density read form the node on which the iteration is running
     */
-    void Set_DfrDrhos(const double temp, const double rho);
+    void Set_DfrDrhos(const double temp, const double rho) override;
 
     //MANGOTURB
     /*!
@@ -613,7 +591,7 @@ namespace Framework {
       * \param[in] C_mu - Turbolent parameter needed for closure
       * \param[out] k - Weight used to build turbolent source term for every species
     */
-    double GetMassProductionTerm(const unsigend short iSpecies, const double omega_turb,const double C_mu);
+    double GetMassProductionTerm(const unsigned short iSpecies, const double omega_turb,const double C_mu) override;
 
     //MANGOTURB
     /*!
@@ -638,7 +616,7 @@ namespace Framework {
     * \brief This function computes the omega term in laminar case.
     * \param[out] tau_c_r - Return smallest reaction time for r-th reaction among all species involved into reaction
     */
-    Eigen::VectorXd GetMassProductionTerm(void);
+    Eigen::VectorXd GetMassProductionTerm(void) override;
 
     //MAGNOTURB
     /*!
@@ -647,21 +625,27 @@ namespace Framework {
     * \param[in] rho - Density at the node
     * \param[out] dk/dT - Return derivative of backward and forward rates w.r.t. Temperature
     */
-    void Set_BackFor_Contr(const double temp, const double rho);
+    void Set_BackFor_Contr(const double temp, const double rho) override;
 
     //MANGOTURB
     /*!
     * \brief Compute part of the turbolent Jacobian associated to source term (only species chemical reactions).
     * \param[out] temp - PArt of jacobian tensor (Missing the transformation operator from compound derivative split)
     */
-    RealMatrix GetTurbSourceJacobian(void);
+    RealMatrix GetTurbSourceJacobian(void) override;
 
     //MANGOTURB
     /*!
     * \brief Compute part of Jacobian in laminar case associated to source term(only species chemical reactions).
     * \param[out] temp - Part of jacobian tensor (Missing the transformation operator from compound derivative split)
     */
-    RealMatrix GetSourceJacobian(void);
+    RealMatrix GetSourceJacobian(const double rho) override;
+
+    //MANGOTURB
+    /*!
+     * \brief This function computes the omega_i_r double tensor species-reactions term.
+     */
+    void SetSourceTerm(const double temp, const double rho, const RealVec& ys) override;
 
 
   protected:
@@ -673,10 +657,10 @@ namespace Framework {
     Eigen::MatrixXd Df_rDrho_i; /*!< \brief Matrix storing derivative of source term per reaction f_r w.r.t every species. */
 
     //MAGNOTURB
-    std::array<double,nReactions> PaSRConstant; /*!< \brief PaSR constant for each reaction. */
+    std::vector<double> PaSRConstant; /*!< \brief PaSR constant for each reaction. */
 
     //MAGNOTURB
-    std::array<std::array<su2double,2>,nReactions> ForBack_rates; /*!< \brief Auxiliary template to store back/forth reaction coefficients derivative w.r.t. Temperature. */
+    std::vector<std::array<double,2>> ForBack_rates; /*!< \brief Auxiliary template to store back/forth reaction coefficients derivative w.r.t. Temperature. */
 
 
 

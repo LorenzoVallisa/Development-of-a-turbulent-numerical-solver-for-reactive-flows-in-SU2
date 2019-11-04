@@ -335,8 +335,7 @@ protected:
 
   RealVec Ys; /*!< \brief Auxiliary vector for mass fractions in the mixture. */
 
-  //MANGOTURB
-  su2double omega_turb; /*!< \brief Auxiliary variable needed for chemistry source closure. */
+
 
 private:
   unsigned short T_INDEX_PRIM, VX_INDEX_PRIM,
@@ -388,14 +387,7 @@ public:
    */
   void ComputeChemistry(su2double* val_residual, su2double** val_Jacobian_i, CConfig* config) override;
 
-  //MANGOTURB
-  /*!
-   * \brief Add turbolent closure for chemistry source term
-   * \param[out] omega - solution of turbolent problem closure
-   */
-  void SetOmegaParam(su2double omega){
-    omegaturb = omega;
-  }
+
 
 };
 
