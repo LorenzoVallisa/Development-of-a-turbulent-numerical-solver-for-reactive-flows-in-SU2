@@ -4832,6 +4832,16 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
     /*--- Set species binary diffusion coefficients at node i and j ---*/
     numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[jPoint]->GetDiffusionCoeff());
 
+    //MANGOTURB
+    /*--- Set values of turbolent kinetik energies and eddy viscosities into numerics class ---*/
+    if (config->GetKind_Turb_Model() == SST){
+       numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
+                                     solver_container[TURB_SOL]->node[jPoint]->GetSolution(0));
+       numerics->SetEddyViscosity(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0)*(node[iPoint]->GetPrimitive()[RHO_INDEX_PRIM])/
+                                  solver_container[TURB_SOL]->node[iPoint]->GetSolution(1),
+                                  solver_container[TURB_SOL]->node[jPoint]->GetSolution(0)*(node[jPoint]->GetPrimitive()[RHO_INDEX_PRIM])/
+                                  solver_container[TURB_SOL]->node[jPoint]->GetSolution(1));
+
     /*--- Compute the residual ---*/
     numerics->ComputeResidual(Res_Visc, Jacobian_i, Jacobian_j, config);
 

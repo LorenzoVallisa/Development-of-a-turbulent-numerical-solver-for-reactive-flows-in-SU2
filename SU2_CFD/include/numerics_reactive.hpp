@@ -86,6 +86,9 @@ public:
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
   using Vec = Eigen::VectorXd;
 
+  //MANGOTURB
+  using AuxMatrix = std::vector<std::vector<su2double>>;
+
 protected:
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
 
@@ -179,6 +182,22 @@ public:
    */
   void ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i, su2double** val_Jacobian_j, CConfig* config) override;
 
+
+  //MANGOTURB
+/*!
+ * \brief Compute projection of the viscous fluxes solving Stefan-Maxwell equations.
+ * \param[in] val_primvar - Primitive variables.
+ * \param[in] val_grad_primvar - Gradient of the primitive variables.
+ * \param[in] val_normal - Normal vector, the norm of the vector is the area of the face.
+ * \param[in] val_viscosity - Laminar viscosity.
+ * \param[in] val_thermal_conductivity - Thermal Conductivity.
+ * \param[in] val_Dij - Harmonic average of binary diffusion coefficients.
+ * \param[in] config - Definition of the particular problem
+ */
+ void SetLaminarTensorFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, su2double* val_normal,
+                                                    const su2double & val_viscosity, const su2double & val_thermal_conductivity,
+                                                    const RealMatrix& val_Dij, CConfig* config);
+
   /*!
    * \brief Set the Gradient of primitives for computing residual
    * \param[in] val_nvar - Index of desired variable
@@ -254,6 +273,31 @@ protected:
                           const su2double val_alpha, const Vec& val_grad_xs_norm, const Vec& val_diffusion_coeff,
                           const su2double val_dist_ij, const su2double val_dS, su2double* val_normal, su2double* val_Proj_Visc_Flux,
                           su2double** val_Proj_Jac_Tensor_i, su2double** val_Proj_Jac_Tensor_j, CConfig* config);
+
+
+  /*!
+   * \brief Approximation of Viscous NS Jacobians in Thermochemical Non Equilibrium.
+   * \param[in] val_Mean_PrimVar - Mean value of the primitive variables.
+   * \param[in] val_laminar_viscosity - Value of the laminar viscosity.
+   * \param[in] val_thermal_conductivity - Value of the thermal conductivity.
+   * \param[in] val_alpha - Value of artificual diffusion coefficient to solve Stefan-Maxwell equations.
+   * \param[in] val_grad_xs_norm - Value of normal gradient of mole fractions.
+   * \param[in] val_diffusion_coeff - Value of binary diffusion coefficients at interface.
+   * \param[in] val_dist_ij - Distance between the points.
+   * \param[in] val_dS - Area of the current face.
+   * \param[in] val_normal - Normal vector
+   * \param[in] val_Proj_Visc_Flux - Pointer to the projected viscous flux.
+   * \param[out] val_Proj_Jac_Tensor_i - Pointer to the projected viscous Jacobian at point i.
+   * \param[out] val_Proj_Jac_Tensor_j - Pointer to the projected viscous Jacobian at point j.
+   * \param[in] config - Definition of the particular problem
+  */
+void SetLaminarViscousProjJacs(const Vec& val_Mean_PrimVar, const su2double val_laminar_viscosity,
+                               const su2double val_thermal_conductivity, const su2double val_alpha,
+                               const Vec& val_grad_xs_norm, const Vec& val_diffusion_coeff,
+                               const su2double val_dist_ij, const su2double val_dS, su2double* val_normal,
+                               su2double* val_Proj_Visc_Flux, su2double** val_Proj_Jac_Tensor_i,
+                               su2double** val_Proj_Jac_Tensor_j, CConfig* config, const Vec& val_Mean_GradPrimVar,
+                               AuxMatrix & dFdVi, AuxMatrix & dFdVj, AuxMatrix & dVdUi, AuxMatrix & dVdUj);
 
   /*!
    * \brief Compute the diffusive flux along a certain direction

@@ -936,8 +936,65 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
                                                                   PrimVar_Grad_j[RHOS_INDEX_GRAD + iSpecies][iDim]);
   }
 
-  /*--- Get projected flux tensor ---*/
-  GetViscousProjFlux(Mean_PrimVar, Mean_GradPrimVar, Normal, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, Mean_Dij, config);
+  //MANGOTURB_init
+  /*--- Set the laminar component of viscous residual tensor ---*/
+  SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
+    Mean_Laminar_Viscosity, Mean_Thermal_Conductivity,
+    Mean_Dij,config);
+
+    if (config->GetKind_Turb_Model() == SST){
+
+      /*--- Local turbolent variables ---*/
+      su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
+      Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
+      Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
+
+      /*--- Reynolds stress tensor (Boussinesq approximation) ---*/
+      unsigned short div_vel(0.0);
+      unsigned short rho(Mean_PrimVar[RHO_INDEX_PRIM]);
+
+      for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+      div_vel += Mean_GradPrimVar(VX_INDEX_AVGGRAD + iDim,iDim);
+
+      RealMatrix tau_turb(nDim,nDim);
+      tau_turb.setZero();
+      for(unsigned short iDim = 0; iDim < nDim; ++iDim) {
+        for(unsigned short jDim = 0; jDim < nDim; ++jDim)
+        tau_turb(iDim,jDim) += Mean_Eddy_Viscosity*(Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) + Mean_GradPrimVar(VX_INDEX_AVGGRAD + iDim,jDim));
+        tau_turb(iDim,iDim) -= TWO3*( Mean_Eddy_Viscosity*div_vel + Mean_Turbolent_KE*rho);
+      }
+
+
+      /*--- Closure for Energy: simplest one cpGradT---*/
+      su2double heat_flux_factor,Cp;
+      Cp = (Gamma / Gamma_Minus_One) * Gas_Constant;
+      heat_flux_factor = Cp * (Mean_Laminar_Viscosity/Prandtl_Lam + Mean_Eddy_Viscosity/Prandtl_Turb);
+
+      for(unsigned short iDim = 0; iDim < nDim; ++iDim) {
+
+        for(unsigned short jDim = 0; jDim < nDim; ++jDim) {
+
+          /*--- Tau_Re closure for Momentum and Energy using simplest closure for energy : cpGradT --*/
+          Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim] += tau_turb(iDim,jDim);
+          Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau_turb(iDim,jDim)*Mean_PrimVar[VX_INDEX_PRIM + jDim] + heat_flux_factor*Mean_GradPrimVar(T_INDEX_AVGGRAD);
+        }
+
+        /*--- Closure for species using molar fractions as approximation ---*/
+        for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+          Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lew_Turb)
+          * Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies) * Normal[iDim];
+        }
+
+      }
+
+    }
+    /*--- Projected flux for momentum and second contribution for energy ---*/
+    for(unsigned short iDim = 0; iDim < nDim; ++iDim) {
+      for(unsigned short iVar = RHOVX_INDEX_SOL; iVar < RHOVX_INDEX_SOL + nDim; ++iVar)
+      Proj_Flux_Tensor[iVar] += Flux_Tensor[iVar][iDim]*Normal[iDim];
+      Proj_Flux_Tensor[RHOE_INDEX_SOL] += Flux_Tensor[RHOE_INDEX_SOL][iDim]*Normal[iDim];
+    }
+    //MANGOTURB-end
 
 	/*--- Update viscous residual with the species projected flux ---*/
   std::copy(Proj_Flux_Tensor, Proj_Flux_Tensor + nVar, val_residual);
@@ -987,10 +1044,435 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     /*--- Compute effective normal gradient of mole fractions ---*/
     Grad_Xs_norm /= Area;
 
-    GetViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
-                       std::sqrt(dist_ij_2), Area, UnitNormal, Proj_Flux_Tensor, val_Jacobian_i, val_Jacobian_j, config);
+
+    /*--- Build auxiliary matrices for jacobian components ---*/
+    AuxMatrix dFdVi(nVar,RealVec(nVar));
+    AuxMatrix dFVj(nVar,RealVec(nVar));
+    AuxMatrix dVdUi(nVar,RealVec(nVar));
+    AuxMatrix dVdUj(nVar,RealVec(nVar));
+
+    /*--- Compute laminar jacobian components ---*/
+    SetLaminarViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
+      std::sqrt(dist_ij_2), Area, UnitNormal, Proj_Flux_Tensor, val_Jacobian_i, val_Jacobian_j, config,Mean_GradPrimVar,
+      dFdVi, dFVj, dVdUi, dVdUj);
+
+    /*--- Add turbolent jacobian closure ---*/
+    if (config->GetKind_Turb_Model() == SST){
+
+      su2double sqrt_dist_ij_2=std::sqrt(dist_ij_2);
+      /*--- Compute Jacobian with respect to primitives ---*/
+      if(nDim == 2) {
+        su2double thetax = theta + UnitNormal[0]*UnitNormal[0]/3.0;
+        su2double thetay = theta + UnitNormal[1]*UnitNormal[1]/3.0;
+
+        su2double etaz = UnitNormal[0]*UnitNormal[1]/3.0;
+
+        su2double pix = Mean_PrimVar[VX_INDEX_PRIM]*thetax + Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz;
+        su2double piy = Mean_PrimVar[VX_INDEX_PRIM]*etaz   + Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay;
+
+        /*--- Populate primitive Jacobian ---*/
+
+        // Momentum : Tau_Reynolds
+
+        // X-momentum
+        dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
+
+        dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*thetax/sqrt_dist_ij_2*Area;
+        dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+
+        // Y-momentum
+        dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
+
+        dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+        dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*thetay/sqrt_dist_ij_2*Area;
+
+
+        // Energy : Tau_Reynolds
+        dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(Mean_PrimVar[VX_INDEX_PRIM]*UnitNormal[0] +
+        Mean_PrimVar[VX_INDEX_PRIM + 1]*UnitNormal[1] +
+        Mean_PrimVar[VX_INDEX_PRIM + 2]*UnitNormal[2])*Area;
+
+        dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+        dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+
+        //Energy: 
+
+        //SONQUI (PAGINA 19 note)
+        // Fick's law partial densities: Energy
+        dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] +=
+
+      } /*--- End onf nDim = 2 ---*/
+        else {
+          su2double thetax = theta + UnitNormal[0]*UnitNormal[0]/3.0;
+          su2double thetay = theta + UnitNormal[1]*UnitNormal[1]/3.0;
+          su2double thetaz = theta + UnitNormal[2]*UnitNormal[2]/3.0;
+
+          su2double etax = UnitNormal[1]*UnitNormal[2]/3.0;
+          su2double etay = UnitNormal[0]*UnitNormal[2]/3.0;
+          su2double etaz = UnitNormal[0]*UnitNormal[1]/3.0;
+
+          su2double pix = Mean_PrimVar[VX_INDEX_PRIM]*thetax + Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz   +
+          Mean_PrimVar[VX_INDEX_PRIM + 2]*etay;
+          su2double piy = Mean_PrimVar[VX_INDEX_PRIM]*etaz   + Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay +
+          Mean_PrimVar[VX_INDEX_PRIM + 2]*etax;
+          su2double piz = Mean_PrimVar[VX_INDEX_PRIM]*etay   + Mean_PrimVar[VX_INDEX_PRIM + 1]*etax   +
+          Mean_PrimVar[VX_INDEX_PRIM + 2]*thetaz;
+
+          /*--- Populate primitive Jacobian ---*/
+          // X-momentum
+          dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] = mu*thetax/sqrt_dist_ij_2*Area;
+          dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] = mu*etaz/sqrt_dist_ij_2*Area;
+          dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 2] = mu*etay/sqrt_dist_ij_2*Area;
+
+          // Y-momentum
+          dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] = mu*etaz/sqrt_dist_ij_2*Area;
+          dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] = mu*thetay/sqrt_dist_ij_2*Area;
+          dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 2] = mu*etax/sqrt_dist_ij_2*Area;
+
+          // Y-momentum
+          dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL] = mu*etay/sqrt_dist_ij_2*Area;
+          dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 1] = mu*etax/sqrt_dist_ij_2*Area;
+          dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 2] = mu*thetaz/sqrt_dist_ij_2*Area;
+
+          // Energy
+          dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] = pix*mu/sqrt_dist_ij_2*Area;
+          dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] = piy*mu/sqrt_dist_ij_2*Area;
+          dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 2] = piz*mu/sqrt_dist_ij_2*Area;
+          dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = ktr*theta/sqrt_dist_ij_2*Area;
+        } /*--- End of nDim = 3 ---*/
+
+      }
+
+
+      GetViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
+        std::sqrt(dist_ij_2), Area, UnitNormal, Proj_Flux_Tensor, val_Jacobian_i, val_Jacobian_j, config);
+      }
+    }
+
+
+//MANGOTURB
+//
+//
+/*--- Set the laminar component of viscous residual tensor ---*/
+//
+//
+void CAvgGradReactive_Boundary::SetLaminarTensorFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, su2double* val_normal,
+                                                   const su2double & val_viscosity, const su2double & val_thermal_conductivity,
+                                                   const RealMatrix& val_Dij, CConfig* config) {
+  /*--- Check memory allocation ---*/
+  if(config->GetExtIter() == 0) {
+    SU2_Assert(Proj_Flux_Tensor != NULL, "The array for the projected viscous flux has not been allocated");
+    SU2_Assert(Flux_Tensor != NULL, "The matrix for the viscous flux tensor has not been allocated");
+    SU2_Assert(tau != NULL,"The matrix for the stress tensor has not been allocated");
   }
+
+  /*--- Local variables ---*/
+ 	unsigned short iSpecies, iVar, iDim, jDim;
+
+  su2double mu, ktr, div_vel;
+  su2double rho, T;
+
+  /*--- Initialize to zero ---*/
+  for(iVar = 0; iVar < nVar; ++iVar) {
+    Proj_Flux_Tensor[iVar] = 0.0;
+    std::fill(Flux_Tensor[iVar], Flux_Tensor[iVar] + nDim, 0.0);
+  }
+
+  /*--- Rename for convenience ---*/
+  rho = val_primvar[RHO_INDEX_PRIM];
+  mu  = val_viscosity;
+  ktr = val_thermal_conductivity;
+  T   = val_primvar[T_INDEX_PRIM];
+
+  /*--- Compute partial enthalpies ---*/
+  bool US_System = (config->GetSystemMeasurements() == US);
+  su2double dim_temp = T*config->GetTemperature_Ref();
+  if(US_System)
+    dim_temp *= 5.0/9.0;
+  hs = library->ComputePartialEnthalpy(dim_temp);
+  for(auto& elem: hs)
+    elem /= config->GetEnergy_Ref();
+  if(US_System) {
+    for(auto& elem: hs)
+      elem *= 3.28084*3.28084;
+  }
+
+  /*--- Extract molar fractions, their gradient and mass fractions ---*/
+  std::copy(val_primvar.data() + RHOS_INDEX_PRIM, val_primvar.data() + (RHOS_INDEX_PRIM + nSpecies), Ys.begin());
+  Xs = library->GetMolarFromMass(Ys);
+
+  /*--- Compute the velocity divergence ---*/
+  div_vel = 0.0;
+  for(iDim = 0; iDim < nDim; ++iDim)
+    div_vel += val_grad_primvar(VX_INDEX_AVGGRAD + iDim,iDim);
+
+  /*--- Compute the viscous stress tensor ---*/
+  for(iDim = 0; iDim < nDim; ++iDim)
+    std::fill(tau[iDim], tau[iDim] + nDim, 0.0);
+
+  for(iDim = 0; iDim < nDim; ++iDim) {
+    for(jDim = 0; jDim < nDim; ++jDim)
+      tau[iDim][jDim] += mu*(val_grad_primvar(VX_INDEX_AVGGRAD + jDim,iDim) + val_grad_primvar(VX_INDEX_AVGGRAD + iDim,jDim));
+    tau[iDim][iDim] -= TWO3*(mu*div_vel);
+  }
+
+  /*--- Populate entries in the viscous flux tensor ---*/
+  alpha = 1.0/(rho*val_Dij.maxCoeff());
+  Grad_Xs_norm.setZero();
+  for(iDim = 0; iDim < nDim; ++iDim) {
+    /*--- Shear stress related terms ---*/
+    for(jDim = 0; jDim < nDim; ++jDim) {
+      Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim] = tau[iDim][jDim];
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau[iDim][jDim]*val_primvar[VX_INDEX_PRIM + jDim];
+    }
+
+    /*--- Heat transfer term due to temperature gradient ---*/
+    Flux_Tensor[RHOE_INDEX_SOL][iDim] += ktr*val_grad_primvar(T_INDEX_AVGGRAD,iDim);
+
+    /*--- Compute gradient in val_normal direction of mass fractions ---*/
+    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      Grad_Xs_norm[iSpecies] += val_grad_primvar(RHOS_INDEX_AVGGRAD + iSpecies, iDim)*val_normal[iDim];
+
+  }
+
+  /*--- Solve Stefan-Maxwell equations ---*/
+  Solve_SM(rho, alpha, val_Dij, Xs, Grad_Xs_norm, Ys);
+
+  /*--- Projected flux for density, partial density and first contribution for energy ---*/
+  Proj_Flux_Tensor[RHO_INDEX_SOL] = -Jd.sum();
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    /*--- Heat flux due to species diffusion term ---*/
+    Proj_Flux_Tensor[RHOE_INDEX_SOL] += -hs[iSpecies]*Jd[iSpecies];
+    /*--- Species diffusion term ---*/
+    Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] = -Jd[iSpecies];
+  }
+
 }
+
+
+
+//MANGOTURB
+//
+//
+/*--- Compute approximate Jacobian of projected viscous flux. ---*/
+//
+//
+void CAvgGradReactive_Boundary::SetLaminarViscousProjJacs(const Vec& val_Mean_PrimVar, const su2double val_laminar_viscosity,
+                                                   const su2double val_thermal_conductivity, const su2double val_alpha,
+                                                   const Vec& val_grad_xs_norm, const Vec& val_diffusion_coeff,
+                                                   const su2double val_dist_ij, const su2double val_dS, su2double* val_normal,
+                                                   su2double* val_Proj_Visc_Flux, su2double** val_Proj_Jac_Tensor_i,
+                                                   su2double** val_Proj_Jac_Tensor_j, CConfig* config,
+                                                   AuxMatrix & dFdVi, AuxMatrix & dFdVj, AuxMatrix & dVdUi, AuxMatrix & dVdUj) {
+
+  /*--- Indexes for iteration ---*/
+  unsigned short iDim, iVar, jVar, kVar, iSpecies, jSpecies, kSpecies;
+
+  /*--- Local variables ---*/
+  su2double mu, ktr, dij, rho, rho_i, rho_j, T, dim_temp;
+
+  su2double theta = std::inner_product(val_normal, val_normal + nDim, val_normal, 0.0);
+
+  /*--- Set Jacobian matrixes to zero ---*/
+  for(iVar = 0; iVar < nVar; ++iVar) {
+    for(jVar = 0; jVar < nVar; ++jVar) {
+      val_Proj_Jac_Tensor_i[iVar][jVar] = 0.0;
+      val_Proj_Jac_Tensor_j[iVar][jVar] = 0.0;
+      dFdVi[iVar][jVar] = 0.0;
+      dFdVj[iVar][jVar] = 0.0;
+      dVdUi[iVar][jVar] = 0.0;
+      dVdUj[iVar][jVar] = 0.0;
+    }
+  }
+
+  /*--- Rename for convenience ---*/
+  dij = val_dist_ij;
+  T = val_Mean_PrimVar[T_INDEX_PRIM];
+  rho = val_Mean_PrimVar[RHO_INDEX_PRIM];
+  rho_i = V_i[RHO_INDEX_PRIM];
+  rho_j = V_j[RHO_INDEX_PRIM];
+  mu = val_laminar_viscosity;
+  ktr = val_thermal_conductivity;
+  alpha = val_alpha;
+  Ds = val_diffusion_coeff;
+
+  /*--- Save mass fractions, partial enthalpies and specific heats at constant pressure---*/
+  bool US_System = (config->GetSystemMeasurements() == US);
+  dim_temp = T*config->GetTemperature_Ref();
+  if(US_System)
+    dim_temp *= 5.0/9.0;
+  Cps = library->ComputeCps(dim_temp);
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+    Cps[iSpecies] /= config->GetGas_Constant_Ref();
+  if(US_System) {
+    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      Cps[iSpecies] *= 3.28084*3.28084*5.0/9.0;
+  }
+
+  /*--- Set diffusion Jacobian matrices to zero ---*/
+  su2double dJdr_j[nSpecies][nSpecies + 1], dJdr_i[nSpecies][nSpecies + 1];
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+    for(jSpecies = 0; jSpecies < nSpecies + 1; ++jSpecies)
+      dJdr_i[iSpecies][jSpecies] = dJdr_j[iSpecies][jSpecies] = 0.0;
+
+  auto mMasses = library->GetMolarMasses();
+  su2double totMass = std::inner_product(mMasses.cbegin(), mMasses.cend(), Xs.cbegin(), 0.0);
+  su2double totMass_i = std::inner_product(mMasses.cbegin(), mMasses.cend(), Xs_i.cbegin(), 0.0);
+  su2double totMass_j = std::inner_product(mMasses.cbegin(), mMasses.cend(), Xs_j.cbegin(), 0.0);
+  su2double sigma_i = std::accumulate(Xs_i.cbegin(), Xs_i.cend(), 0.0);
+  su2double sigma_j = std::accumulate(Xs_j.cbegin(), Xs_j.cend(), 0.0);
+
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    for(kSpecies  = 0; kSpecies < nSpecies; ++kSpecies) {
+      dJdr_j[iSpecies][kSpecies + 1] = -rho*mMasses[iSpecies]*Ds[iSpecies]*Xs_j[iSpecies]/(totMass*dij*sigma_j*rho_j);
+      dJdr_i[iSpecies][kSpecies + 1] = rho*mMasses[iSpecies]*Ds[iSpecies]*Xs_i[iSpecies]/(totMass*dij*sigma_i*rho_i);
+      for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+        dJdr_j[iSpecies][kSpecies + 1] += rho*Ys[iSpecies]*mMasses[jSpecies]*Ds[jSpecies]*Xs_j[jSpecies]/(totMass*dij*sigma_j*rho_j);
+        dJdr_i[iSpecies][kSpecies + 1] -= rho*Ys[iSpecies]*mMasses[jSpecies]*Ds[jSpecies]*Xs_i[jSpecies]/(totMass*dij*sigma_i*rho_i);
+      }
+      dJdr_j[iSpecies][kSpecies + 1] += rho*Ys[iSpecies]*Ds[kSpecies]*totMass_j*sigma_j/(dij*totMass*rho_j);
+      dJdr_i[iSpecies][kSpecies + 1] -= rho*Ys[iSpecies]*Ds[kSpecies]*totMass_i*sigma_i/(dij*totMass*rho_i);
+      if(iSpecies == kSpecies) {
+        dJdr_j[iSpecies][kSpecies + 1] -= rho*Ds[iSpecies]*totMass_j*sigma_j/(dij*totMass*rho_j);
+        dJdr_i[iSpecies][kSpecies + 1] += rho*Ds[iSpecies]*totMass_i*sigma_i/(dij*totMass*rho_i);
+      }
+    }
+  }
+
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    for(kSpecies = 0; kSpecies < nSpecies; ++kSpecies) {
+      if(iSpecies == kSpecies) {
+        for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+          dJdr_j[iSpecies][kSpecies + 1] += 0.5*rho*mMasses[jSpecies]*Ds[jSpecies]*val_grad_xs_norm[jSpecies]/(totMass*rho_j);
+          dJdr_i[iSpecies][kSpecies + 1] += 0.5*rho*mMasses[jSpecies]*Ds[jSpecies]*val_grad_xs_norm[jSpecies]/(totMass*rho_i);
+        }
+      }
+    }
+  }
+
+  /*--- Compute transformation matrix ---*/
+  //Mixture density;
+  dVdUi[RHO_INDEX_SOL][RHO_INDEX_SOL] = 1.0;
+  dVdUj[RHO_INDEX_SOL][RHO_INDEX_SOL] = 1.0;
+  // Partial densities
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    dVdUi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + iSpecies] = 1.0;
+    dVdUj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + iSpecies] = 1.0;
+  }
+  for(iDim = 0; iDim < nDim; ++iDim) {
+    dVdUi[RHOVX_INDEX_SOL + iDim][RHO_INDEX_SOL] = -V_i[VX_INDEX_PRIM + iDim]/V_i[RHO_INDEX_PRIM];
+    dVdUi[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + iDim] = 1.0/V_i[RHO_INDEX_PRIM];
+    dVdUj[RHOVX_INDEX_SOL + iDim][RHO_INDEX_SOL] = -V_j[VX_INDEX_PRIM + iDim]/V_j[RHO_INDEX_PRIM];
+    dVdUj[RHOVX_INDEX_SOL + iDim][RHOVX_INDEX_SOL + iDim] = 1.0/V_j[RHO_INDEX_PRIM];
+  }
+  for(iVar = 0; iVar < nVar; ++iVar) {
+    dVdUi[RHOE_INDEX_SOL][iVar] = S_i[iVar];
+    dVdUj[RHOE_INDEX_SOL][iVar] = S_j[iVar];
+  }
+
+  /*--- Compute Jacobian with respect to primitives ---*/
+  if(nDim == 2) {
+    su2double thetax = theta + val_normal[0]*val_normal[0]/3.0;
+    su2double thetay = theta + val_normal[1]*val_normal[1]/3.0;
+
+    su2double etaz = val_normal[0]*val_normal[1]/3.0;
+
+    su2double pix = val_Mean_PrimVar[VX_INDEX_PRIM]*thetax + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz;
+    su2double piy = val_Mean_PrimVar[VX_INDEX_PRIM]*etaz   + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay;
+
+    /*--- Populate primitive Jacobian ---*/
+    // X-momentum
+    dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] = mu*thetax/dij*val_dS;
+    dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] = mu*etaz/dij*val_dS;
+
+    // Y-momentum
+    dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] = mu*etaz/dij*val_dS;
+    dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] = mu*thetay/dij*val_dS;
+
+    // Energy
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] = pix*mu/dij*val_dS;
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] = piy*mu/dij*val_dS;
+    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = ktr*theta/dij*val_dS;
+
+  } /*--- End onf nDim = 2 ---*/
+  else {
+    su2double thetax = theta + val_normal[0]*val_normal[0]/3.0;
+    su2double thetay = theta + val_normal[1]*val_normal[1]/3.0;
+    su2double thetaz = theta + val_normal[2]*val_normal[2]/3.0;
+
+    su2double etax = val_normal[1]*val_normal[2]/3.0;
+    su2double etay = val_normal[0]*val_normal[2]/3.0;
+    su2double etaz = val_normal[0]*val_normal[1]/3.0;
+
+    su2double pix = val_Mean_PrimVar[VX_INDEX_PRIM]*thetax + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz   +
+                    val_Mean_PrimVar[VX_INDEX_PRIM + 2]*etay;
+    su2double piy = val_Mean_PrimVar[VX_INDEX_PRIM]*etaz   + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay +
+                    val_Mean_PrimVar[VX_INDEX_PRIM + 2]*etax;
+    su2double piz = val_Mean_PrimVar[VX_INDEX_PRIM]*etay   + val_Mean_PrimVar[VX_INDEX_PRIM + 1]*etax   +
+                    val_Mean_PrimVar[VX_INDEX_PRIM + 2]*thetaz;
+
+    /*--- Populate primitive Jacobian ---*/
+    // X-momentum
+    dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] = mu*thetax/dij*val_dS;
+    dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] = mu*etaz/dij*val_dS;
+    dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 2] = mu*etay/dij*val_dS;
+
+    // Y-momentum
+    dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] = mu*etaz/dij*val_dS;
+    dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] = mu*thetay/dij*val_dS;
+    dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 2] = mu*etax/dij*val_dS;
+
+    // Y-momentum
+    dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL] = mu*etay/dij*val_dS;
+    dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 1] = mu*etax/dij*val_dS;
+    dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 2] = mu*thetaz/dij*val_dS;
+
+    // Energy
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] = pix*mu/dij*val_dS;
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] = piy*mu/dij*val_dS;
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 2] = piz*mu/dij*val_dS;
+    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = ktr*theta/dij*val_dS;
+  } /*--- End of nDim = 3 ---*/
+
+  for(iVar = 0; iVar < nVar; ++iVar)
+    for(jVar = 0; jVar < nVar; ++jVar)
+      dFdVi[iVar][jVar] = -dFdVj[iVar][jVar];
+
+  // Common terms
+  for(iDim = 0; iDim < nDim; ++iDim) {
+    dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*val_Proj_Visc_Flux[RHOVX_INDEX_SOL + iDim];
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*val_Proj_Visc_Flux[RHOVX_INDEX_SOL + iDim];
+  }
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Proj_Visc_Flux[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
+    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Proj_Visc_Flux[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
+  }
+
+  // Unique terms
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] = -dJdr_j[iSpecies][0]*val_dS;
+    dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] = -dJdr_i[iSpecies][0]*val_dS;
+    dFdVj[RHO_INDEX_SOL][RHO_INDEX_SOL] += dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL];
+    dFdVi[RHO_INDEX_SOL][RHO_INDEX_SOL] += dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL];
+    dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -dJdr_j[iSpecies][0]*hs[iSpecies]*val_dS;
+    dFdVi[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -dJdr_i[iSpecies][0]*hs[iSpecies]*val_dS;
+    for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
+      dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies] = -dJdr_j[iSpecies][jSpecies + 1]*val_dS;
+      dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies] = -dJdr_i[iSpecies][jSpecies + 1]*val_dS;
+      dFdVj[RHO_INDEX_SOL][RHOS_INDEX_SOL + jSpecies] += -dJdr_j[iSpecies][jSpecies + 1]*val_dS;
+      dFdVi[RHO_INDEX_SOL][RHOS_INDEX_SOL + jSpecies] += -dJdr_i[iSpecies][jSpecies + 1]*val_dS;
+      dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] += -dJdr_j[jSpecies][iSpecies + 1]*hs[jSpecies]*val_dS;
+      dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] += -dJdr_i[jSpecies][iSpecies + 1]*hs[jSpecies]*val_dS;
+    }
+  }
+
+
+} /*--- End of function ---*/
+
+
+
+
+
 
 //
 //
