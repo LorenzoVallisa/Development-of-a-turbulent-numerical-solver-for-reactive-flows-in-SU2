@@ -305,7 +305,7 @@ namespace Framework {
   //
   /*--- Compute Jacobian in laminar case ---*/
   RealMatrix ReactingModelLibrary::GetSourceJacobian(const double rho){
-    
+
     RealMatrix source_jacobian(Ys.size(),Ys.size()+1);
 
     for(unsigned short iReac=0; iReac < nReactions; iReac++ ) {
@@ -329,9 +329,6 @@ namespace Framework {
     return source_jacobian;
 
   }
-
-
-
 
 
 

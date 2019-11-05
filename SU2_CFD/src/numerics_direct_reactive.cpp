@@ -893,6 +893,7 @@ void CAvgGradReactive_Boundary::GetViscousProjJacs(const Vec& val_Mean_PrimVar, 
 
 } /*--- End of function ---*/
 
+//MANGOTURB
 //
 //
 /*--- Compute residual for the viscous part for boundary conditions----*/
@@ -949,7 +950,15 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
       Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
       Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
 
+      SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal)
+      //SONQUI
+
+
+
+
+
       /*--- Reynolds stress tensor (Boussinesq approximation) ---*/
+      unsigned short iDim,jDim,iSpecies,iVar;
       unsigned short div_vel(0.0);
       unsigned short rho(Mean_PrimVar[RHO_INDEX_PRIM]);
 
@@ -958,21 +967,19 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
 
       RealMatrix tau_turb(nDim,nDim);
       tau_turb.setZero();
-      for(unsigned short iDim = 0; iDim < nDim; ++iDim) {
-        for(unsigned short jDim = 0; jDim < nDim; ++jDim)
+      for( iDim = 0; iDim < nDim; ++iDim) {
+        for( jDim = 0; jDim < nDim; ++jDim)
         tau_turb(iDim,jDim) += Mean_Eddy_Viscosity*(Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) + Mean_GradPrimVar(VX_INDEX_AVGGRAD + iDim,jDim));
-        tau_turb(iDim,iDim) -= TWO3*( Mean_Eddy_Viscosity*div_vel + Mean_Turbolent_KE*rho);
+      tau_turb(iDim,iDim) -= TWO3*( Mean_Eddy_Viscosity*div_vel + Mean_Turbolent_KE*rho);
       }
 
 
       /*--- Closure for Energy: simplest one cpGradT---*/
-      su2double heat_flux_factor,Cp;
-      Cp = (Gamma / Gamma_Minus_One) * Gas_Constant;
-      heat_flux_factor = Cp * (Mean_Laminar_Viscosity/Prandtl_Lam + Mean_Eddy_Viscosity/Prandtl_Turb);
+      su2double heat_flux_factor = Get_HeatFactor();
 
-      for(unsigned short iDim = 0; iDim < nDim; ++iDim) {
+      for( iDim = 0; iDim < nDim; ++iDim) {
 
-        for(unsigned short jDim = 0; jDim < nDim; ++jDim) {
+        for( jDim = 0; jDim < nDim; ++jDim) {
 
           /*--- Tau_Re closure for Momentum and Energy using simplest closure for energy : cpGradT --*/
           Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim] += tau_turb(iDim,jDim);
@@ -980,19 +987,19 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
         }
 
         /*--- Closure for species using molar fractions as approximation ---*/
-        for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-          Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lew_Turb)
-          * Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies) * Normal[iDim];
+        for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+          Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lew_Turb)*
+                  Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies) * Normal[iDim];
         }
 
       }
 
     }
     /*--- Projected flux for momentum and second contribution for energy ---*/
-    for(unsigned short iDim = 0; iDim < nDim; ++iDim) {
-      for(unsigned short iVar = RHOVX_INDEX_SOL; iVar < RHOVX_INDEX_SOL + nDim; ++iVar)
+    for( iDim = 0; iDim < nDim; ++iDim) {
+      for( iVar = RHOVX_INDEX_SOL; iVar < RHOVX_INDEX_SOL + nDim; ++iVar)
       Proj_Flux_Tensor[iVar] += Flux_Tensor[iVar][iDim]*Normal[iDim];
-      Proj_Flux_Tensor[RHOE_INDEX_SOL] += Flux_Tensor[RHOE_INDEX_SOL][iDim]*Normal[iDim];
+    Proj_Flux_Tensor[RHOE_INDEX_SOL] += Flux_Tensor[RHOE_INDEX_SOL][iDim]*Normal[iDim];
     }
     //MANGOTURB-end
 
@@ -1051,103 +1058,215 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     AuxMatrix dVdUi(nVar,RealVec(nVar));
     AuxMatrix dVdUj(nVar,RealVec(nVar));
 
+
     /*--- Compute laminar jacobian components ---*/
     SetLaminarViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
-      std::sqrt(dist_ij_2), Area, UnitNormal, Proj_Flux_Tensor, val_Jacobian_i, val_Jacobian_j, config,Mean_GradPrimVar,
-      dFdVi, dFVj, dVdUi, dVdUj);
+      std::sqrt(dist_ij_2), Area, UnitNormal, config, dFdVi, dFVj, dVdUi, dVdUj);
 
     /*--- Add turbolent jacobian closure ---*/
     if (config->GetKind_Turb_Model() == SST){
 
-      su2double sqrt_dist_ij_2=std::sqrt(dist_ij_2);
-      /*--- Compute Jacobian with respect to primitives ---*/
-      if(nDim == 2) {
-        su2double thetax = theta + UnitNormal[0]*UnitNormal[0]/3.0;
-        su2double thetay = theta + UnitNormal[1]*UnitNormal[1]/3.0;
+      /*--- Local turbolent variables ---*/
+      su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
+      Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
+      Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
 
-        su2double etaz = UnitNormal[0]*UnitNormal[1]/3.0;
+      SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFVj)
 
-        su2double pix = Mean_PrimVar[VX_INDEX_PRIM]*thetax + Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz;
-        su2double piy = Mean_PrimVar[VX_INDEX_PRIM]*etaz   + Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay;
+    }
 
-        /*--- Populate primitive Jacobian ---*/
-
-        // Momentum : Tau_Reynolds
-
-        // X-momentum
-        dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
-
-        dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*thetax/sqrt_dist_ij_2*Area;
-        dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
-
-        // Y-momentum
-        dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
-
-        dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
-        dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*thetay/sqrt_dist_ij_2*Area;
-
-
-        // Energy : Tau_Reynolds
-        dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(Mean_PrimVar[VX_INDEX_PRIM]*UnitNormal[0] +
-        Mean_PrimVar[VX_INDEX_PRIM + 1]*UnitNormal[1] +
-        Mean_PrimVar[VX_INDEX_PRIM + 2]*UnitNormal[2])*Area;
-
-        dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
-        dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
-
-        //Energy: 
-
-        //SONQUI (PAGINA 19 note)
-        // Fick's law partial densities: Energy
-        dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] +=
-
-      } /*--- End onf nDim = 2 ---*/
-        else {
-          su2double thetax = theta + UnitNormal[0]*UnitNormal[0]/3.0;
-          su2double thetay = theta + UnitNormal[1]*UnitNormal[1]/3.0;
-          su2double thetaz = theta + UnitNormal[2]*UnitNormal[2]/3.0;
-
-          su2double etax = UnitNormal[1]*UnitNormal[2]/3.0;
-          su2double etay = UnitNormal[0]*UnitNormal[2]/3.0;
-          su2double etaz = UnitNormal[0]*UnitNormal[1]/3.0;
-
-          su2double pix = Mean_PrimVar[VX_INDEX_PRIM]*thetax + Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz   +
-          Mean_PrimVar[VX_INDEX_PRIM + 2]*etay;
-          su2double piy = Mean_PrimVar[VX_INDEX_PRIM]*etaz   + Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay +
-          Mean_PrimVar[VX_INDEX_PRIM + 2]*etax;
-          su2double piz = Mean_PrimVar[VX_INDEX_PRIM]*etay   + Mean_PrimVar[VX_INDEX_PRIM + 1]*etax   +
-          Mean_PrimVar[VX_INDEX_PRIM + 2]*thetaz;
-
-          /*--- Populate primitive Jacobian ---*/
-          // X-momentum
-          dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] = mu*thetax/sqrt_dist_ij_2*Area;
-          dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] = mu*etaz/sqrt_dist_ij_2*Area;
-          dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 2] = mu*etay/sqrt_dist_ij_2*Area;
-
-          // Y-momentum
-          dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] = mu*etaz/sqrt_dist_ij_2*Area;
-          dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] = mu*thetay/sqrt_dist_ij_2*Area;
-          dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 2] = mu*etax/sqrt_dist_ij_2*Area;
-
-          // Y-momentum
-          dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL] = mu*etay/sqrt_dist_ij_2*Area;
-          dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 1] = mu*etax/sqrt_dist_ij_2*Area;
-          dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 2] = mu*thetaz/sqrt_dist_ij_2*Area;
-
-          // Energy
-          dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] = pix*mu/sqrt_dist_ij_2*Area;
-          dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] = piy*mu/sqrt_dist_ij_2*Area;
-          dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 2] = piz*mu/sqrt_dist_ij_2*Area;
-          dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = ktr*theta/sqrt_dist_ij_2*Area;
-        } /*--- End of nDim = 3 ---*/
-
+      unsigned short iDim,iVar,jVar;
+      /*--- Common terms: Proj_Flux_Tensor, if turbolence is active, contains Reynolds stress tensor as well ---*/
+      for(iDim = 0; iDim < nDim; ++iDim) {
+        dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*Proj_Flux_Tensor[RHOVX_INDEX_SOL + iDim];
+        dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*Proj_Flux_Tensor[RHOVX_INDEX_SOL + iDim];
       }
 
+      for(iVar = 0; iVar < nVar; ++iVar) {
+        for(jVar = 0; jVar < nVar; ++jVar) {
+          val_Jacobian_i[iVar][jVar] = 0.0;
+          val_Jacobian_j[iVar][jVar] = 0.0;
+        }
+      }
 
-      GetViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
-        std::sqrt(dist_ij_2), Area, UnitNormal, Proj_Flux_Tensor, val_Jacobian_i, val_Jacobian_j, config);
+      for(iVar = 0; iVar < nVar; ++iVar) {
+        for(jVar = 0; jVar < nVar; ++jVar) {
+          for(kVar = 0; kVar < nVar; ++kVar) {
+            val_Jacobian_i[iVar][jVar] += dFdVi[iVar][kVar]*dVdUi[kVar][jVar];
+            val_Jacobian_j[iVar][jVar] += dFdVj[iVar][kVar]*dVdUj[kVar][jVar];
+          }
+        }
       }
     }
+  }
+
+//MANGOTURB
+//
+//
+/*--- Build the closure for Jacobian tensor of viscous residaul ---*/
+//
+//
+void CAvgGradReactive_Boundary::SST_Reactive_JacobianClosure(su2double* UnitNormal,const Vec& Mean_PrimVar,const su2double  Mean_Turbolent_KE,
+                                                          const su2double Area, const su2double Mean_Eddy_Viscosity,const su2double dist_ij_2, AuxMatrix & dFdVi,
+                                                          AuxMatrix & dFdVj) {
+
+
+unsigned short iSpecies;
+su2double theta = std::inner_product(UnitNormal, UnitNormal + nDim, UnitNormal, 0.0);
+RealVec molar_masses = library->GetMolarMasses();
+su2double M_tot = std::accumulate(molar_masses.begin(),molar_masses.end(),0);
+su2double heat_flux_factor = Get_HeatFactor();
+su2double sqrt_dist_ij_2=std::sqrt(dist_ij_2);
+
+/*--- Compute Jacobian with respect to primitives: symmetric (UnitNormal sign independent) or dimensionwise dependent---*/
+if(nDim == 2) {
+  su2double thetax = theta + UnitNormal[0]*UnitNormal[0]/3.0;
+  su2double thetay = theta + UnitNormal[1]*UnitNormal[1]/3.0;
+
+  su2double etaz = UnitNormal[0]*UnitNormal[1]/3.0;
+
+  su2double pix = Mean_PrimVar[VX_INDEX_PRIM]*thetax + Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz;
+  su2double piy = Mean_PrimVar[VX_INDEX_PRIM]*etaz   + Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay;
+
+  /*--- Populate primitive Jacobian ---*/
+
+  // Momentum : Tau_Reynolds
+
+  // X-momentum
+  dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
+  dFdVi[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
+
+  dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*thetax/sqrt_dist_ij_2*Area;
+  dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+  dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] -= Mean_Eddy_Viscosity*thetax/sqrt_dist_ij_2*Area;
+  dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+
+  // Y-momentum
+  dFdVj[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
+  dFdVi[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
+
+  dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+  dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*thetay/sqrt_dist_ij_2*Area;
+  dFdVi[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] -= Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+  dFdVi[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*thetay/sqrt_dist_ij_2*Area;
+
+  // Energy : Tau_Reynolds
+  dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+  dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+  dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] -= pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+  dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+
+  //Energy: cpGradT
+  dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += heat_flux_factor*theta/sqrt_dist_ij_2*Area;
+  dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] -= heat_flux_factor*theta/sqrt_dist_ij_2*Area;
+
+
+  // Species: Fick's law partial densities
+  for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+
+  dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +iSpecies] +=
+  Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/Mean_PrimVar[RHO_INDEX_PRIM]*(M_tot/molar_masses[iSpecies])/sqrt_dist_ij_2*Area;
+
+  dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +iSpecies] -=
+  Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/Mean_PrimVar[RHO_INDEX_PRIM]*(M_tot/molar_masses[iSpecies])/sqrt_dist_ij_2*Area;
+
+  dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] +=
+  - Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(Mean_PrimVar[RHO_INDEX_PRIM]*Mean_PrimVar[RHO_INDEX_PRIM])*(M_tot/molar_masses[iSpecies])*
+                                theta*Mean_PrimVar[RHOS_INDEX_PRIM+iSpecies]/sqrt_dist_ij_2*Area;
+
+  dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] -=
+  - Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(Mean_PrimVar[RHO_INDEX_PRIM]*Mean_PrimVar[RHO_INDEX_PRIM])*(M_tot/molar_masses[iSpecies])*
+                                theta*Mean_PrimVar[RHOS_INDEX_PRIM+iSpecies]/sqrt_dist_ij_2*Area;
+  }
+
+
+} /*--- End onf nDim = 2 ---*/
+
+
+  else {
+    su2double thetax = theta + UnitNormal[0]*UnitNormal[0]/3.0;
+    su2double thetay = theta + UnitNormal[1]*UnitNormal[1]/3.0;
+    su2double thetaz = theta + UnitNormal[2]*UnitNormal[2]/3.0;
+
+    su2double etax = UnitNormal[1]*UnitNormal[2]/3.0;
+    su2double etay = UnitNormal[0]*UnitNormal[2]/3.0;
+    su2double etaz = UnitNormal[0]*UnitNormal[1]/3.0;
+
+    su2double pix = Mean_PrimVar[VX_INDEX_PRIM]*thetax + Mean_PrimVar[VX_INDEX_PRIM + 1]*etaz   +
+    Mean_PrimVar[VX_INDEX_PRIM + 2]*etay;
+    su2double piy = Mean_PrimVar[VX_INDEX_PRIM]*etaz   + Mean_PrimVar[VX_INDEX_PRIM + 1]*thetay +
+    Mean_PrimVar[VX_INDEX_PRIM + 2]*etax;
+    su2double piz = Mean_PrimVar[VX_INDEX_PRIM]*etay   + Mean_PrimVar[VX_INDEX_PRIM + 1]*etax   +
+    Mean_PrimVar[VX_INDEX_PRIM + 2]*thetaz;
+
+    /*--- Populate primitive Jacobian ---*/
+    // X-momentum
+    dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
+    dFdVi[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
+
+    dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*thetax/sqrt_dist_ij_2*Area;
+    dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+    dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 2] += Mean_Eddy_Viscosity*etay/sqrt_dist_ij_2*Area;
+    dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] -= Mean_Eddy_Viscosity*thetax/sqrt_dist_ij_2*Area;
+    dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+    dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 2] -= Mean_Eddy_Viscosity*etay/sqrt_dist_ij_2*Area;
+
+    // Y-momentum
+    dFdVj[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
+    dFdVi[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
+
+
+    dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+    dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*thetay/sqrt_dist_ij_2*Area;
+    dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 2] +=Mean_Eddy_Viscosity*etax/sqrt_dist_ij_2*Area;
+    dFdVi[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] -= Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
+    dFdVi[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*thetay/sqrt_dist_ij_2*Area;
+    dFdVi[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 2] -=Mean_Eddy_Viscosity*etax/sqrt_dist_ij_2*Area;
+
+    // Z-momentum
+    dFdVj[RHOVX_INDEX_SOL+2][RHO_INDEX_SOL] += -(2/3)*UnitNormal[2]*Mean_Turbolent_KE*Area;
+    dFdVi[RHOVX_INDEX_SOL+2][RHO_INDEX_SOL] += -(2/3)*UnitNormal[2]*Mean_Turbolent_KE*Area;
+
+
+    dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*etay/sqrt_dist_ij_2*Area;
+    dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*etax/sqrt_dist_ij_2*Area;
+    dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 2] +=Mean_Eddy_Viscosity*thetaz/sqrt_dist_ij_2*Area;
+    dFdVi[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL] -= Mean_Eddy_Viscosity*etay/sqrt_dist_ij_2*Area;
+    dFdVi[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*etax/sqrt_dist_ij_2*Area;
+    dFdVi[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 2] -=Mean_Eddy_Viscosity*thetaz/sqrt_dist_ij_2*Area;
+
+    // Energy
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 2] += piz*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+    dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] -= pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+    dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+    dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 2] -= piz*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+
+    // Species: Fick's law partial densities
+    for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+
+    dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +iSpecies] +=
+    Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/Mean_PrimVar[RHO_INDEX_PRIM]*(M_tot/molar_masses[iSpecies])/sqrt_dist_ij_2*Area;
+
+    dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +iSpecies] -=
+    Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/Mean_PrimVar[RHO_INDEX_PRIM]*(M_tot/molar_masses[iSpecies])/sqrt_dist_ij_2*Area;
+
+    dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] +=
+    - Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(Mean_PrimVar[RHO_INDEX_PRIM]*Mean_PrimVar[RHO_INDEX_PRIM])*(M_tot/molar_masses[iSpecies])*
+                                  theta*Mean_PrimVar[RHOS_INDEX_PRIM+iSpecies]/sqrt_dist_ij_2*Area;
+
+    dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] -=
+    - Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(Mean_PrimVar[RHO_INDEX_PRIM]*Mean_PrimVar[RHO_INDEX_PRIM])*(M_tot/molar_masses[iSpecies])*
+                                  theta*Mean_PrimVar[RHOS_INDEX_PRIM+iSpecies]/sqrt_dist_ij_2*Area;
+    }
+
+  } /*--- End of nDim = 3 ---*/
+
+  /*--- Common terms to both dimensional choice ---*/
+  su2double aux_sum = std::inner_product(Mean_PrimVar.data() + VX_INDEX_PRIM,Mean_PrimVar.data() + VX_INDEX_PRIM + nDim, UnitNormal ,0);
+  dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(aux_sum)*Area;
+}
 
 
 //MANGOTURB
@@ -1260,9 +1379,7 @@ void CAvgGradReactive_Boundary::SetLaminarTensorFlux(const Vec& val_primvar, con
 void CAvgGradReactive_Boundary::SetLaminarViscousProjJacs(const Vec& val_Mean_PrimVar, const su2double val_laminar_viscosity,
                                                    const su2double val_thermal_conductivity, const su2double val_alpha,
                                                    const Vec& val_grad_xs_norm, const Vec& val_diffusion_coeff,
-                                                   const su2double val_dist_ij, const su2double val_dS, su2double* val_normal,
-                                                   su2double* val_Proj_Visc_Flux, su2double** val_Proj_Jac_Tensor_i,
-                                                   su2double** val_Proj_Jac_Tensor_j, CConfig* config,
+                                                   const su2double val_dist_ij, const su2double val_dS, su2double* val_normal,CConfig* config,
                                                    AuxMatrix & dFdVi, AuxMatrix & dFdVj, AuxMatrix & dVdUi, AuxMatrix & dVdUj) {
 
   /*--- Indexes for iteration ---*/
@@ -1276,8 +1393,6 @@ void CAvgGradReactive_Boundary::SetLaminarViscousProjJacs(const Vec& val_Mean_Pr
   /*--- Set Jacobian matrixes to zero ---*/
   for(iVar = 0; iVar < nVar; ++iVar) {
     for(jVar = 0; jVar < nVar; ++jVar) {
-      val_Proj_Jac_Tensor_i[iVar][jVar] = 0.0;
-      val_Proj_Jac_Tensor_j[iVar][jVar] = 0.0;
       dFdVi[iVar][jVar] = 0.0;
       dFdVj[iVar][jVar] = 0.0;
       dVdUi[iVar][jVar] = 0.0;
@@ -1438,21 +1553,17 @@ void CAvgGradReactive_Boundary::SetLaminarViscousProjJacs(const Vec& val_Mean_Pr
     for(jVar = 0; jVar < nVar; ++jVar)
       dFdVi[iVar][jVar] = -dFdVj[iVar][jVar];
 
-  // Common terms
-  for(iDim = 0; iDim < nDim; ++iDim) {
-    dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*val_Proj_Visc_Flux[RHOVX_INDEX_SOL + iDim];
-    dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*val_Proj_Visc_Flux[RHOVX_INDEX_SOL + iDim];
-  }
+
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-    dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Proj_Visc_Flux[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
-    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*val_Proj_Visc_Flux[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
+    dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*Jd[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
+    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*Jd[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
   }
 
   // Unique terms
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
     dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] = -dJdr_j[iSpecies][0]*val_dS;
     dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] = -dJdr_i[iSpecies][0]*val_dS;
-    dFdVj[RHO_INDEX_SOL][RHO_INDEX_SOL] += dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL];
+    dFdVj[RHO_INDEX_SOL][RHO_INDEX_SOL] += dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL];/////????!?!?!??!?!?!?!WTF?!?!?!!?
     dFdVi[RHO_INDEX_SOL][RHO_INDEX_SOL] += dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL];
     dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -dJdr_j[iSpecies][0]*hs[iSpecies]*val_dS;
     dFdVi[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -dJdr_i[iSpecies][0]*hs[iSpecies]*val_dS;
@@ -1488,6 +1599,7 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
   limiter = config->GetViscous_Limiter_Flow();
 }
 
+//MANGOTURB
 //
 //
 /*--- Compute residual for the viscous part at interface between two nodes. ----*/
@@ -1573,30 +1685,86 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
     }
   }
 
-  Proj_Mean_GradPrimVar_Edge = Mean_GradPrimVar*Edge_Vector;
-  su2double dist_ij_2 = std::inner_product(Edge_Vector.data(), Edge_Vector.data() + Edge_Vector.size(), Edge_Vector.data(), 0.0);
-  if(dist_ij_2 > EPS) {
-    Diff_PrimVar[T_INDEX_AVGGRAD] = V_j[T_INDEX_PRIM] - V_i[T_INDEX_PRIM];
-    /*--- Difference of velocities ---*/
-    for(iDim = 0; iDim < nDim; ++iDim)
-      Diff_PrimVar[VX_INDEX_AVGGRAD + iDim] = V_j[VX_INDEX_PRIM + iDim] - V_i[VX_INDEX_PRIM + iDim];
-    /*--- Difference of mole fractions ---*/
-    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
-      Diff_PrimVar[RHOS_INDEX_AVGGRAD + iSpecies] = Xs_j[iSpecies] - Xs_i[iSpecies];
+Proj_Mean_GradPrimVar_Edge = Mean_GradPrimVar*Edge_Vector;
+su2double dist_ij_2 = std::inner_product(Edge_Vector.data(), Edge_Vector.data() + Edge_Vector.size(), Edge_Vector.data(), 0.0);
+if(dist_ij_2 > EPS) {
+  Diff_PrimVar[T_INDEX_AVGGRAD] = V_j[T_INDEX_PRIM] - V_i[T_INDEX_PRIM];
+  /*--- Difference of velocities ---*/
+  for(iDim = 0; iDim < nDim; ++iDim)
+  Diff_PrimVar[VX_INDEX_AVGGRAD + iDim] = V_j[VX_INDEX_PRIM + iDim] - V_i[VX_INDEX_PRIM + iDim];
+  /*--- Difference of mole fractions ---*/
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+  Diff_PrimVar[RHOS_INDEX_AVGGRAD + iSpecies] = Xs_j[iSpecies] - Xs_i[iSpecies];
 
-    Mean_GradPrimVar -= (Proj_Mean_GradPrimVar_Edge - Diff_PrimVar)*Edge_Vector.transpose()/dist_ij_2;
+  Mean_GradPrimVar -= (Proj_Mean_GradPrimVar_Edge - Diff_PrimVar)*Edge_Vector.transpose()/dist_ij_2;
+}
+else
+throw std::runtime_error("Error: You are trying to compute flux between a node and itself");
+
+//MANGOTURB_init
+/*--- Set the laminar component of viscous residual tensor ---*/
+SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
+  Mean_Laminar_Viscosity, Mean_Thermal_Conductivity,
+  Mean_Dij,config);
+
+  if (config->GetKind_Turb_Model() == SST){
+
+    /*--- Local turbolent variables ---*/
+    su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
+    Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
+    Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
+
+    /*--- Reynolds stress tensor (Boussinesq approximation) ---*/
+    unsigned short div_vel(0.0);
+    unsigned short rho(Mean_PrimVar[RHO_INDEX_PRIM]);
+
+    for(unsigned short iDim = 0; iDim < nDim; ++iDim)
+    div_vel += Mean_GradPrimVar(VX_INDEX_AVGGRAD + iDim,iDim);
+
+    RealMatrix tau_turb(nDim,nDim);
+    tau_turb.setZero();
+    for( iDim = 0; iDim < nDim; ++iDim) {
+      for( jDim = 0; jDim < nDim; ++jDim)
+      tau_turb(iDim,jDim) += Mean_Eddy_Viscosity*(Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) + Mean_GradPrimVar(VX_INDEX_AVGGRAD + iDim,jDim));
+      tau_turb(iDim,iDim) -= TWO3*( Mean_Eddy_Viscosity*div_vel + Mean_Turbolent_KE*rho);
+    }
+
+
+    /*--- Closure for Energy: simplest one cpGradT---*/
+    su2double heat_flux_factor = Get_HeatFactor();
+
+    for( iDim = 0; iDim < nDim; ++iDim) {
+
+      for( jDim = 0; jDim < nDim; ++jDim) {
+
+        /*--- Tau_Re closure for Momentum and Energy using simplest closure for energy : cpGradT --*/
+        Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim] += tau_turb(iDim,jDim);
+        Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau_turb(iDim,jDim)*Mean_PrimVar[VX_INDEX_PRIM + jDim] + heat_flux_factor*Mean_GradPrimVar(T_INDEX_AVGGRAD);
+      }
+
+      /*--- Closure for species using molar fractions as approximation ---*/
+      for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+        Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lew_Turb)*
+        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies) * Normal[iDim];
+      }
+
+    }
+
   }
-  else
-    throw std::runtime_error("Error: You are trying to compute flux between a node and itself");
+  /*--- Projected flux for momentum and second contribution for energy ---*/
+  for( iDim = 0; iDim < nDim; ++iDim) {
+    for( iVar = RHOVX_INDEX_SOL; iVar < RHOVX_INDEX_SOL + nDim; ++iVar)
+    Proj_Flux_Tensor[iVar] += Flux_Tensor[iVar][iDim]*Normal[iDim];
+    Proj_Flux_Tensor[RHOE_INDEX_SOL] += Flux_Tensor[RHOE_INDEX_SOL][iDim]*Normal[iDim];
+  }
+  //MANGOTURB-end
 
-  /*--- Get projected flux tensor ---*/
-  GetViscousProjFlux(Mean_PrimVar, Mean_GradPrimVar, Normal, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, Mean_Dij, config);
 
-	/*--- Update viscous residual with the species projected flux ---*/
+  /*--- Update viscous residual with the species projected flux ---*/
   std::copy(Proj_Flux_Tensor, Proj_Flux_Tensor + nVar, val_residual);
 
-	/*--- Implicit part ---*/
-	if(implicit) {
+  /*--- Implicit part ---*/
+  if(implicit) {
     su2double denom_i, denom_j;
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
       denom_i = denom_j = 0.0;
@@ -1633,9 +1801,11 @@ void CAvgGradReactive_Flow::ComputeResidual(su2double* val_residual, su2double**
     Grad_Xs_norm /= Area;
 
     GetViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
-                       std::sqrt(dist_ij_2), Area, UnitNormal, Proj_Flux_Tensor, val_Jacobian_i, val_Jacobian_j, config);
+                        std::sqrt(dist_ij_2), Area, UnitNormal, Proj_Flux_Tensor, val_Jacobian_i, val_Jacobian_j, config);
+    }
   }
-}
+
+
 
 //
 //

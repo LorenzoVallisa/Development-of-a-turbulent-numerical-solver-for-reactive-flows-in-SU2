@@ -3,6 +3,7 @@
 
 #include "numerics_structure.hpp"
 #include "variable_reactive.hpp"
+#include <numeric>
 
 /*!
  * \class CUpwReactiveAUSM
@@ -198,6 +199,21 @@ public:
                                                     const su2double & val_viscosity, const su2double & val_thermal_conductivity,
                                                     const RealMatrix& val_Dij, CConfig* config);
 
+  //MANGOTURB
+  /*!
+  * \brief /*--- Build the closure for Jacobian tensor of viscous residaul ---*
+  * \param[in] Mean_PrimVar - Primitive variables.
+  * \param[in] Mean_Turbolent_KE - Turbolent kinetic energy
+  * \param[in] UnitNormal - Normal vector, the norm of the vector is the area of the face.
+  * \param[in] Mean_Eddy_Viscosity - Turbolent viscosity.
+  * \param[in] dist_ij_2 - Nodes distance
+  * \param[in] dFdVi - Auxiliary matrix
+  * \param[in] dFdVj -  Auxiliary matrix
+  */
+  void SST_Reactive_JacobianClosure(su2double* UnitNormal,const Vec& Mean_PrimVar,const su2double  Mean_Turbolent_KE,
+                                                            const su2double Area, const su2double Mean_Eddy_Viscosity,const su2double dist_ij_2, AuxMatrix & dFdVi,
+                                                            AuxMatrix & dFdVj);
+
   /*!
    * \brief Set the Gradient of primitives for computing residual
    * \param[in] val_nvar - Index of desired variable
@@ -275,6 +291,7 @@ protected:
                           su2double** val_Proj_Jac_Tensor_i, su2double** val_Proj_Jac_Tensor_j, CConfig* config);
 
 
+  //MANGOTURB
   /*!
    * \brief Approximation of Viscous NS Jacobians in Thermochemical Non Equilibrium.
    * \param[in] val_Mean_PrimVar - Mean value of the primitive variables.
@@ -291,13 +308,20 @@ protected:
    * \param[out] val_Proj_Jac_Tensor_j - Pointer to the projected viscous Jacobian at point j.
    * \param[in] config - Definition of the particular problem
   */
-void SetLaminarViscousProjJacs(const Vec& val_Mean_PrimVar, const su2double val_laminar_viscosity,
+  void SetLaminarViscousProjJacs(const Vec& val_Mean_PrimVar, const su2double val_laminar_viscosity,
                                const su2double val_thermal_conductivity, const su2double val_alpha,
                                const Vec& val_grad_xs_norm, const Vec& val_diffusion_coeff,
                                const su2double val_dist_ij, const su2double val_dS, su2double* val_normal,
-                               su2double* val_Proj_Visc_Flux, su2double** val_Proj_Jac_Tensor_i,
-                               su2double** val_Proj_Jac_Tensor_j, CConfig* config, const Vec& val_Mean_GradPrimVar,
-                               AuxMatrix & dFdVi, AuxMatrix & dFdVj, AuxMatrix & dVdUi, AuxMatrix & dVdUj);
+                               CConfig* config, AuxMatrix & dFdVi, AuxMatrix & dFdVj, AuxMatrix & dVdUi, AuxMatrix & dVdUj);
+   //MANGOTURB
+   /*!
+   * \brief Return heat flux factor for turbolent closure.
+   */
+   su2double Get_HeatFactor(){
+
+     return ((Gamma / Gamma_Minus_One) * Gas_Constant) * (Mean_Laminar_Viscosity/Prandtl_Lam + Mean_Eddy_Viscosity/Prandtl_Turb);
+
+   }
 
   /*!
    * \brief Compute the diffusive flux along a certain direction

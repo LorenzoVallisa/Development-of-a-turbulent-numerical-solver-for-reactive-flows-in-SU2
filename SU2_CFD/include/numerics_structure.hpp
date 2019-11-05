@@ -70,6 +70,8 @@ protected:
   su2double C_mu;  /*!< \brief Turbulent constant. */
   //MANGOTURB
   su2double omega_turb; /*!< \brief Auxiliary variable needed for chemistry source closure. */
+  //MANGOTURB
+  su2double Lewis_Turb; /*!< \brief Auxiliary variable needed for chemistry source closure. */
 
 public:
 
