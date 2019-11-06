@@ -450,12 +450,12 @@ void CAvgGradReactive_Boundary::Solve_SM(const su2double val_density, const su2d
   su2double alpha = val_alpha;
 
   /*--- Compute original matrix of Stefan-Maxwell equations ---*/
-  Gamma = library->GetGamma(rho, val_xs, val_ys, val_Dij);
+  Gamma_Mat = library->GetGamma(rho, val_xs, val_ys, val_Dij);
 
   /*--- Add artificial diffusion part ---*/
   for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
     for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
-      Gamma_tilde(iSpecies,jSpecies) = Gamma(iSpecies,jSpecies) + alpha*val_ys[iSpecies];
+      Gamma_tilde(iSpecies,jSpecies) = Gamma_Mat(iSpecies,jSpecies) + alpha*val_ys[iSpecies];
 
   Eigen::BiCGSTAB<RealMatrix> bicg(Gamma_tilde);
   bicg.setTolerance(toll);
@@ -520,7 +520,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
     Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
 
-    SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity, Mean_Turbolent_KE);
+    SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity,Mean_Turbolent_KE,Mean_Laminar_Viscosity);
 
   }
 
@@ -583,14 +583,14 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     //MANGOTURB
     /*--- Build auxiliary matrices for jacobian components ---*/
     AuxMatrix dFdVi(nVar,RealVec(nVar));
-    AuxMatrix dFVj(nVar,RealVec(nVar));
+    AuxMatrix dFdVj(nVar,RealVec(nVar));
     AuxMatrix dVdUi(nVar,RealVec(nVar));
     AuxMatrix dVdUj(nVar,RealVec(nVar));
 
 
     /*--- Compute laminar jacobian components ---*/
     SetLaminarViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
-      std::sqrt(dist_ij_2), Area, UnitNormal, config, dFdVi, dFVj, dVdUi, dVdUj);
+      std::sqrt(dist_ij_2), Area, UnitNormal, config, dFdVi, dFdVj, dVdUi, dVdUj);
 
     /*--- Add turbolent jacobian closure ---*/
     if (config->GetKind_Turb_Model() == SST){
@@ -600,11 +600,11 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
       Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
       Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
 
-      SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFVj)
+      SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity);
 
     }
 
-      unsigned short iDim,iVar,jVar;
+      unsigned short iDim,iVar,jVar,kVar;
       /*--- Common terms: Proj_Flux_Tensor, if turbolence is active, contains Reynolds stress tensor as well ---*/
       for(iDim = 0; iDim < nDim; ++iDim) {
         dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*Proj_Flux_Tensor[RHOVX_INDEX_SOL + iDim];
@@ -637,7 +637,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
 //
 //
 void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_PrimVar, const Vec& Mean_GradPrimVar, su2double* Normal,
-                                                              const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE){
+                                                              const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,const su2double Mean_Laminar_Viscosity){
 
 
     /*--- Reynolds stress tensor (Boussinesq approximation) ---*/
@@ -653,12 +653,12 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
     for( iDim = 0; iDim < nDim; ++iDim) {
       for( jDim = 0; jDim < nDim; ++jDim)
       tau_turb(iDim,jDim) += Mean_Eddy_Viscosity*(Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) + Mean_GradPrimVar(VX_INDEX_AVGGRAD + iDim,jDim));
-      tau_turb(iDim,iDim) -= TWO3*( Mean_Eddy_Viscosity*div_vel + Mean_Turbolent_KE*rho);
+    tau_turb(iDim,iDim) -= TWO3*( Mean_Eddy_Viscosity*div_vel + Mean_Turbolent_KE*rho);
     }
 
 
     /*--- Closure for Energy: simplest one cpGradT---*/
-    su2double heat_flux_factor = Get_HeatFactor();
+    su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,Mean_Laminar_Viscosity);
 
     for( iDim = 0; iDim < nDim; ++iDim) {
 
@@ -666,13 +666,15 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
 
         /*--- Tau_Re closure for Momentum and Energy using simplest closure for energy : cpGradT --*/
         Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim] += tau_turb(iDim,jDim);
-        Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau_turb(iDim,jDim)*Mean_PrimVar[VX_INDEX_PRIM + jDim] + heat_flux_factor*Mean_GradPrimVar(T_INDEX_AVGGRAD);
+        Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau_turb(iDim,jDim)*Mean_PrimVar[VX_INDEX_PRIM + jDim];
       }
+
+        Flux_Tensor[RHOE_INDEX_SOL][iDim] += heat_flux_factor*Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim);
 
       /*--- Closure for species using molar fractions as approximation ---*/
       for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
         Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*
-        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies) * Normal[iDim];
+        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) * Normal[iDim];
       }
 
     }
@@ -691,14 +693,14 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
 //
 void CAvgGradReactive_Boundary::SST_Reactive_JacobianClosure(su2double* UnitNormal,const Vec& Mean_PrimVar,const su2double  Mean_Turbolent_KE,
                                                           const su2double Area, const su2double Mean_Eddy_Viscosity,const su2double dist_ij_2, AuxMatrix & dFdVi,
-                                                          AuxMatrix & dFdVj) {
+                                                          AuxMatrix & dFdVj,const su2double Mean_Laminar_Viscosity) {
 
 
 unsigned short iSpecies;
 su2double theta = std::inner_product(UnitNormal, UnitNormal + nDim, UnitNormal, 0.0);
 RealVec molar_masses = library->GetMolarMasses();
-su2double M_tot = std::accumulate(molar_masses.begin(),molar_masses.end(),0);
-su2double heat_flux_factor = Get_HeatFactor();
+su2double M_tot = std::accumulate(molar_masses.begin(),molar_masses.end(),0.0);
+su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,Mean_Laminar_Viscosity);
 su2double sqrt_dist_ij_2=std::sqrt(dist_ij_2);
 
 /*--- Compute Jacobian with respect to primitives: symmetric (UnitNormal sign independent) or dimensionwise dependent---*/
@@ -847,7 +849,7 @@ if(nDim == 2) {
   } /*--- End of nDim = 3 ---*/
 
   /*--- Common terms to both dimensional choice ---*/
-  su2double aux_sum = std::inner_product(Mean_PrimVar.data() + VX_INDEX_PRIM,Mean_PrimVar.data() + VX_INDEX_PRIM + nDim, UnitNormal ,0);
+  su2double aux_sum = std::inner_product(Mean_PrimVar.data() + VX_INDEX_PRIM,Mean_PrimVar.data() + VX_INDEX_PRIM + nDim, UnitNormal ,0.0);
   dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(aux_sum)*Area;
 }
 
@@ -1295,7 +1297,7 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
     Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
 
-    SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity, Mean_Turbolent_KE);
+    SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity, Mean_Turbolent_KE,Mean_Laminar_Viscosity);
 
   }
 
@@ -1350,14 +1352,14 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     //MANGOTURB
     /*--- Build auxiliary matrices for jacobian components ---*/
     AuxMatrix dFdVi(nVar,RealVec(nVar));
-    AuxMatrix dFVj(nVar,RealVec(nVar));
+    AuxMatrix dFdVj(nVar,RealVec(nVar));
     AuxMatrix dVdUi(nVar,RealVec(nVar));
     AuxMatrix dVdUj(nVar,RealVec(nVar));
 
 
     /*--- Compute laminar jacobian components ---*/
     SetLaminarViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
-      std::sqrt(dist_ij_2), Area, UnitNormal, config, dFdVi, dFVj, dVdUi, dVdUj);
+      std::sqrt(dist_ij_2), Area, UnitNormal, config, dFdVi, dFdVj, dVdUi, dVdUj);
 
       /*--- Add turbolent jacobian closure ---*/
       if (config->GetKind_Turb_Model() == SST){
@@ -1367,11 +1369,11 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
         Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
         Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
 
-        SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFVj)
+        SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity);
 
       }
 
-      unsigned short iDim,iVar,jVar;
+      unsigned short iDim,iVar,jVar,kVar;
       /*--- Common terms: Proj_Flux_Tensor, if turbolence is active, contains Reynolds stress tensor as well ---*/
       for(iDim = 0; iDim < nDim; ++iDim) {
         dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + iDim] += 0.5*Proj_Flux_Tensor[RHOVX_INDEX_SOL + iDim];

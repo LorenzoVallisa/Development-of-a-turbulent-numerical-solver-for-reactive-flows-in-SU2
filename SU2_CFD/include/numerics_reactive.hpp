@@ -131,7 +131,7 @@ protected:
              Dij_j,             /*!< \brief Binary diffusion coefficients at point j. */
              Mean_Dij;          /*!< \brief Harmonic average of binary diffusion coefficients at point i and j. */
 
-  RealMatrix Gamma,
+  RealMatrix Gamma_Mat,
              Gamma_tilde;  /*!< \brief Auxiliary matrices for solving Stefan-Maxwell equations. */
 
   RealVec hs,                   /*!< \brief Auxiliary vector to store partial enthalpy for species diffusion flux contribution. */
@@ -212,7 +212,7 @@ public:
   */
   void SST_Reactive_JacobianClosure(su2double* UnitNormal,const Vec& Mean_PrimVar,const su2double  Mean_Turbolent_KE,
                                                             const su2double Area, const su2double Mean_Eddy_Viscosity,const su2double dist_ij_2, AuxMatrix & dFdVi,
-                                                            AuxMatrix & dFdVj);
+                                                            AuxMatrix & dFdVj, const su2double Mean_Laminar_Viscosity);
 
 
 
@@ -226,7 +226,7 @@ public:
   * \param[in] Mean_Eddy_Viscosity - Turbolent viscosity.
   */
   void SST_Reactive_ResidualClosure(const Vec& Mean_PrimVar, const Vec& Mean_GradPrimVar, su2double* Normal,
-                                                                const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE);
+                                                                const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,const su2double Mean_Laminar_Viscosity);
 
 
   /*!
@@ -283,9 +283,9 @@ protected:
    /*!
    * \brief Return heat flux factor for turbolent closure.
    */
-   su2double Get_HeatFactor(){
+   inline su2double Get_HeatFactor(const su2double eddy_visc, const su2double lam_visc){
 
-     return ((Gamma / Gamma_Minus_One) * Gas_Constant) * (Mean_Laminar_Viscosity/Prandtl_Lam + Mean_Eddy_Viscosity/Prandtl_Turb);
+     return (Gamma/Gamma_Minus_One)*Gas_Constant*(lam_visc/Prandtl_Lam + eddy_visc/Prandtl_Turb);
 
    }
 

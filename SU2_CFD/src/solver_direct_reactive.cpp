@@ -4799,7 +4799,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
 /*--- Compute viscous residual at each interface. ---*/
 //
 //
-void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution_container, CNumerics* numerics,
+void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solver_container, CNumerics* numerics,
                                          CConfig *config, unsigned short iMesh, unsigned short iRKStep) {
   /*--- Local variables ---*/
 	unsigned long iPoint, jPoint, iEdge;
@@ -4841,7 +4841,7 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solution
                                   solver_container[TURB_SOL]->node[iPoint]->GetSolution(1),
                                   solver_container[TURB_SOL]->node[jPoint]->GetSolution(0)*(node[jPoint]->GetPrimitive()[RHO_INDEX_PRIM])/
                                   solver_container[TURB_SOL]->node[jPoint]->GetSolution(1));
-
+    }
     /*--- Compute the residual ---*/
     numerics->ComputeResidual(Res_Visc, Jacobian_i, Jacobian_j, config);
 
