@@ -509,7 +509,7 @@ void CMeanFlowIteration::Iterate(COutput *output,
   /*--- Update global parameters ---*/
 
   switch( config_container[val_iZone]->GetKind_Solver() ) {
-
+  
     case EULER: case DISC_ADJ_EULER:
       config_container[val_iZone]->SetGlobalParam(EULER, RUNTIME_FLOW_SYS, ExtIter); break;
 
@@ -517,7 +517,7 @@ void CMeanFlowIteration::Iterate(COutput *output,
       config_container[val_iZone]->SetGlobalParam(NAVIER_STOKES, RUNTIME_FLOW_SYS, ExtIter); break;
 
     case RANS: case DISC_ADJ_RANS:
-      config_container[val_iZone]->SetGlobalParam(RANS, RUNTIME_FLOW_SYS, ExtIter); break;
+      config_container[val_iZone]->SetGlobalParam(RANS, RUNTIME_REACTIVE_SYS, ExtIter); break;
 
     /*--- NOTE: Reactive simulations additions ---*/
     case REACTIVE_EULER:

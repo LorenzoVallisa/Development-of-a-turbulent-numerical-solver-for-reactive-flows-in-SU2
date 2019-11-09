@@ -704,6 +704,8 @@ private:
   Temperature_ve_FreeStream,  /*!< \brief Total vibrational-electronic temperature of the fluid.  */
   *MassFrac_FreeStream, /*!< \brief Mixture mass fractions of the fluid. */
   Prandtl_Lam,      /*!< \brief Laminar Prandtl number for the gas.  */
+  Lewis_Turb,       /*!< \brief Turbolent Lewis number for the gas.  */
+  C_mu,             /*!< \brief Beta Star coefficient.  */
   Prandtl_Turb,     /*!< \brief Turbulent Prandtl number for the gas.  */
   Length_Ref,       /*!< \brief Reference length for non-dimensionalization. */
   Pressure_Ref,     /*!< \brief Reference pressure for non-dimensionalization.  */
@@ -1689,6 +1691,18 @@ public:
    * \return Laminar Prandtl number.
    */
   su2double GetPrandtl_Lam(void);
+
+  /*!
+   * \brief Get the value of the turbolent Lewis number.
+   * \return turbolent Lewis number.
+   */
+  su2double GetLewis_Turb(void);
+
+  /*!
+   * \brief Get the value of the beta star coefficient.
+   * \beta star coefficient.
+   */
+  su2double Get_Cmu(void);
 
   /*!
    * \brief Get the value of the turbulent Prandtl number.

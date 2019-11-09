@@ -391,6 +391,12 @@ CAvgGradReactive_Boundary::CAvgGradReactive_Boundary(unsigned short val_nDim, un
   nPrimVar = nSpecies + nDim + 5;
   nPrimVarAvgGrad = nSpecies + nDim + 1;
 
+  if (config->GetKind_Turb_Model() == SST){
+
+    Lewis_Turb = config -> GetLewis_Turb();
+
+  }
+
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
 
   /*--- Set local variables to access indices in proper arrays ---*/
@@ -626,6 +632,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
           }
         }
       }
+
     }
   }
 
@@ -658,7 +665,7 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
 
 
     /*--- Closure for Energy: simplest one cpGradT---*/
-    su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,Mean_Laminar_Viscosity);
+    su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity);
 
     for( iDim = 0; iDim < nDim; ++iDim) {
 
@@ -700,7 +707,7 @@ unsigned short iSpecies;
 su2double theta = std::inner_product(UnitNormal, UnitNormal + nDim, UnitNormal, 0.0);
 RealVec molar_masses = library->GetMolarMasses();
 su2double M_tot = std::accumulate(molar_masses.begin(),molar_masses.end(),0.0);
-su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,Mean_Laminar_Viscosity);
+su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity);
 su2double sqrt_dist_ij_2=std::sqrt(dist_ij_2);
 
 /*--- Compute Jacobian with respect to primitives: symmetric (UnitNormal sign independent) or dimensionwise dependent---*/
@@ -1138,10 +1145,9 @@ void CAvgGradReactive_Boundary::SetLaminarViscousProjJacs(const Vec& val_Mean_Pr
     for(jVar = 0; jVar < nVar; ++jVar)
       dFdVi[iVar][jVar] = -dFdVj[iVar][jVar];
 
-
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-    dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*Jd[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
-    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*Jd[RHOS_INDEX_SOL + iSpecies]*Cps[iSpecies];
+    dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*Jd(iSpecies)*Cps[iSpecies];
+    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*Jd(iSpecies)*Cps[iSpecies];
   }
 
   // Unique terms
@@ -1349,6 +1355,7 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
 
     /*--- Compute normal gradient of mole fractions ---*/
     Grad_Xs_norm /= Area;
+
     //MANGOTURB
     /*--- Build auxiliary matrices for jacobian components ---*/
     AuxMatrix dFdVi(nVar,RealVec(nVar));
@@ -1360,6 +1367,7 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     /*--- Compute laminar jacobian components ---*/
     SetLaminarViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
       std::sqrt(dist_ij_2), Area, UnitNormal, config, dFdVi, dFdVj, dVdUi, dVdUj);
+
 
       /*--- Add turbolent jacobian closure ---*/
       if (config->GetKind_Turb_Model() == SST){
@@ -1407,6 +1415,13 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
 CSourceReactive::CSourceReactive(unsigned short val_nDim, unsigned short val_nVar, CConfig* config, LibraryPtr lib_ptr):
                  CNumerics(val_nDim, val_nVar, config), library(lib_ptr), nSpecies(library->GetnSpecies()) {
   implicit = (config->GetKind_TimeIntScheme_Flow() == EULER_IMPLICIT);
+
+  if (config->GetKind_Turb_Model() == SST){
+
+    C_mu = config -> Get_Cmu();
+
+  }
+
 
   /*--- Set local variables to access indices in proper arrays ---*/
   T_INDEX_PRIM    = CReactiveEulerVariable::GetT_INDEX_PRIM();

@@ -281,11 +281,11 @@ protected:
                                CConfig* config, AuxMatrix & dFdVi, AuxMatrix & dFdVj, AuxMatrix & dVdUi, AuxMatrix & dVdUj);
    //MANGOTURB
    /*!
-   * \brief Return heat flux factor for turbolent closure.
+   * \brief Return heat flux factor for only turbolent closure, since laminar one already implemented in SetLaminarTensorFlux.
    */
-   inline su2double Get_HeatFactor(const su2double eddy_visc, const su2double lam_visc){
+   inline su2double Get_HeatFactor(const su2double eddy_visc){
 
-     return (Gamma/Gamma_Minus_One)*Gas_Constant*(lam_visc/Prandtl_Lam + eddy_visc/Prandtl_Turb);
+     return (Gamma/Gamma_Minus_One)*Gas_Constant*(eddy_visc/Prandtl_Turb);
 
    }
 

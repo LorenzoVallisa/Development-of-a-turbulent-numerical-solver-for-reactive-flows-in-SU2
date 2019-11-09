@@ -40,6 +40,7 @@ protected:
   RealVec dTdYs,            /*!< \brief Auxiliary vector for temperature derivatives w.r.t partial densities. */
           dPdYs;            /*!< \brief Auxiliary vector for pressure derivatives w.r.t partial densities. */
 
+
   /**
    * Mapping between the primitive variable name and its position in the physical data
    */
@@ -438,6 +439,13 @@ public:
    */
   bool SetPrimVar(CConfig* config) override;
 
+  //MANGOTURB
+  /*!
+   * \brief Set all the primitive variables for compressible flows.
+   * \param[in] config - Configuration of the particular problem.
+   */
+  bool SetPrimVar(CConfig* config,su2double val_ke) override;
+
   /*!
    * \brief Set all the primitive variables form conserved variables.
    * \param[in] config - Configuration of the particular problem.
@@ -445,6 +453,15 @@ public:
    * \param[in] V - Storage of primitive variables.
    */
   bool Cons2PrimVar(CConfig* config, su2double* U, su2double* V);
+
+  //MANGOTURB
+  /*!
+   * \brief Set all the primitive variables form conserved variables.
+   * \param[in] config - Configuration of the particular problem.
+   * \param[in] U - Storage of conservative variables.
+   * \param[in] V - Storage of primitive variables.
+   */
+  bool Cons2PrimVar(CConfig* config, su2double* U, su2double* V,su2double val_ke);
 
   /*!
    * \brief Set all the conserved variables from primitive variables.
@@ -643,6 +660,12 @@ protected:
   su2double  Thermal_Conductivity;   /*!< \brief Thermal conductivity of the gas mixture. */
   RealMatrix Diffusion_Coeffs;      /*!< \brief Binary diffusion coefficients of the mixture. */
 
+  //MANGOTURB
+  su2double Eddy_Viscosity;
+  su2double* Vorticity;
+  su2double StrainMag;
+
+
 public:
   static unsigned short RHOS_INDEX_GRAD; /*!< \brief Index for position of mole fractions in primitives gradient. */
 
@@ -718,6 +741,23 @@ public:
                       unsigned short val_nSpecies, unsigned short val_nprimvar, unsigned short val_nprimvargrad,
                       unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
+
+  //MANGOTURB
+  bool SetVorticity(bool val_limiter);
+
+  //MANGOTURB
+  bool SetStrainMag(bool val_limiter);
+
+  //MANGOTURB
+  su2double* GetVorticity()const {
+    return Vorticity;
+  }
+
+  //MANGOTURB
+  su2double GetStrainMag()const{
+    return StrainMag;
+  }
+
   /*!
 	 * \brief Destructor of the class.
 	 */
@@ -736,6 +776,24 @@ public:
    * \param[in] config - Configuration of the particular problem.
    */
   bool SetPrimVar(CConfig* config) override;
+
+  //MANGOTURB
+  /*!
+   * \brief Set all primitive variables and transport properties for compressible flows.
+   * \param[in] config - Configuration of the particular problem.
+   */
+  bool SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke)override;
+
+
+  //MANGOTURB
+  inline void SetEddyViscosity( const su2double eddy ){
+    Eddy_Viscosity=eddy;
+  }
+
+  //MANGOTURB
+  inline su2double GetEddyViscosity(void)const{
+    return Eddy_Viscosity;
+  }
 
   /*!
    * \brief Get the laminar viscosity of the mixture.

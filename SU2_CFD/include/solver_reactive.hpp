@@ -3,6 +3,7 @@
 
 #include "solver_structure.hpp"
 #include "variable_reactive.hpp"
+#include <iostream>
 
 /*! \class CReactiveEulerSolver
  *  \brief Main class for defining a solver for multispecies (chemically reacting or not) inviscid flows.
@@ -69,6 +70,8 @@ protected:
                  P_INDEX_PRIM, RHO_INDEX_PRIM,
                  H_INDEX_PRIM, A_INDEX_PRIM,
                  RHOS_INDEX_PRIM;               /*!< \brief Mapping for position in primitives array. */
+  //MANGOTURB
+  su2double Eddy_Viscosity;
 
   unsigned short RHO_INDEX_SOL, RHOVX_INDEX_SOL,
                  RHOE_INDEX_SOL, RHOS_INDEX_SOL; /*!< \brief Mapping for position in conserved array. */
@@ -403,8 +406,14 @@ protected:
           Xs_j,       /*!< \brief Auxiliary vectors to store mole fractions at node j. */
           Xs;         /*!< \brief Auxiliary vector to store mole fractions. */
 
+  //MANGOTURB
+  su2double Tke_Inf;
+  su2double Prandtl_Turb;
+  su2double StrainMag_Max,Omega_Max;
+
 protected:
   unsigned short RHOS_INDEX_GRAD; /*!< \brief Index for position of mole fractions in primitive gradient. */
+
 
 public:
   /*!
@@ -431,6 +440,15 @@ public:
    * \param[in] config - Definition of the particular problem.
    */
    void SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* config) override;
+
+   //MANGOTURB
+   su2double GetTke_Inf(void) { return Tke_Inf; }
+
+   //MANGOTURB
+   void SetStrainMag_Max(su2double val_strainmag_max) { StrainMag_Max = val_strainmag_max; }
+
+   //MANGOTURB
+   void SetOmega_Max(su2double val_omega_max) { Omega_Max = val_omega_max; }
 
   /*!
    * \brief Set the gradient of primitive variables using weighted least squares.

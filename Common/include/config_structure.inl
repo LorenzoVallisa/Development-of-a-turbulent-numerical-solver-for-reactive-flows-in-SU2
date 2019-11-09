@@ -367,6 +367,10 @@ inline su2double CConfig::GetTemperature_ve_FreeStream(void) { return Temperatur
 
 inline su2double CConfig::GetPrandtl_Lam(void) { return Prandtl_Lam; }
 
+inline su2double CConfig::GetLewis_Turb(void) { return Lewis_Turb; }
+
+inline su2double CConfig::Get_Cmu(void) { return C_mu; }
+
 inline su2double CConfig::GetPrandtl_Turb(void) { return Prandtl_Turb; }
 
 inline su2double CConfig::GetLength_Ref(void) { return Length_Ref; }

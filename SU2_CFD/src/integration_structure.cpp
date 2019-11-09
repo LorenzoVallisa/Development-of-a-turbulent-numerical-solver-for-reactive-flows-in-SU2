@@ -74,13 +74,13 @@ void CIntegration::Space_Integration(CGeometry *geometry,
   }
 
   /*--- Compute viscous residuals ---*/
-
+  std::cout<< " integration_sturcture -> Sono nello step di Space Integration:prima viscous"<<std::endl;
   solver_container[MainSolver]->Viscous_Residual(geometry, solver_container, numerics[VISC_TERM], config, iMesh, iRKStep);
 
 
 
   /*--- Compute source term residuals ---*/
-
+  std::cout<< " integration_sturcture -> Sono nello step di Space Integration:prima source"<<std::endl;
   solver_container[MainSolver]->Source_Residual(geometry, solver_container, numerics[SOURCE_FIRST_TERM], numerics[SOURCE_SECOND_TERM], config, iMesh);
 
   /*--- Add viscous and convective residuals, and compute the Dual Time Source term ---*/

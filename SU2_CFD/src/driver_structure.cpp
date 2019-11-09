@@ -2726,9 +2726,10 @@ void CDriver::PreprocessExtIter(unsigned long ExtIter) {
     }
   }
 
-  /*--- NOTE: Set initial condition in case of restart multispecies simulation ---*/
+  /*--- MANGOTURB: Set initial condition in case of restart multispecies simulation for turbulent solver too ---*/
   if(!fsi && (config_container[ZONE_0]->GetKind_Solver() == REACTIVE_EULER ||
-              config_container[ZONE_0]->GetKind_Solver() == REACTIVE_NAVIER_STOKES)) {
+              config_container[ZONE_0]->GetKind_Solver() == REACTIVE_NAVIER_STOKES ||
+              (config_container[ZONE_0]->GetKind_Solver() ==  RANS) ) )  {
     for(iZone = 0; iZone < nZone; ++iZone)
       solver_container[iZone][MESH_0][FLOW_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
                                                                        config_container[iZone], ExtIter);

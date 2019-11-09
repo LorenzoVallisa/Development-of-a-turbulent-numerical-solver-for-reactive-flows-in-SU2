@@ -698,6 +698,10 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   addDoubleOption("PRANDTL_LAM", Prandtl_Lam, 0.72);
   /*!\brief PRANDTL_TURB \n DESCRIPTION: Turbulent Prandtl number (0.9 (air), only for compressible flows) \n DEFAULT 0.90 \ingroup Config*/
   addDoubleOption("PRANDTL_TURB", Prandtl_Turb, 0.90);
+  /*!\brief LEWIS_TURB \n DESCRIPTION: Turbulent Lewis number (1.2 (air), only for compressible flows) \n DEFAULT 1.20 \ingroup Config*/
+  addDoubleOption("LEWIS_TURB", Lewis_Turb, 1.20);
+  /*!\brief C_mu \n DESCRIPTION: Beta Star Coefficient (0.09)), only for compressible flows) \n DEFAULT 0.09 \ingroup Config*/
+  addDoubleOption("C_MU", C_mu, 0.09);
   /*!\brief BULK_MODULUS \n DESCRIPTION: Value of the Bulk Modulus  \n DEFAULT 1.42E5 \ingroup Config*/
   addDoubleOption("BULK_MODULUS", Bulk_Modulus, 1.42E5);
   /* DESCRIPTION: Artifical compressibility factor  */
@@ -5817,6 +5821,12 @@ void CConfig::SetGlobalParam(unsigned short val_solver,
       break;
     case RANS:
       if (val_system == RUNTIME_FLOW_SYS) {
+        SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,
+                              Kind_Upwind_Flow, Kind_SlopeLimit_Flow,
+                              SpatialOrder_Flow);
+        SetKind_TimeIntScheme(Kind_TimeIntScheme_Flow);
+      }
+      if (val_system == RUNTIME_REACTIVE_SYS) {
         SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,
                               Kind_Upwind_Flow, Kind_SlopeLimit_Flow,
                               SpatialOrder_Flow);

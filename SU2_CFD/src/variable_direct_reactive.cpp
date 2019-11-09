@@ -280,6 +280,44 @@ bool CReactiveEulerVariable::SetPrimVar(CConfig* config) {
   return nonPhys;
 }
 
+
+
+//MANGOTURB
+//
+//
+/*--- Set primitive variables ---*/
+//
+//
+bool CReactiveEulerVariable::SetPrimVar(CConfig* config,su2double val_ke) {
+  /*--- Convert conserved to primitive variables ---*/
+  bool nonPhys = Cons2PrimVar(config, Solution, Primitive.data(),val_ke);
+
+  /*--- Check for non physical solutions. NOTE: The first global iteration is taken into account by the solver class ---*/
+  if(nonPhys && config->GetExtIter() > 0) {
+    std::copy(Solution_Old, Solution_Old + nVar, Solution);
+    bool nonPhys_old = Cons2PrimVar(config, Solution, Primitive.data(),val_ke);
+    SU2_Assert(nonPhys_old == false, "Neither the old solution is feasible to set primitive variables: problem unsolvable");
+  }
+
+  /*--- Set specific heat at constant pressure ---*/
+  su2double dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
+  su2double dim_a = Primitive[A_INDEX_PRIM]*config->GetVelocity_Ref();
+  if(US_System) {
+    dim_temp *= 5.0/9.0;
+    dim_a /= 3.28084;
+  }
+  Cp = library->ComputeCP_FromSoundSpeed(dim_temp, dim_a, Ys)/config->GetGas_Constant_Ref();
+  if(US_System)
+    Cp *= 3.28084*3.28084*5.0/9.0;
+
+  /*--- Set temperature and pressure derivatives ---*/
+  CalcdTdU(Primitive.data(), config, dTdU.data());
+  CalcdPdU(Primitive.data(), config, dPdU.data());
+
+  return nonPhys;
+}
+
+
 //
 //
 /*--- Pass from conserved to primitive variables ---*/
@@ -501,6 +539,230 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
 
   return nonPhys;
 }
+
+//MANGOTURB-//DUBBI
+//
+//
+/*--- Pass from conserved to primitive variables ---*/
+//
+//
+bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2double* V,su2double val_ke) {
+  if(config->GetExtIter() == 0) {
+    SU2_Assert(U != NULL,"The array of conserved varaibles has not been allocated");
+    SU2_Assert(V != NULL,"The array of primitive varaibles has not been allocated");
+  }
+
+  bool NRconvg, Bconvg, nonPhys;
+	unsigned short iDim, iSpecies, iIter, maxBIter, maxNIter;
+  su2double rho, rhoE;
+  su2double sqvel;
+  su2double f, df, NRtol, Btol;
+  su2double T, Told, Tnew, hs, hs_old, Tmin, Tmax;
+
+  /*--- Conserved and primitive vector layout ---*/
+  // U:  [rho, rhou, rhov, rhow, rhoE, rho1, ..., rhoNs]^T
+  // V: [T, u, v, w, P, rho, h, a, Y1, ..., YNs]^T
+
+  /*--- Set boolean for non physical state---*/
+  nonPhys = false;
+
+  /*--- Assign species mass fraction and mixture density ---*/
+  // NOTE: If any species densities are < 0, these values are re-assigned
+  //       in the conserved vector to ensure positive density
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+    if(U[RHOS_INDEX_SOL + iSpecies] < 0.0) {
+      U[RHOS_INDEX_SOL + iSpecies] = 1.0e-30;
+      nonPhys = true;
+    }
+  }
+
+  if(U[RHO_INDEX_SOL] < EPS) {
+    V[RHO_INDEX_PRIM] = U[RHO_INDEX_SOL] = EPS;
+    nonPhys = true;
+  }
+  else
+    V[RHO_INDEX_PRIM] = U[RHO_INDEX_SOL];
+
+  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+    V[RHOS_INDEX_PRIM + iSpecies] = U[RHOS_INDEX_SOL + iSpecies]/U[RHO_INDEX_SOL];
+
+  /*--- Checking sum of mass fraction ---*/
+  std::copy(V + RHOS_INDEX_PRIM, V + (RHOS_INDEX_PRIM + nSpecies), Ys.begin());
+  nonPhys = nonPhys || (std::abs(std::accumulate(Ys.cbegin(), Ys.cend(), 0.0) - 1.0) > 0.1);
+
+  /*--- Rename for convenience ---*/
+  rho = U[RHO_INDEX_SOL];    // Density [Kg/m3]
+  rhoE = U[RHOE_INDEX_SOL] + val_ke;   // Density*total energy per unit of mass [J/m3]
+
+  /*--- Assign mixture velocity and compute squared velocity ---*/
+  sqvel = 0.0;
+  for(iDim = 0; iDim < nDim; ++iDim) {
+    V[VX_INDEX_PRIM + iDim] = U[RHOVX_INDEX_SOL + iDim]/rho;
+    sqvel += V[VX_INDEX_PRIM + iDim]*V[VX_INDEX_PRIM + iDim];
+  }
+
+  /*--- Set temperature clipping values ---*/
+  Tmin   = config->GetTemperatureMin()/config->GetTemperature_Ref();
+  Tmax   = config->GetTemperatureMax()/config->GetTemperature_Ref();
+
+  /*--- Set temperature secant algorithm paramters ---*/
+  NRtol    = 1.0e-6;    // Tolerance for the Secant method
+  Btol     = 1.0e-4;    // Tolerance for the Bisection method
+  maxNIter = 7;        // Maximum Secant method iterations
+  maxBIter = 32;        // Maximum Bisection method iterations
+  NRconvg  = false;
+
+  /*--- Translational-Rotational Temperature ---*/
+  const su2double Rgas = library->ComputeRgas(Ys)/config->GetGas_Constant_Ref();
+  const su2double C1 = (-rhoE + 0.5*rho*sqvel)/(rho*Rgas);
+  const su2double C2 = 1.0/Rgas;
+
+  /*--- Pick initial state and start algorithm ---*/
+  const su2double old_temp = V[T_INDEX_PRIM];
+  T = V[T_INDEX_PRIM];
+  Told = T + 1.0;
+  for(iIter = 0; iIter < maxNIter; ++iIter) {
+    try {
+      /*--- Execute a secant root-finding method to find T ---*/
+      su2double dim_temp, dim_temp_old;
+      dim_temp = T*config->GetTemperature_Ref();
+      dim_temp_old = Told*config->GetTemperature_Ref();
+      if(US_System) {
+        dim_temp *= 5.0/9.0;
+        dim_temp_old *= 5.0/9.0;
+      }
+      hs_old = (library->ComputeEnthalpy(dim_temp_old, Ys)+val_ke)/config->GetEnergy_Ref();
+      hs = (library->ComputeEnthalpy(dim_temp, Ys)+val_ke)/config->GetEnergy_Ref();
+      if(US_System) {
+        hs_old *= 3.28084*3.28084;
+        hs *= 3.28084*3.28084;
+      }
+
+      f = T - C1 - C2*hs;
+      df = T - Told + C2*(hs_old-hs);
+      Tnew = T - f*(T-Told)/df;
+
+      /*--- Check for convergence ---*/
+      if(std::abs(Tnew - T) < NRtol) {
+        NRconvg = true;
+        break;
+      }
+      else {
+        Told = T;
+        T = Tnew;
+      }
+    }
+    catch(const std::out_of_range& e) {
+      /*--- Print error message ---*/
+      std::cout<<e.what()<<" Trying with bisection method."<<std::endl;
+
+      /*--- Execute bisection method ---*/
+      su2double Ta = Tmin;
+      su2double Tb = Tmax;
+      for(iIter = 0; iIter < 10000; ++iIter) {
+        T = (Ta + Tb)/2.0;
+        su2double dim_temp = T*config->GetTemperature_Ref();;
+        if(US_System)
+          dim_temp *= 5.0/9.0;
+        hs = (library->ComputeEnthalpy(dim_temp, Ys)+val_ke)/config->GetEnergy_Ref();
+        if(US_System)
+          hs *= 3.28084*3.28084;
+        f = T - C1 - C2*hs;
+
+        if(std::abs(f) < Btol) {
+          NRconvg = true;
+          break;
+        }
+        else {
+          if(f > 0)
+            Ta = T;
+          else
+            Tb = T;
+       }
+     }
+     if(NRconvg)
+        break;
+     else
+        throw std::runtime_error("Convergence not achieved for bisection method after catching out of range");
+    }
+  }
+
+  /*--- If the secant method has converged, assign the value of T.
+        Otherwise, if no exception has been caught, execute a bisection root-finding method ---*/
+  if(NRconvg)
+    V[T_INDEX_PRIM] = T;
+  else {
+    Bconvg = false;
+    su2double Ta = Tmin;
+    su2double Tb = Tmax;
+    for(iIter = 0; iIter < maxBIter; ++iIter) {
+      T = (Ta + Tb)/2.0;
+      su2double dim_temp = T*config->GetTemperature_Ref();;
+      if(US_System)
+        dim_temp *= 5.0/9.0;
+      hs = (library->ComputeEnthalpy(dim_temp, Ys)+val_ke)/config->GetEnergy_Ref();
+      if(US_System)
+        hs *= 3.28084*3.28084;
+      f = T - C1 - C2*hs;
+
+      if(std::abs(f) < Btol) {
+        V[T_INDEX_PRIM] = T;
+        Bconvg = true;
+        break;
+      }
+      else {
+        if(f > 0)
+          Ta = T;
+        else
+          Tb = T;
+      }
+    }
+
+    /*--- If absolutely no convergence, then something is going really wrong ---*/
+    if(!Bconvg)
+      throw std::runtime_error("Convergence not achieved for bisection method");
+  }
+
+  /*--- Avoid too large variation in temperature ---*/
+  if(config->GetExtIter() > 0 && config->GetClipping_Temp())
+     V[T_INDEX_PRIM] = std::min(std::max(V[T_INDEX_PRIM],0.95*old_temp),1.05*old_temp);
+
+  /*--- Check if the solution found is inside the limits, otherwise set non physical point ---*/
+  if(V[T_INDEX_PRIM] < Tmin) {
+    V[T_INDEX_PRIM] = Tmin;
+    nonPhys = true;
+  }
+  else if(V[T_INDEX_PRIM] > Tmax) {
+    V[T_INDEX_PRIM] = Tmax;
+    nonPhys = true;
+  }
+
+  /*--- Rename for convenience ---*/
+  T = V[T_INDEX_PRIM];
+
+  /*--- Pressure ---*/
+  V[P_INDEX_PRIM] = rho*Rgas*T;
+  if(V[P_INDEX_PRIM] < EPS) {
+    V[P_INDEX_PRIM] = EPS;
+    nonPhys = true;
+  }
+
+  /*--- Sound speed ---*/
+  su2double dim_temp = T*config->GetTemperature_Ref();
+  if(US_System)
+    dim_temp *= 5.0/9.0;
+  V[A_INDEX_PRIM] = library->ComputeFrozenSoundSpeed(dim_temp, Ys, V[P_INDEX_PRIM], rho);
+  if(V[A_INDEX_PRIM] < EPS) {
+    V[A_INDEX_PRIM] = EPS;
+    nonPhys = true;
+  }
+
+  /*--- Enthalpy ---*/
+  V[H_INDEX_PRIM] = (U[RHOE_INDEX_SOL] + val_ke + V[P_INDEX_PRIM])/rho;
+
+  return nonPhys;
+}
+
 
 //
 //
@@ -753,6 +1015,83 @@ CReactiveNSVariable::CReactiveNSVariable(su2double* val_solution, unsigned short
   Diffusion_Coeffs.resize(nSpecies,nSpecies);
 }
 
+//MANGOTURB
+//
+//
+/*--- Set Vorticity ---*/
+//
+//
+bool CReactiveNSVariable::SetVorticity(bool val_limiter) {
+
+  Vorticity[0] = 0.0; Vorticity[1] = 0.0;
+
+  Vorticity[2] = Gradient_Primitive[2][0]-Gradient_Primitive[1][1];
+
+  if (nDim == 3) {
+    Vorticity[0] = Gradient_Primitive[3][1]-Gradient_Primitive[2][2];
+    Vorticity[1] = -(Gradient_Primitive[3][0]-Gradient_Primitive[1][2]);
+  }
+
+  return false;
+
+}
+
+
+//MANGOTURB
+//
+//
+/*--- Set StrainMag ---*/
+//
+//
+bool CReactiveNSVariable::SetStrainMag(bool val_limiter) {
+
+  su2double Div;
+  unsigned short iDim;
+
+  AD::StartPreacc();
+  AD::SetPreaccIn(Gradient_Primitive, nDim+1, nDim);
+
+  Div = 0.0;
+  for (iDim = 0; iDim < nDim; iDim++) {
+    Div += Gradient_Primitive[iDim+1][iDim];
+  }
+
+  StrainMag = 0.0;
+
+  /*--- Add diagonal part ---*/
+
+  for (iDim = 0; iDim < nDim; iDim++) {
+    StrainMag += pow(Gradient_Primitive[iDim+1][iDim] - 1.0/3.0*Div, 2.0);
+  }
+
+  /*--- Add off diagonals ---*/
+
+  StrainMag += 2.0*pow(0.5*(Gradient_Primitive[1][1] + Gradient_Primitive[2][0]), 2.0);
+
+  if (nDim == 3) {
+    StrainMag += 2.0*pow(0.5*(Gradient_Primitive[1][2] + Gradient_Primitive[3][0]), 2.0);
+    StrainMag += 2.0*pow(0.5*(Gradient_Primitive[2][2] + Gradient_Primitive[3][1]), 2.0);
+  }
+
+  StrainMag = sqrt(2.0*StrainMag);
+
+  AD::SetPreaccOut(StrainMag);
+  AD::EndPreacc();
+
+  return false;
+
+}
+
+
+
+
+
+
+
+
+
+
+
 
 //
 //
@@ -762,6 +1101,43 @@ CReactiveNSVariable::CReactiveNSVariable(su2double* val_solution, unsigned short
 bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
   /*--- Convert conserved to primitive variables using Euler version since primitives are the same ---*/
   bool nonPhys = CReactiveEulerVariable::SetPrimVar(config);
+
+  su2double dim_temp, dim_press;
+  dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
+  dim_press = Primitive[P_INDEX_PRIM]*config->GetPressure_Ref()/101325.0;
+  if(US_System) {
+    dim_temp *= 5.0/9.0;
+    dim_press *= 47.8803;
+  }
+
+  /*--- Compute transport properties --- */
+  Ys = GetMassFractions();
+  Laminar_Viscosity = library->ComputeEta(dim_temp, Ys)/config->GetViscosity_Ref();
+  if(US_System)
+    Laminar_Viscosity *= 0.02088553108;
+  Thermal_Conductivity = library->ComputeLambda(dim_temp, Ys)/config->GetConductivity_Ref();
+  if(US_System)
+    Thermal_Conductivity *= 0.12489444444;
+  /*--- Compute binary diffusion coefficents. NOTE: The empirical formula employed in the library should return it in cm2/s ---*/
+  Diffusion_Coeffs = library->GetDij_SM(dim_temp, dim_press)/(config->GetVelocity_Ref()*config->GetLength_Ref()*1.0e4);
+  if(US_System)
+    Diffusion_Coeffs *= 3.28084*3.28084;
+
+  return nonPhys;
+}
+
+//MANGOTURB
+//
+//
+/*--- Set primitive and turbulent variables ---*/
+//
+//
+bool CReactiveNSVariable::SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke) {
+  /*--- Convert conserved to primitive variables using Euler version since primitives are the same ---*/
+  bool nonPhys = CReactiveEulerVariable::SetPrimVar(config,turb_ke);
+
+  //MANGOTURB
+  SetEddyViscosity(eddy_visc);
 
   su2double dim_temp, dim_press;
   dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();

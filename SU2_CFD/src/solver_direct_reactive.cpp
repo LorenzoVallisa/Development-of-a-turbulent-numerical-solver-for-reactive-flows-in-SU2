@@ -31,7 +31,7 @@ CReactiveEulerSolver::LibraryPtr CReactiveEulerSolver::library = NULL;
 CReactiveEulerSolver::CReactiveEulerSolver(): CSolver(), nSpecies(), nPrimVarLim(), space_centered(), implicit(), grid_movement(),
                                               least_squares(), second_order(), limiter(), Density_Inf(), Pressure_Inf(), Temperature_Inf(),
                                               T_INDEX_PRIM(), VX_INDEX_PRIM(), P_INDEX_PRIM(), RHO_INDEX_PRIM(), H_INDEX_PRIM(),
-                                              A_INDEX_PRIM(), RHOS_INDEX_PRIM(), RHO_INDEX_SOL(), RHOVX_INDEX_SOL(), RHOE_INDEX_SOL(),
+                                              A_INDEX_PRIM(), RHOS_INDEX_PRIM(), EDDY_MU_INDEX_PRIM(),RHO_INDEX_SOL(), RHOVX_INDEX_SOL(), RHOE_INDEX_SOL(),
                                               RHOS_INDEX_SOL(), T_INDEX_GRAD(), VX_INDEX_GRAD(), P_INDEX_GRAD(),
                                               T_INDEX_LIM(), VX_INDEX_LIM(), P_INDEX_LIM() {
   /*--- Built-in types variables which is better to set since they are used frequently ---*/
@@ -42,6 +42,9 @@ CReactiveEulerSolver::CReactiveEulerSolver(): CSolver(), nSpecies(), nPrimVarLim
 
   Max_Delta_Time = 0.0;
   Min_Delta_Time = 1.E6;
+
+  //MANGOTURB
+  Eddy_Viscosity=0.0;
 
   nPoint = 0;
   nPointDomain = 0;
@@ -65,6 +68,11 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   nSecondaryVarGrad = 0;
   nVarGrad = 0;
   IterLinSolver = 0;
+
+  //MANGOTURB
+  Eddy_Viscosity= 0.0;
+
+
 
   /*--- Load library ---*/
   if(iMesh == MESH_0) {
@@ -673,13 +681,17 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
   unsigned long iPoint, Point_Fine;
   unsigned short iMesh, iChildren, iVar;
   su2double Area_Children, Area_Parent, Solution[nVar];
-
+  //MANGOTURB
+  bool rans = ((config->GetKind_Solver() == RANS) ||
+              (config->GetKind_Solver() == ADJ_RANS) ||
+              (config->GetKind_Solver() == DISC_ADJ_RANS));
   bool restart = (config->GetRestart() || config->GetRestart_Flow());
   bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
 
   /*--- If restart solution, then interpolate the flow solution to
         all the multigrid levels, this is important with the dual time strategy ---*/
   if(restart && ExtIter == 0) {
+
     for(iMesh = 1; iMesh <= config->GetnMGLevels(); ++iMesh) {
       for (iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint) {
         Area_Parent = geometry[iMesh]->node[iPoint]->GetVolume();
@@ -695,6 +707,33 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
       }
       solver_container[iMesh][FLOW_SOL]->Set_MPI_Solution(geometry[iMesh], config);
     }
+    delete [] Solution;
+    //MANGOTURB
+    /*--- Including turbulent initial conditions ---*/
+    if (rans) {
+
+      unsigned short nVar_Turb = solver_container[MESH_0][TURB_SOL]->GetnVar();
+      Solution = new su2double[nVar_Turb];
+      for (iMesh = 1; iMesh <= config->GetnMGLevels(); iMesh++) {
+        for (iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); iPoint++) {
+          Area_Parent = geometry[iMesh]->node[iPoint]->GetVolume();
+          for (iVar = 0; iVar < nVar_Turb; iVar++) Solution[iVar] = 0.0;
+          for (iChildren = 0; iChildren < geometry[iMesh]->node[iPoint]->GetnChildren_CV(); iChildren++) {
+            Point_Fine = geometry[iMesh]->node[iPoint]->GetChildren_CV(iChildren);
+            Area_Children = geometry[iMesh-1]->node[Point_Fine]->GetVolume();
+            auto Solution_Fine = solver_container[iMesh-1][TURB_SOL]->node[Point_Fine]->GetSolution();
+            for (iVar = 0; iVar < nVar_Turb; iVar++) {
+              Solution[iVar] += Solution_Fine[iVar]*Area_Children/Area_Parent;
+            }
+          }
+          solver_container[iMesh][TURB_SOL]->node[iPoint]->SetSolution(Solution);
+        }
+        solver_container[iMesh][TURB_SOL]->Set_MPI_Solution(geometry[iMesh], config);
+        solver_container[iMesh][TURB_SOL]->Postprocessing(geometry[iMesh], solver_container[iMesh], config, iMesh);
+      }
+      delete [] Solution;
+    }
+
   } /*--- End of restart ---*/
 
   /*--- The value of the solution for the first iteration of the dual time ---*/
@@ -705,6 +744,11 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
       for(iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint) {
         solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n();
         solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n1();
+        //MANGOTURB
+        if (rans) {
+          solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n();
+          solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n1();
+        }
       }
     }
 
@@ -712,19 +756,38 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
       /*--- Load an additional restart file for a 2nd-order restart ---*/
       solver_container[MESH_0][FLOW_SOL]->LoadRestart(geometry, solver_container, config, SU2_TYPE::Int(config->GetUnst_RestartIter() - 1));
 
+      //MANGOTURB
+      /*--- Load an additional restart file for the turbulence model ---*/
+      if (rans)
+        solver_container[MESH_0][TURB_SOL]->LoadRestart(geometry, solver_container, config, SU2_TYPE::Int(config->GetUnst_RestartIter()-1));
+
       /*--- Push back this new solution to time level N. ---*/
       for(iMesh = 0; iMesh <= config->GetnMGLevels(); ++iMesh) {
-        for(iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint)
+        for(iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint){
           solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n();
+          //MANGOTURB
+          if (rans) {
+            solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n();
+          }
+        }
       }
     }
   }
 }
 
+
+
+
+
+
+
+
 //
 //
 /*--- Set the fluid solver nondimensionalization. ---*/
 void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig* config, unsigned short iMesh) {
+
+
    su2double Temperature_FreeStream = 0.0, ModVel_FreeStream = 0.0, Energy_FreeStream = 0.0,
              Density_FreeStream = 0.0, Pressure_FreeStream = 0.0, SoundSpeed_FreeStream = 0.0;
 
@@ -743,15 +806,16 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 
    int rank = MASTER_NODE;
    #ifdef HAVE_MPI
-      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
    #endif
 
- 	 /*--- Compressible non dimensionalization ---*/
+   /*--- Compressible non dimensionalization ---*/
    Pressure_FreeStream = config->GetPressure_FreeStream();
    Temperature_FreeStream = config->GetTemperature_FreeStream();
    Density_FreeStream = library->ComputeDensity(Temperature_FreeStream, Pressure_FreeStream, MassFrac_Inf);
    config->SetDensity_FreeStream(Density_FreeStream);
    SoundSpeed_FreeStream = library->ComputeFrozenSoundSpeed(Temperature_FreeStream, MassFrac_Inf);
+
 
    /*--- Compute the modulus of the free stream velocity ---*/
    ModVel_FreeStream = std::inner_product(config->GetVelocity_FreeStream(), config->GetVelocity_FreeStream() + nDim,
@@ -759,8 +823,10 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    ModVel_FreeStream = std::sqrt(ModVel_FreeStream);
    config->SetModVel_FreeStream(ModVel_FreeStream);
 
+
    /*--- Compute the free stream energy ---*/
    Energy_FreeStream = library->ComputeEnergy(Temperature_FreeStream, MassFrac_Inf) + 0.5*ModVel_FreeStream*ModVel_FreeStream;
+   config->SetEnergy_FreeStream(Energy_FreeStream);
 
    /*--- Compute non dimensional quantities: Notice that the grid is in meters. ---*/
    if(config->GetRef_NonDim() == DIMENSIONAL) {
@@ -788,11 +854,20 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    Velocity_Ref = std::sqrt(Pressure_Ref/Density_Ref);
    config->SetVelocity_Ref(Velocity_Ref);
 
+   //MANGOTURB
+   su2double Omega_Ref=0.0;
+   Omega_Ref         = Velocity_Ref/Length_Ref;
+   config->SetOmega_Ref(Omega_Ref);
+
+
    Time_Ref = Length_Ref/Velocity_Ref;
    config->SetTime_Ref(Time_Ref);
 
    Energy_Ref = Velocity_Ref*Velocity_Ref;
    config->SetEnergy_Ref(Energy_Ref);
+
+   Energy_FreeStreamND = Energy_FreeStream/Energy_Ref;
+   config->SetEnergy_FreeStreamND(Energy_FreeStreamND);
 
    Gas_Constant_Ref = Energy_Ref/Temperature_Ref;
    config->SetGas_Constant_Ref(Gas_Constant_Ref);
@@ -812,12 +887,11 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    Temperature_FreeStreamND = Temperature_FreeStream/Temperature_Ref;
    config->SetTemperature_FreeStreamND(Temperature_FreeStreamND);
 
-   Energy_FreeStreamND = Energy_FreeStream/Energy_Ref;
-   config->SetEnergy_FreeStreamND(Energy_FreeStreamND);
 
    ModVel_FreeStreamND = std::inner_product(Velocity_FreeStreamND, Velocity_FreeStreamND + nDim, Velocity_FreeStreamND, 0.0);
    ModVel_FreeStreamND = std::sqrt(ModVel_FreeStreamND);
    config->SetModVel_FreeStreamND(ModVel_FreeStreamND);
+
 
    Total_UnstTimeND = config->GetTotal_UnstTime()/Time_Ref;
    config->SetTotal_UnstTimeND(Total_UnstTimeND);
@@ -893,7 +967,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 
      std::cout << "Magnitude (non-dim): " << ModVel_FreeStreamND << std::endl;
 
-     std::cout << "Free-stream total energy per unit mass (non-dim): " << Energy_FreeStreamND << std::endl;
+     //std::cout << "Free-stream total energy per unit mass (non-dim): " << Energy_FreeStreamND << std::endl;
 
      if(unsteady) {
        std::cout << "Total time (non-dim): " << Total_UnstTimeND << std::endl;
@@ -909,10 +983,23 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 //
 //
 unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver** solver_container, CConfig* config, bool Output) {
+
+  //MANGOTURB
+  su2double eddy_visc = 0.0, turb_ke = 0.0;
+  unsigned short turb_model = config->GetKind_Turb_Model();
+  bool tkeNeeded            = (turb_model == SST);
+
   unsigned long iPoint, ErrorCounter = 0;
   bool NonPhys = false;
 
   for(iPoint = 0; iPoint < nPoint; ++iPoint) {
+
+    //MANGOTURB-//INCOMPLETO
+    if (turb_model != NONE) {
+      eddy_visc = solver_container[TURB_SOL]->node[iPoint]->GetmuT();
+      if (tkeNeeded) turb_ke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);
+    }
+
     /*--- Initialize the non-physical points vector ---*/
     node[iPoint]->SetNon_Physical(false);
 
@@ -941,6 +1028,24 @@ unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver** solver_cont
   }
 
   return ErrorCounter;
+  //MANGOTURB
+  // unsigned short turb_model = config->GetKind_Turb_Model();
+  // bool tkeNeeded            = (turb_model == SST);
+  // su2double eddy_visc = 0.0, turb_ke = 0.0;
+  //
+  // /*--- Retrieve the value of the kinetic energy (if need it) ---*/
+  //
+  // if (turb_model != NONE) {
+  //   eddy_visc = solver_container[TURB_SOL]->node[iPoint]->GetmuT();
+  //   if (tkeNeeded) turb_ke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);
+  // }
+  //DUBBI nel solver originale eddy_visc è una delle primitive,che viene immagazzinata dal solver e bisogna capire dove viene usata
+  // Nel solver originale turb_ke viene usata in static energy che viene presa da fluid model per costruire variabili tipi pressione e tempreatura
+  //in caso di gas ideale (Bisogna vedere DOVE viene usata da orlando per costruire queste variabili)
+
+
+
+
 }
 
 //
@@ -3078,6 +3183,10 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
   unsigned short iDim;
   unsigned long iVertex, iPoint, Point_Normal;
 
+  //MANGOTURB
+  bool tkeNeeded = (((config->GetKind_Solver() == RANS )|| (config->GetKind_Solver() == DISC_ADJ_RANS)) &&
+                    (config->GetKind_Turb_Model() == SST));
+
   su2double Riemann, SoundSpeed, Vn, Vel_Mag, Gamma, Gamma_Minus_One, dim_temp, alpha, Area;
   su2double Normal[nDim], UnitNormal[nDim];
 
@@ -3123,6 +3232,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
             therefore we can specify all but one state variable at the inlet.
             The outgoing Riemann invariant provides the final piece of info. ---*/
       switch (Kind_Inlet) {
+
         /*--- Total properties have been specified at the inlet. ---*/
         case TOTAL_CONDITIONS: {
           /*--- Retrieve the specified mass flow for the inlet. ---*/
@@ -3149,6 +3259,9 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
 
           /*--- Compute total enthalpy from total temperature ---*/
           su2double Tot_Enthalpy = library->ComputeEnthalpy(dim_temp, Ys);
+          //MANGOTURB
+          if (tkeNeeded) Tot_Enthalpy += GetTke_Inf();
+
           V_inlet[H_INDEX_PRIM] = Tot_Enthalpy;
 
           /*--- Compute inner product between unit normal and flow direction and save current gas constant ---*/
@@ -3277,7 +3390,12 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           dim_temp = V_inlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
           if(US_System)
             dim_temp *= 5.0/9.0;
-          V_inlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
+          //MANGOTURB
+          su2double Aux_Ent = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
+          if (tkeNeeded) Aux_Ent+= GetTke_Inf(); //Questo è non dimensionale
+          V_inlet[H_INDEX_PRIM] =Aux_Ent;
+
+
           if(US_System)
             V_inlet[H_INDEX_PRIM] *= 3.28084*3.28084;
           V_inlet[H_INDEX_PRIM] += 0.5*Vel_Mag*Vel_Mag;
@@ -3309,7 +3427,9 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           dim_temp = Temperature*config->GetTemperature_Ref();
           if(US_System)
             dim_temp *= 5.0/9.0;
-          V_inlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
+          //MANGOTURB
+          V_inlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref() + (tkeNeeded)*GetTke_Inf();
+
           if(US_System)
             V_inlet[H_INDEX_PRIM] *= 3.28084*3.28084;
           V_inlet[H_INDEX_PRIM] += 0.5*Vel_Mag*Vel_Mag;
@@ -3425,6 +3545,17 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
 
         /*--- Species binary coefficients ---*/
         visc_numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
+
+        //MANGOTURB
+        if (config->GetKind_Turb_Model() == SST){
+
+        numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
+                                       solver_container[TURB_SOL]->node[jPoint]->GetSolution(0));
+
+        numerics->SetEddyViscosity(solver_container[TURB_SOL]->node[iPoint]->GetmuT(),
+                                    solver_container[TURB_SOL]->node[jPoint]->GetmuT());
+        }
+
 
         /*--- Compute residual ---*/
         visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
@@ -3603,6 +3734,10 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
   bool viscous = config->GetViscous();
   bool gravity = config->GetGravityForce();
 
+  //MANGOTURB
+  bool tkeNeeded = (((config->GetKind_Solver() == RANS )|| (config->GetKind_Solver() == DISC_ADJ_RANS)) &&
+                    (config->GetKind_Turb_Model() == SST));
+
   /*--- Loop over all the vertices on this boundary marker ---*/
   for(iVertex = 0; iVertex < geometry->nVertex[val_marker]; ++iVertex) {
     iPoint = geometry->vertex[val_marker][iVertex]->GetNode();
@@ -3683,7 +3818,9 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         dim_temp = Temperature*config->GetTemperature_Ref();
         if(US_System)
           dim_temp *= 5.0/9.0;
-        V_outlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
+        //MANGOTURB
+        V_outlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref() + (tkeNeeded)*GetTke_Inf();
+
         if(US_System)
           V_outlet[H_INDEX_PRIM] *= 3.28084*3.28084;
         V_outlet[H_INDEX_PRIM] += 0.5*Velocity2;
@@ -3785,7 +3922,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
             Secondary[RHO_INDEX_SOL] = 0.5*sq_vel/rhoCv;
             for(unsigned short iDim = 0; iDim < nDim; ++iDim)
               Secondary[RHOVX_INDEX_SOL + iDim] = -V_outlet[VX_INDEX_PRIM + iDim]/rhoCv;
-            Secondary[RHOE_INDEX_SOL] = 1.0/rhoCv;
+            Secondary[RHOE_INDEX_SOL] = 1.0/rhoCv;//DUBBI qui non ci va derivata seconda rispetto a variabli di trasformazione poichè ke costante
             for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
               Secondary[RHOS_INDEX_SOL + iSpecies] = -library->ComputePartialEnergy(dim_temp, iSpecies)/(config->GetEnergy_Ref()*rhoCv);
               if(US_System)
@@ -3803,6 +3940,16 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
 
         /*--- Species binary coefficients ---*/
         visc_numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
+
+        //MANGOTURB
+        if (config->GetKind_Turb_Model() == SST){
+
+          numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
+                                         solver_container[TURB_SOL]->node[jPoint]->GetSolution(0));
+
+          numerics->SetEddyViscosity(solver_container[TURB_SOL]->node[iPoint]->GetmuT(),
+                                     solver_container[TURB_SOL]->node[jPoint]->GetmuT());
+        }
 
         /*--- Compute residual ---*/
         visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
@@ -4012,6 +4159,10 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config, unsig
       }
     }
   }
+
+  //MANGOTURB
+  Tke_Inf= config->GetTke_FreeStreamND();
+  Prandtl_Turb    = config->GetPrandtl_Turb();
 
   /*--- Store the number of vertices on each marker for deallocation later ---*/
   nVertex.reserve(nMarker);
@@ -4233,6 +4384,13 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   #endif
 
+  //MANGOTURB
+  /*--- Local turbolent variables for the adimensionalitazion of viscous contribution ---*/
+  su2double Tke_FreeStream = 0.0,Tke_FreeStreamND = 0.0;
+  bool turbulent          = (config->GetKind_Solver() == RANS) || (config->GetKind_Solver() == DISC_ADJ_RANS);
+  bool tkeNeeded          = ((turbulent) && (config->GetKind_Turb_Model() == SST));
+  su2double Omega_FreeStream = 0.0, Omega_FreeStreamND = 0.0;
+
   /*--- Local variables for the adimensionalitazion of viscous contribution ---*/
   su2double Viscosity_FreeStream = 0.0;
   su2double Viscosity_Ref = 0.0, Conductivity_Ref = 0.0;
@@ -4258,6 +4416,26 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
 
   Viscosity_FreeStreamND = Viscosity_FreeStream/Viscosity_Ref;
   config->SetViscosity_FreeStreamND(Viscosity_FreeStreamND);
+
+  //MANGOTURB
+
+  /*--- Update turbolent omega, turbolent ke and consequently free stream energy in case of turbolence---*/
+  if (tkeNeeded){
+    Tke_FreeStream  = 3.0/2.0*((config->GetModVel_FreeStream())*(config->GetModVel_FreeStream())*config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
+    config->SetTke_FreeStream(Tke_FreeStream);
+    su2double Energy_FreeStream = config->GetEnergy_FreeStream() + Tke_FreeStream;
+    config->SetEnergy_FreeStream(Energy_FreeStream);
+    Tke_FreeStreamND  = 3.0/2.0*((config->GetModVel_FreeStreamND())*(config->GetModVel_FreeStreamND())*config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
+    config->SetTke_FreeStreamND(Tke_FreeStreamND);
+    su2double Energy_FreeStreamND = config->GetEnergy_FreeStreamND() + Tke_FreeStreamND;
+    config->SetEnergy_FreeStreamND(Energy_FreeStreamND);
+    su2double Energy_Ref = Energy_FreeStream/Energy_FreeStreamND;
+    config->SetEnergy_Ref(Energy_Ref);
+    Omega_FreeStream = (config->GetDensity_FreeStream())*Tke_FreeStream/(Viscosity_FreeStream*config->GetTurb2LamViscRatio_FreeStream());
+    config->SetOmega_FreeStream(Omega_FreeStream);
+    Omega_FreeStreamND = (config->GetDensity_FreeStreamND())*Tke_FreeStreamND/(Viscosity_FreeStreamND*config->GetTurb2LamViscRatio_FreeStream());
+    config->SetOmega_FreeStreamND(Omega_FreeStreamND);
+  }
 
   /*--- Write output to the console if this is the master node and first domain ---*/
   if(config->GetConsole_Output_Verb() == VERB_HIGH && rank == MASTER_NODE && iMesh == MESH_0) {
@@ -4294,6 +4472,27 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
   /*--- Set the primitive variables ---*/
   unsigned long ErrorCounter = SetPrimitive_Variables(solver_container, config, Output);
 
+  //MANGOTURB
+  /*--- Set Voriticity and Omega parameters ---*/
+  su2double StrainMag = 0.0, Omega = 0.0, *Vorticity;
+  bool limiter_visc         = config->GetViscous_Limiter_Flow();
+  StrainMag_Max = 0.0, Omega_Max = 0.0;
+
+
+  for (iPoint = 0; iPoint < nPoint; iPoint++) {
+
+    solver_container[FLOW_SOL]->node[iPoint]->SetVorticity(limiter_visc);
+    solver_container[FLOW_SOL]->node[iPoint]->SetStrainMag(limiter_visc);
+
+    StrainMag = solver_container[FLOW_SOL]->node[iPoint]->GetStrainMag();
+    Vorticity = solver_container[FLOW_SOL]->node[iPoint]->GetVorticity();
+    Omega = sqrt(Vorticity[0]*Vorticity[0]+ Vorticity[1]*Vorticity[1]+ Vorticity[2]*Vorticity[2]);
+
+    StrainMag_Max = max(StrainMag_Max, StrainMag);
+    Omega_Max = max(Omega_Max, Omega);
+
+  }
+
   /*--- Gradient computation ---*/
   if(least_squares)
     SetPrimitive_Gradient_LS(geometry, config);
@@ -4312,13 +4511,25 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
   if(implicit)
     Jacobian.SetValZero();
 
+  //MANGOTURB
   /*--- Error message ---*/
   if(config->GetConsole_Output_Verb() == VERB_HIGH) {
+
     #ifdef HAVE_MPI
+      su2double MyOmega_Max = Omega_Max; Omega_Max = 0.0;
+      su2double MyStrainMag_Max = StrainMag_Max; StrainMag_Max = 0.0;
+
       SU2_MPI::Allreduce(MPI_IN_PLACE, &ErrorCounter, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+      SU2_MPI::Allreduce(&MyStrainMag_Max, &StrainMag_Max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+      SU2_MPI::Allreduce(&MyOmega_Max, &Omega_Max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
     #endif
-    if(iMesh == MESH_0)
+
+    if(iMesh == MESH_0){
       config->SetNonphysical_Points(ErrorCounter);
+      solver_container[FLOW_SOL]->SetStrainMag_Max(StrainMag_Max);
+      solver_container[FLOW_SOL]->SetOmega_Max(Omega_Max);
+    }
   }
 }
 
@@ -4606,6 +4817,11 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
   unsigned long iEdge, iVertex, iPoint, jPoint;
   unsigned short iMarker, iSpecies;
 
+  //MANGOTURB
+  su2double Mean_EddyVisc=0.0;
+  bool rans = ((config->GetKind_Solver() == RANS) ||
+               (config->GetKind_Solver() == ADJ_RANS));
+
   su2double Area, Volume;
   su2double Local_Delta_Time, Global_Delta_Time = 1.0e6;
   su2double Local_Delta_Time_Visc;
@@ -4650,6 +4866,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
       Mean_ProjVel -= 0.5*(ProjVel_i + ProjVel_j);
     }
 
+
     Mean_Density = 0.5*(node[iPoint]->GetDensity() + node[jPoint]->GetDensity());
     Mean_ThermalCond = 0.5*(node[iPoint]->GetThermalConductivity() + node[jPoint]->GetThermalConductivity());
     Mean_LaminarVisc = 0.5*(node[iPoint]->GetLaminarViscosity() + node[jPoint]->GetLaminarViscosity());
@@ -4664,8 +4881,18 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
       node[jPoint]->AddMax_Lambda_Inv(Lambda);
 
     /*--- Determine the viscous spectral radius and apply it to the control volume ---*/
-  	Lambda_1 = 4.0/3.0*Mean_LaminarVisc;
-  	Lambda_2 = Mean_ThermalCond/Mean_CV;
+    //MANGOTURB
+    if(rans){
+      su2double Prandtl_Turb = config->GetPrandtl_Turb();
+      Mean_EddyVisc    = 0.5*(node[iPoint]->GetEddyViscosity() + node[jPoint]->GetEddyViscosity());
+      Lambda_1 = 4.0/3.0*(Mean_LaminarVisc+Mean_EddyVisc);
+      Lambda_2 = (1.0 + (Prandtl_Lam/Prandtl_Turb)*(Mean_EddyVisc/Mean_LaminarVisc))*(Gamma*Mean_LaminarVisc/Prandtl_Lam);
+    }
+    else {
+      Lambda_1 = 4.0/3.0*Mean_LaminarVisc;
+      Lambda_2 = Mean_ThermalCond/Mean_CV;
+    }
+
   	Lambda = (Lambda_1 + Lambda_2)*Area*Area/Mean_Density;
   	if(geometry->node[iPoint]->GetDomain())
       node[iPoint]->AddMax_Lambda_Visc(Lambda);
@@ -4704,8 +4931,18 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
           node[iPoint]->AddMax_Lambda_Inv(Lambda);
 
         /*--- Viscous contribution ---*/
-      	Lambda_1 = 4.0/3.0*Mean_LaminarVisc;
-      	Lambda_2 = Mean_ThermalCond/Mean_CV;
+        //MANGOTURB
+        if(rans){
+          su2double Prandtl_Turb = config->GetPrandtl_Turb();
+          Mean_EddyVisc    = node[iPoint]->GetEddyViscosity();
+          Lambda_1 = (4.0/3.0)*(Mean_LaminarVisc + Mean_EddyVisc);
+          Lambda_2 = (1.0 + (Prandtl_Lam/Prandtl_Turb)*(Mean_EddyVisc/Mean_LaminarVisc))*(Gamma*Mean_LaminarVisc/Prandtl_Lam);
+        }
+        else
+        {
+          Lambda_1 = 4.0/3.0*Mean_LaminarVisc;
+          Lambda_2 = Mean_ThermalCond/Mean_CV;
+        }
       	Lambda = (Lambda_1 + Lambda_2)*Area*Area/Mean_Density;
       	if(geometry->node[iPoint]->GetDomain())
           node[iPoint]->AddMax_Lambda_Visc(Lambda);
@@ -4832,18 +5069,22 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solver_c
     /*--- Set species binary diffusion coefficients at node i and j ---*/
     numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[jPoint]->GetDiffusionCoeff());
 
+
     //MANGOTURB
     /*--- Set values of turbolent kinetik energies and eddy viscosities into numerics class ---*/
+    // std::cout<<"qui ci sono"<<std::endl;
     if (config->GetKind_Turb_Model() == SST){
-       numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
+      std::cout<<"qui ci sono"<<std::endl;
+      numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
                                      solver_container[TURB_SOL]->node[jPoint]->GetSolution(0));
-       numerics->SetEddyViscosity(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0)*(node[iPoint]->GetPrimitive()[RHO_INDEX_PRIM])/
-                                  solver_container[TURB_SOL]->node[iPoint]->GetSolution(1),
-                                  solver_container[TURB_SOL]->node[jPoint]->GetSolution(0)*(node[jPoint]->GetPrimitive()[RHO_INDEX_PRIM])/
-                                  solver_container[TURB_SOL]->node[jPoint]->GetSolution(1));
+      std::cout<<"dai dio can"<<std::endl;
+      numerics->SetEddyViscosity(solver_container[TURB_SOL]->node[iPoint]->GetmuT(),
+                                  solver_container[TURB_SOL]->node[jPoint]->GetmuT());
     }
+
     /*--- Compute the residual ---*/
     numerics->ComputeResidual(Res_Visc, Jacobian_i, Jacobian_j, config);
+
 
     /*--- Check for NaNs before applying the residual to the linear system ---*/
     bool err = !std::none_of(Res_Visc, Res_Visc + nVar, [](su2double elem){return std::isnan(elem);});
@@ -4892,6 +5133,12 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
   su2double Tj, dTdn, Twall;
   su2double dij, Area;
   su2double Normal[nDim], UnitNormal[nDim];
+
+  //MANGOTURB
+  su2double eddy_viscosity;
+  su2double Prandtl_Turb = config->GetPrandtl_Turb();
+
+
 
   /*--- Identify the boundary ---*/
 	auto Marker_Tag = config->GetMarker_All_TagBound(val_marker);
@@ -4946,6 +5193,14 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
       Tj   = node[Point_Normal]->GetTemperature();
       ktr  = node[iPoint]->GetThermalConductivity();
 
+      //MANGOTURB
+      /*--- Simple Turbolent closure ---*/
+      if(rans){
+        su2double eddy_v = node[iPoint]->GetEddyViscosity();
+        su2double ktr_turb = visc_numerics-> Get_HeatFactor(eddy_v);
+        ktr+=ktr_turb;
+      }
+
       /*--- Compute normal gradient with finite difference approximation ---*/
       dTdn = (Twall - Tj)/dij;
 
@@ -4975,6 +5230,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
       /*--- If the wall is moving, there are additional residual contributions
             due to pressure (p v_{wall}\cdot n) and shear stress ((tau*v_{wall}) \cdot n). ---*/
       if(grid_movement) {
+        //SONQUI
         /*--- Get the projected grid velocity at the current boundary node ---*/
         su2double ProjGridVel = std::inner_product(Vector, Vector + nDim, UnitNormal, 0.0);
 
@@ -4997,9 +5253,21 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         su2double tau[nDim][nDim];
         for(iDim = 0; iDim < nDim; iDim++) {
           /*--- Compute tau---*/
-          for(jDim = 0; jDim < nDim; jDim++)
-            tau[iDim][jDim] = mu*(Grad_Vel[iDim][jDim] + Grad_Vel[jDim][iDim]);
-          tau[iDim][iDim] -= mu*TWO3*div_vel;
+
+          //MANGOTURB
+          if(rans){
+            mu += node[iPoint]->GetEddyViscosity();
+            su2double tke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);
+            su2double rho = node[iPoint]->GetDensity();
+            for(jDim = 0; jDim < nDim; jDim++)
+              tau[iDim][jDim] = mu*(Grad_Vel[iDim][jDim] + Grad_Vel[jDim][iDim]);
+            tau[iDim][iDim] -= (mu*TWO3*div_vel + TWO3*rho*tke);
+          }
+          else {
+            for(jDim = 0; jDim < nDim; jDim++)
+              tau[iDim][jDim] = mu*(Grad_Vel[iDim][jDim] + Grad_Vel[jDim][iDim]);
+            tau[iDim][iDim] -= mu*TWO3*div_vel;
+          }
         }
 
         /*--- Dot product of the stress tensor with the grid velocity ---*/
@@ -5103,6 +5371,9 @@ void CReactiveNSSolver::BC_HeatFlux_Wall(CGeometry* geometry, CSolver** solver_c
   /*--- Local variables ---*/
   unsigned short iDim, iVar, jVar;
   unsigned long iVertex, iPoint, Point_Normal;
+  //MANGOTURB
+  bool rans = ((config->GetKind_Solver() == RANS )|| (config->GetKind_Solver() == DISC_ADJ_RANS));
+
 
   su2double Area;
   su2double Normal[nDim], UnitNormal[nDim];
@@ -5173,10 +5444,21 @@ void CReactiveNSSolver::BC_HeatFlux_Wall(CGeometry* geometry, CSolver** solver_c
         su2double tau[nDim][nDim];
         for(iDim = 0; iDim < nDim; iDim++) {
           /*--- Compute tau---*/
+        //MANGOTURB
+        if(rans){
+          mu += node[iPoint]->GetEddyViscosity();
+          su2double tke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);
+          su2double rho = node[iPoint]->GetDensity();
+          for(jDim = 0; jDim < nDim; jDim++)
+            tau[iDim][jDim] = mu*(Grad_Vel[iDim][jDim] + Grad_Vel[jDim][iDim]);
+          tau[iDim][iDim] -= (mu*TWO3*div_vel + TWO3*rho*tke);
+        }
+        else {
           for(jDim = 0; jDim < nDim; jDim++)
             tau[iDim][jDim] = mu*(Grad_Vel[iDim][jDim] + Grad_Vel[jDim][iDim]);
           tau[iDim][iDim] -= mu*TWO3*div_vel;
         }
+
 
         /*--- Dot product of the stress tensor with the grid velocity ---*/
         su2double tau_vel[nDim];
