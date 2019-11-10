@@ -894,7 +894,7 @@ public:
    * \return \f$\rho C^{v-e}_{v} \f$
    */
   virtual su2double GetRhoCv_ve(void);
-  
+
   /*!
    * \brief A virtual member.
    * \param[in] val_dim - Index of the dimension.
@@ -1015,6 +1015,10 @@ public:
    */
   virtual bool SetPrimVar(CConfig *config);
 
+  //MANGOTURB
+  virtual bool SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke);
+
+  virtual bool SetPrimVar(CConfig* config,su2double val_ke);
   /*!
    * \brief A virtual member.
    */

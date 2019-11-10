@@ -798,8 +798,6 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
     }
     if(reactive_ns) {
       solver_container[iMGlevel][FLOW_SOL] = new CReactiveNSSolver(geometry[iMGlevel], config, iMGlevel);
-      //OCIU
-      std::cout<<" Costruttore Reactive NS ok"<<std::endl;
     }
 
     // NOTE: Previous contribution
@@ -816,8 +814,6 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
       }
       else if (menter_sst) {
         solver_container[iMGlevel][TURB_SOL] = new CTurbSSTSolver(geometry[iMGlevel], config, iMGlevel);
-        //OCIU
-        std::cout<<" Fa il preprocessing di flow e turb in sst "<<std::endl;
         solver_container[iMGlevel][FLOW_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config, iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
         solver_container[iMGlevel][TURB_SOL]->Postprocessing(geometry[iMGlevel], solver_container[iMGlevel], config, iMGlevel);
       }
@@ -1894,32 +1890,32 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
   }
 
   /*--- Solver definition for the FEM problem ---*/
-  if (fem) {
-    switch (config->GetGeometricConditions()) {
-      case SMALL_DEFORMATIONS :
-      switch (config->GetMaterialModel()) {
-          case LINEAR_ELASTIC: numerics_container[MESH_0][FEA_SOL][FEA_TERM] = new CFEM_LinearElasticity(nDim, nVar_FEM, config); break;
-          case NEO_HOOKEAN : cout << "Material model does not correspond to geometric conditions." << endl; exit(EXIT_FAILURE); break;
-          default: cout << "Material model not implemented." << endl; exit(EXIT_FAILURE); break;
-      }
-      break;
-      case LARGE_DEFORMATIONS :
-      switch (config->GetMaterialModel()) {
-          case LINEAR_ELASTIC: cout << "Material model does not correspond to geometric conditions." << endl; exit(EXIT_FAILURE); break;
-          case NEO_HOOKEAN :
-        switch (config->GetMaterialCompressibility()) {
-              case COMPRESSIBLE_MAT : numerics_container[MESH_0][FEA_SOL][FEA_TERM] = new CFEM_NeoHookean_Comp(nDim, nVar_FEM, config); break;
-              case INCOMPRESSIBLE_MAT : numerics_container[MESH_0][FEA_SOL][FEA_TERM] = new CFEM_NeoHookean_Incomp(nDim, nVar_FEM, config); break;
-              default: cout << "Material model not implemented." << endl; exit(EXIT_FAILURE); break;
-        }
-        break;
-          default: cout << "Material model not implemented." << endl; exit(EXIT_FAILURE); break;
-      }
-      break;
-      default: cout << " Solver not implemented." << endl; exit(EXIT_FAILURE); break;
-    }
-
-  }
+  // if (fem) {
+  //   switch (config->GetGeometricConditions()) {
+  //     case SMALL_DEFORMATIONS :
+  //     switch (config->GetMaterialModel()) {
+  //         case LINEAR_ELASTIC: numerics_container[MESH_0][FEA_SOL][FEA_TERM] = new CFEM_LinearElasticity(nDim, nVar_FEM, config); break;
+  //         case NEO_HOOKEAN : cout << "Material model does not correspond to geometric conditions." << endl; exit(EXIT_FAILURE); break;
+  //         default: cout << "Material model not implemented." << endl; exit(EXIT_FAILURE); break;
+  //     }
+  //     break;
+  //     case LARGE_DEFORMATIONS :
+  //     switch (config->GetMaterialModel()) {
+  //         case LINEAR_ELASTIC: cout << "Material model does not correspond to geometric conditions." << endl; exit(EXIT_FAILURE); break;
+  //         case NEO_HOOKEAN :
+  //       switch (config->GetMaterialCompressibility()) {
+  //             case COMPRESSIBLE_MAT : numerics_container[MESH_0][FEA_SOL][FEA_TERM] = new CFEM_NeoHookean_Comp(nDim, nVar_FEM, config); break;
+  //             case INCOMPRESSIBLE_MAT : numerics_container[MESH_0][FEA_SOL][FEA_TERM] = new CFEM_NeoHookean_Incomp(nDim, nVar_FEM, config); break;
+  //             default: cout << "Material model not implemented." << endl; exit(EXIT_FAILURE); break;
+  //       }
+  //       break;
+  //         default: cout << "Material model not implemented." << endl; exit(EXIT_FAILURE); break;
+  //     }
+  //     break;
+  //     default: cout << " Solver not implemented." << endl; exit(EXIT_FAILURE); break;
+  //   }
+  //
+  // }
 
 }
 
@@ -2679,8 +2675,6 @@ void CDriver::StartSolver() {
     /*--- Perform some external iteration preprocessing. ---*/
 
     PreprocessExtIter(ExtIter);
-    //OCIU
-    std::cout<<" passato ext iter"<<std::endl;
     /*--- Perform a single iteration of the chosen PDE solver. ---*/
 
     if (!fsi) {
@@ -2692,8 +2686,6 @@ void CDriver::StartSolver() {
       /*--- Run a single iteration of the problem (mean flow, wave, heat, ...). ---*/
 
       Run();
-      //OCIU
-      std::cout<<" passato run"<<std::endl;
 
       /*--- Update the solution for dual time stepping strategy ---*/
 
@@ -3577,7 +3569,8 @@ void CFluidDriver::Run() {
     for (iZone = 0; iZone < nZone; iZone++) {
       config_container[iZone]->SetIntIter(IntIter);
       //OCIU
-      std::cout<<" Dentro a RUN, sto per iniziare iterazione"<<std::endl;
+      std::cout<<" Dentro a CFluidDriver::Run: sto per iniziare CMeanFlowIteration::Iterate di iteration_container"<<std::endl;
+      std::cout<<" zona "<<iZone<<std::endl;
       iteration_container[iZone]->Iterate(output, integration_container, geometry_container, solver_container, numerics_container, config_container, surface_movement, grid_movement, FFDBox, iZone);
     }
 

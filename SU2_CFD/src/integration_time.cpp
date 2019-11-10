@@ -151,10 +151,12 @@ void CMultiGridIntegration::MultiGrid_Cycle(CGeometry ***geometry,
 
     for (iRKStep = 0; iRKStep < iRKLimit; iRKStep++) {
       //OCIU
-      std::cout<<" Sono in Multigridcycle e sto per fare un altro Preprocessing con "<<SolContainer_Position<<std::endl;
+
       /*--- Send-Receive boundary conditions, and preprocessing ---*/
       solver_container[iZone][iMesh][SolContainer_Position]->Preprocessing(geometry[iZone][iMesh], solver_container[iZone][iMesh], config[iZone], iMesh, iRKStep, RunTime_EqSystem, false);
-      std::cout<<" Sono in Multigridcycle e ho appena fatto Preprocessing con "<<SolContainer_Position<<std::endl;
+      std::cout<<" Sono in CMultiGridIntegration::MultiGrid_Cycle e ho appena fatto Solver_Preprocessing"<<std::endl;
+      std::cout<<" In totale ho "<<iRKLimit<<" iterazioni " <<std::endl;
+
       if (iRKStep == 0) {
 
         /*--- Set the old solution ---*/

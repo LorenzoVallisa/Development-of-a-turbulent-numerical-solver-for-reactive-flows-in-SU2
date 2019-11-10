@@ -538,15 +538,14 @@ void CMeanFlowIteration::Iterate(COutput *output,
   if (config_container[val_iZone]->GetKind_Solver() == REACTIVE_EULER ||
       config_container[val_iZone]->GetKind_Solver() == REACTIVE_NAVIER_STOKES){
     integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,
-                                                                        config_container, RUNTIME_REACTIVE_SYS, IntIter, val_iZone);}
-  else if (config_container[val_iZone]->GetKind_Solver() == REACTIVE_RANS ||){
+                                                                        config_container, RUNTIME_REACTIVE_SYS, IntIter, val_iZone);
+  }
+  else if (config_container[val_iZone]->GetKind_Solver() == REACTIVE_RANS){
     integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,
                                                                     config_container, RUNTIME_REACTIVE_SYS, IntIter, val_iZone);
     config_container[val_iZone]->SetGlobalParam(REACTIVE_RANS, RUNTIME_TURB_SYS, ExtIter);
     integration_container[val_iZone][TURB_SOL]->SingleGrid_Iteration(geometry_container, solver_container, numerics_container,
                                                                      config_container, RUNTIME_TURB_SYS, IntIter, val_iZone);
-    //OCIU
-    std::cout<<" Dentro ad iterazione, ho creato la parte FLOW_SOL e TURB_SOL"<<std::endl;
   }
   else
   integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,

@@ -234,7 +234,7 @@ public:
   * \param[in] UnitNormal - Normal vector, the norm of the vector is the area of the face.
   * \param[in] Mean_Eddy_Viscosity - Turbolent viscosity.
   */
-  void SST_Reactive_ResidualClosure(const Vec& Mean_PrimVar, const Vec& Mean_GradPrimVar, su2double* Normal,
+  void SST_Reactive_ResidualClosure(const Vec& Mean_PrimVar, const RealMatrix& Mean_GradPrimVar, su2double* Normal,
                                                                 const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,const su2double Mean_Laminar_Viscosity);
 
 

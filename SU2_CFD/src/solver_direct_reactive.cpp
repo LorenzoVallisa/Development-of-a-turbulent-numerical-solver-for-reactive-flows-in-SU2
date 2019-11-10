@@ -678,15 +678,12 @@ void CReactiveEulerSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
 //
 void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** solver_container, CConfig *config,
                                                unsigned long ExtIter) {
-  //OCIU
-  std::cout<<"Sono dentro setinitialcondition"<<std::endl;
+
   unsigned long iPoint, Point_Fine;
   unsigned short iMesh, iChildren, iVar;
   su2double Area_Children, Area_Parent, Solution[nVar];
   //MANGOTURB
-  bool rans = ((config->GetKind_Solver() == RANS) ||
-              (config->GetKind_Solver() == ADJ_RANS) ||
-              (config->GetKind_Solver() == DISC_ADJ_RANS));
+  bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
 
   bool restart = (config->GetRestart() || config->GetRestart_Flow());
   bool dual_time = (config->GetUnsteady_Simulation() == DT_STEPPING_1ST || config->GetUnsteady_Simulation() == DT_STEPPING_2ND);
@@ -713,8 +710,7 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
     //MANGOTURB
     /*--- Including turbulent initial conditions ---*/
     if (rans) {
-      //OCIU
-      std::cout<<"sto effetttivamente costruendo soluzioi per il turb"<<std::endl;
+
       unsigned short nVar_Turb = solver_container[MESH_0][TURB_SOL]->GetnVar();
       su2double SolutionTurb[nVar_Turb];
       for (iMesh = 1; iMesh <= config->GetnMGLevels(); iMesh++) {
@@ -749,8 +745,7 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
         solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n1();
         //MANGOTURB
         if (rans) {
-          //OCIU
-          std::cout<<"sto effetttivamente costruendo soluzioi per il turb"<<std::endl;
+
           solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n();
           solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n1();
         }
@@ -772,8 +767,7 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
           solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n();
           //MANGOTURB
           if (rans) {
-            //OCIU
-            std::cout<<"stoeffetttivamente costruendo soluzioi per il turb"<<std::endl;
+
             solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n();
           }
         }
@@ -992,7 +986,6 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver** solver_container, CConfig* config, bool Output) {
 
 
-std::cout<<" Son Dentro a SetPrimitiveVariable"<<std::endl;
   //MANGOTURB
   su2double eddy_visc = 0.0, turb_ke = 0.0;
   unsigned short turb_model = config->GetKind_Turb_Model();
@@ -1002,23 +995,24 @@ std::cout<<" Son Dentro a SetPrimitiveVariable"<<std::endl;
   bool NonPhys = false;
 
   for(iPoint = 0; iPoint < nPoint; ++iPoint) {
-std::cout<<" Bordello con getmu"<<std::endl;
     //MANGOTURB-//INCOMPLETO
     if (turb_model != NONE) {
       eddy_visc = solver_container[TURB_SOL]->node[iPoint]->GetmuT();
-      std::cout<<" Non trova getmu"<<std::endl;
-
       if (tkeNeeded) turb_ke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);
-        std::cout<<" Non trova soluzione turbolenta"<<std::endl;
     }
 
     /*--- Initialize the non-physical points vector ---*/
     node[iPoint]->SetNon_Physical(false);
 
     /*--- Compressible flow, primitive variables nSpecies + nDim + 5, (T, vx, vy, vz, P, rho, h, a, Y1,....YNs) ---*/
-    NonPhys = node[iPoint]->SetPrimVar(config);
+    //MANGOTURB
+    if (tkeNeeded)
+      NonPhys = node[iPoint]->SetPrimVar(config,eddy_visc,turb_ke);
+    else
+      NonPhys = node[iPoint]->SetPrimVar(config);
+
     bool ignition = config->GetIgnition();
-    std::cout<<" Bordello ignition"<<std::endl;
+
     /*--- Check if ignition is desired ---*/
     if(ignition) {
       if(config->GetExtIter() < config->GetIgnitionIter()) {
@@ -3197,7 +3191,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
   unsigned long iVertex, iPoint, Point_Normal;
 
   //MANGOTURB
-  bool tkeNeeded = (((config->GetKind_Solver() == RANS )|| (config->GetKind_Solver() == DISC_ADJ_RANS)) &&
+  bool tkeNeeded = ((config->GetKind_Solver() == REACTIVE_RANS) &&
                     (config->GetKind_Turb_Model() == SST));
 
   su2double Riemann, SoundSpeed, Vn, Vel_Mag, Gamma, Gamma_Minus_One, dim_temp, alpha, Area;
@@ -3748,7 +3742,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
   bool gravity = config->GetGravityForce();
 
   //MANGOTURB
-  bool tkeNeeded = (((config->GetKind_Solver() == RANS )|| (config->GetKind_Solver() == DISC_ADJ_RANS)) &&
+  bool tkeNeeded = ((config->GetKind_Solver() == REACTIVE_RANS) &&
                     (config->GetKind_Turb_Model() == SST));
 
   /*--- Loop over all the vertices on this boundary marker ---*/
@@ -4401,7 +4395,7 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
   //MANGOTURB
   /*--- Local turbolent variables for the adimensionalitazion of viscous contribution ---*/
   su2double Tke_FreeStream = 0.0,Tke_FreeStreamND = 0.0;
-  bool turbulent          = (config->GetKind_Solver() == RANS) || (config->GetKind_Solver() == DISC_ADJ_RANS);
+  bool turbulent          =(config->GetKind_Solver() == REACTIVE_RANS);
   bool tkeNeeded          = ((turbulent) && (config->GetKind_Turb_Model() == SST));
   su2double Omega_FreeStream = 0.0, Omega_FreeStreamND = 0.0;
 
@@ -4485,10 +4479,10 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
 void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_container, CConfig* config, unsigned short iMesh,
                                       unsigned short iRKStep, unsigned short RunTime_EqSystem, bool Output) {
 
-  std::cout<<" Prima di SerPtimitiveVariable "<<std::endl;
+
   /*--- Set the primitive variables ---*/
   unsigned long ErrorCounter = SetPrimitive_Variables(solver_container, config, Output);
-  unsigned short iPoint;
+  unsigned long iPoint;
 
   //MANGOTURB
   /*--- Set Voriticity and Omega parameters ---*/
@@ -4496,15 +4490,18 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
   bool limiter_visc         = config->GetViscous_Limiter_Flow();
   StrainMag_Max = 0.0, Omega_Max = 0.0;
 
-std::cout<<" Bordello con vorticita e strainmag "<<std::endl;
+
   for (iPoint = 0; iPoint < nPoint; iPoint++) {
 
     solver_container[FLOW_SOL]->node[iPoint]->SetVorticity(limiter_visc);
     solver_container[FLOW_SOL]->node[iPoint]->SetStrainMag(limiter_visc);
 
+
     StrainMag = solver_container[FLOW_SOL]->node[iPoint]->GetStrainMag();
     Vorticity = solver_container[FLOW_SOL]->node[iPoint]->GetVorticity();
+
     Omega = sqrt(Vorticity[0]*Vorticity[0]+ Vorticity[1]*Vorticity[1]+ Vorticity[2]*Vorticity[2]);
+
 
     StrainMag_Max = max(StrainMag_Max, StrainMag);
     Omega_Max = max(Omega_Max, Omega);
@@ -4524,16 +4521,17 @@ std::cout<<" Bordello con vorticita e strainmag "<<std::endl;
   /*--- Artificial dissipation ---*/
   if(space_centered && !Output)
     throw Common::NotImplemented("Centered convective scheme not implemented\n");
-    std::cout<<" Poco prima jacobiano "<<std::endl;
+
 
   /*--- Initialize the Jacobian matrices ---*/
   if(implicit)
     Jacobian.SetValZero();
-    std::cout<<" Merda con MPI "<<std::endl;
+
 
   //MANGOTURB
   /*--- Error message ---*/
   if(config->GetConsole_Output_Verb() == VERB_HIGH) {
+
 
     #ifdef HAVE_MPI
       su2double MyOmega_Max = Omega_Max; Omega_Max = 0.0;
@@ -4546,9 +4544,11 @@ std::cout<<" Bordello con vorticita e strainmag "<<std::endl;
     #endif
 
     if(iMesh == MESH_0){
+
       config->SetNonphysical_Points(ErrorCounter);
       solver_container[FLOW_SOL]->SetStrainMag_Max(StrainMag_Max);
       solver_container[FLOW_SOL]->SetOmega_Max(Omega_Max);
+
     }
   }
 }
@@ -4839,8 +4839,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
 
   //MANGOTURB
   su2double Mean_EddyVisc=0.0;
-  bool rans = ((config->GetKind_Solver() == RANS) ||
-               (config->GetKind_Solver() == ADJ_RANS));
+  bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
   su2double Prandtl_Lam = config-> GetPrandtl_Lam();
   su2double MeanGamma =0.0;
 
@@ -5097,18 +5096,16 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solver_c
 
     //MANGOTURB
     /*--- Set values of turbolent kinetik energies and eddy viscosities into numerics class ---*/
-    // std::cout<<"qui ci sono"<<std::endl;
     if (config->GetKind_Turb_Model() == SST){
-      std::cout<<"qui ci sono"<<std::endl;
       numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
                                      solver_container[TURB_SOL]->node[jPoint]->GetSolution(0));
-      std::cout<<"dai dio can"<<std::endl;
       numerics->SetEddyViscosity(solver_container[TURB_SOL]->node[iPoint]->GetmuT(),
                                   solver_container[TURB_SOL]->node[jPoint]->GetmuT());
     }
 
     /*--- Compute the residual ---*/
     numerics->ComputeResidual(Res_Visc, Jacobian_i, Jacobian_j, config);
+
 
 
     /*--- Check for NaNs before applying the residual to the linear system ---*/
@@ -5152,7 +5149,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
     SU2_Assert(Vector != NULL,"The array to store velocity for boundary conditions has not been allocated");
 
     //MANGOTURB
-    bool rans = ((config->GetKind_Solver() == RANS )|| (config->GetKind_Solver() == DISC_ADJ_RANS));
+    bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
 
 
 
@@ -5404,7 +5401,7 @@ void CReactiveNSSolver::BC_HeatFlux_Wall(CGeometry* geometry, CSolver** solver_c
     unsigned short iDim, iVar, jVar;
     unsigned long iVertex, iPoint, Point_Normal;
     //MANGOTURB
-    bool rans = ((config->GetKind_Solver() == RANS )|| (config->GetKind_Solver() == DISC_ADJ_RANS));
+    bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
 
 
     su2double Area;

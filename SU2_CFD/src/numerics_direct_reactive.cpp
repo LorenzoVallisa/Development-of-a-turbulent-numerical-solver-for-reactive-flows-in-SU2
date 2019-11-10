@@ -643,7 +643,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
 /*--- Build the closure for residual tensor of viscous residaul ---*/
 //
 //
-void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_PrimVar, const Vec& Mean_GradPrimVar, su2double* Normal,
+void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_PrimVar,const RealMatrix& Mean_GradPrimVar, su2double* Normal,
                                                               const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,const su2double Mean_Laminar_Viscosity){
 
 
@@ -665,7 +665,8 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
 
 
     /*--- Closure for Energy: simplest one cpGradT---*/
-    su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,Mean_PrimVar[T_INDEX_PRIM]);
+    su2double temp = Mean_PrimVar[T_INDEX_PRIM];
+    su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,temp);
 
     for( iDim = 0; iDim < nDim; ++iDim) {
 
@@ -707,7 +708,8 @@ unsigned short iSpecies;
 su2double theta = std::inner_product(UnitNormal, UnitNormal + nDim, UnitNormal, 0.0);
 RealVec molar_masses = library->GetMolarMasses();
 su2double M_tot = std::accumulate(molar_masses.begin(),molar_masses.end(),0.0);
-su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,Mean_PrimVar[T_INDEX_PRIM]);
+su2double temp = Mean_PrimVar[T_INDEX_PRIM];
+su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,temp);
 su2double sqrt_dist_ij_2=std::sqrt(dist_ij_2);
 
 /*--- Compute Jacobian with respect to primitives: symmetric (UnitNormal sign independent) or dimensionwise dependent---*/
@@ -1261,6 +1263,8 @@ for(iDim = 0; iDim < nDim; ++iDim) {
   /*--- Temperature ---*/
   Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim) = 0.5*(PrimVar_Grad_i[T_INDEX_GRAD][iDim]*PrimVar_Lim_i[T_INDEX_LIM] +
     PrimVar_Grad_j[T_INDEX_GRAD][iDim]*PrimVar_Lim_j[T_INDEX_LIM]);
+
+
     /*--- Velocities ---*/
     for(jDim = 0; jDim < nDim; ++jDim)
     Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim) = 0.5*(PrimVar_Grad_i[VX_INDEX_GRAD + jDim][iDim]*
@@ -1275,6 +1279,7 @@ for(iDim = 0; iDim < nDim; ++iDim) {
     }
 
 Proj_Mean_GradPrimVar_Edge = Mean_GradPrimVar*Edge_Vector;
+
 su2double dist_ij_2 = std::inner_product(Edge_Vector.data(), Edge_Vector.data() + Edge_Vector.size(), Edge_Vector.data(), 0.0);
 if(dist_ij_2 > EPS) {
   Diff_PrimVar[T_INDEX_AVGGRAD] = V_j[T_INDEX_PRIM] - V_i[T_INDEX_PRIM];

@@ -662,7 +662,7 @@ protected:
 
   //MANGOTURB
   su2double Eddy_Viscosity;
-  su2double* Vorticity;
+  su2double Vorticity[3];
   su2double StrainMag;
 
 
@@ -749,12 +749,12 @@ public:
   bool SetStrainMag(bool val_limiter);
 
   //MANGOTURB
-  su2double* GetVorticity()const  {
+  su2double* GetVorticity(void) {
     return Vorticity;
   }
 
   //MANGOTURB
-  su2double GetStrainMag()const {
+  su2double GetStrainMag(void){
     return StrainMag;
   }
 
