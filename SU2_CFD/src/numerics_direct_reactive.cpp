@@ -665,7 +665,7 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
 
 
     /*--- Closure for Energy: simplest one cpGradT---*/
-    su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity);
+    su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,Mean_PrimVar[T_INDEX_PRIM]);
 
     for( iDim = 0; iDim < nDim; ++iDim) {
 
@@ -707,7 +707,7 @@ unsigned short iSpecies;
 su2double theta = std::inner_product(UnitNormal, UnitNormal + nDim, UnitNormal, 0.0);
 RealVec molar_masses = library->GetMolarMasses();
 su2double M_tot = std::accumulate(molar_masses.begin(),molar_masses.end(),0.0);
-su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity);
+su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,Mean_PrimVar[T_INDEX_PRIM]);
 su2double sqrt_dist_ij_2=std::sqrt(dist_ij_2);
 
 /*--- Compute Jacobian with respect to primitives: symmetric (UnitNormal sign independent) or dimensionwise dependent---*/

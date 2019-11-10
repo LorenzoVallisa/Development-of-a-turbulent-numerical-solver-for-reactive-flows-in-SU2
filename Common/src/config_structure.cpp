@@ -2853,6 +2853,10 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
       (Kind_Turb_Model != NONE))
     Kind_Solver = RANS;
 
+  if ((Kind_Solver == REACTIVE_NAVIER_STOKES) &&
+      (Kind_Turb_Model != NONE))
+    Kind_Solver = REACTIVE_RANS;
+
   if (Kind_Solver == EULER || Kind_Solver == REACTIVE_EULER)
     Kind_Turb_Model = NONE;
 
@@ -3034,6 +3038,7 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
 
   Viscous = (( Kind_Solver == NAVIER_STOKES          ) ||
              ( Kind_Solver == ADJ_NAVIER_STOKES      ) ||
+             ( Kind_Solver == REACTIVE_RANS          ) ||
              ( Kind_Solver == RANS                   ) ||
              ( Kind_Solver == REACTIVE_NAVIER_STOKES ) ||
              ( Kind_Solver == ADJ_RANS               ) );
@@ -3776,10 +3781,10 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible Laminar Navier-Stokes' equations." << endl;
         if (Kind_Regime == INCOMPRESSIBLE) cout << "Incompressible Laminar Navier-Stokes' equations." << endl;
         break;
-      case REACTIVE_NAVIER_STOKES:
+        case REACTIVE_NAVIER_STOKES:
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible reacting flow Navier-Stokes equations." << endl;
         break;
-      case RANS: case DISC_ADJ_RANS:
+        case RANS: case DISC_ADJ_RANS:
         if (Kind_Regime == COMPRESSIBLE) cout << "Compressible RANS equations." << endl;
         if (Kind_Regime == INCOMPRESSIBLE) cout << "Incompressible RANS equations." << endl;
         cout << "Turbulence model: ";
@@ -3787,6 +3792,13 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
           case SA:     cout << "Spalart Allmaras" << endl; break;
           case SA_NEG: cout << "Negative Spalart Allmaras" << endl; break;
           case SST:    cout << "Menter's SST"     << endl; break;
+        }
+        break;
+        case REACTIVE_RANS:
+        if (Kind_Regime == COMPRESSIBLE) cout << "Compressible reacting RANS equations." << endl;
+        cout << "Turbulence model: ";
+        switch (Kind_Turb_Model) {
+          case SST:    cout << "(Reactive) Menter's SST"     << endl; break;
         }
         break;
       case POISSON_EQUATION: cout << "Poisson equation." << endl; break;
@@ -3820,11 +3832,11 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
 
     if ((Kind_Regime == COMPRESSIBLE) && (Kind_Solver != FEM_ELASTICITY) &&
         (Kind_Solver != HEAT_EQUATION) && (Kind_Solver != WAVE_EQUATION) &&
-        ((Kind_Solver != REACTIVE_EULER)) && (Kind_Solver != REACTIVE_NAVIER_STOKES)) {
+        ((Kind_Solver != REACTIVE_EULER)) && (Kind_Solver != REACTIVE_NAVIER_STOKES) && (Kind_Solver != REACTIVE_NAVIER_STOKES)) {
       cout << "Mach number: " << Mach <<"."<< endl;
       cout << "Angle of attack (AoA): " << AoA <<" deg, and angle of sideslip (AoS): " << AoS <<" deg."<< endl;
       if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == ADJ_NAVIER_STOKES) || (Kind_Solver == REACTIVE_NAVIER_STOKES) ||
-          (Kind_Solver == RANS) || (Kind_Solver == ADJ_RANS))
+          (Kind_Solver == RANS) || (Kind_Solver == ADJ_RANS) || (Kind_Solver == REACTIVE_RANS))
         cout << "Reynolds number: " << Reynolds <<". Reference length "  << Length_Reynolds << "." << endl;
       if (Fixed_CL_Mode) cout << "Fixed CL mode, target value: " << Target_CL << "." << endl;
       if (Fixed_CM_Mode) {
@@ -5819,19 +5831,26 @@ void CConfig::SetGlobalParam(unsigned short val_solver,
         SetKind_TimeIntScheme(Kind_TimeIntScheme_Flow);
       }
       break;
-    case RANS:
-      if (val_system == RUNTIME_FLOW_SYS) {
-        SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,
-                              Kind_Upwind_Flow, Kind_SlopeLimit_Flow,
-                              SpatialOrder_Flow);
-        SetKind_TimeIntScheme(Kind_TimeIntScheme_Flow);
-      }
+    case REACTIVE_RANS:
       if (val_system == RUNTIME_REACTIVE_SYS) {
         SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,
                               Kind_Upwind_Flow, Kind_SlopeLimit_Flow,
                               SpatialOrder_Flow);
         SetKind_TimeIntScheme(Kind_TimeIntScheme_Flow);
       }
+      if (val_system == RUNTIME_TURB_SYS) {
+        SetKind_ConvNumScheme(Kind_ConvNumScheme_Turb, Kind_Centered_Turb,
+          Kind_Upwind_Turb, Kind_SlopeLimit_Turb,
+          SpatialOrder_Turb);
+          SetKind_TimeIntScheme(Kind_TimeIntScheme_Turb);
+      }
+    case RANS:
+        if (val_system == RUNTIME_FLOW_SYS) {
+          SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,
+            Kind_Upwind_Flow, Kind_SlopeLimit_Flow,
+            SpatialOrder_Flow);
+            SetKind_TimeIntScheme(Kind_TimeIntScheme_Flow);
+          }
       if (val_system == RUNTIME_TURB_SYS) {
         SetKind_ConvNumScheme(Kind_ConvNumScheme_Turb, Kind_Centered_Turb,
                               Kind_Upwind_Turb, Kind_SlopeLimit_Turb,

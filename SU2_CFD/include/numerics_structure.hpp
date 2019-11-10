@@ -467,6 +467,14 @@ public:
    */
   virtual void SetF2blending(su2double val_F1_i, su2double val_F1_j) {/* empty */};
 
+  //MANGOTURB
+  /*!
+   * \brief Set the value of the second blending function.
+   * \param[in] val_F1_i - Value of the second Menter blending function at point i.
+   * \param[in] val_F1_j - Value of the second Menter blending function at point j.
+   */
+  virtual su2double Get_HeatFactor(const su2double eddy_visc,const su2double temp){};
+
   /*!
    * \brief Set the value of the cross diffusion for the SST model.
    * \param[in] val_CDkw_i - Value of the cross diffusion at point i.

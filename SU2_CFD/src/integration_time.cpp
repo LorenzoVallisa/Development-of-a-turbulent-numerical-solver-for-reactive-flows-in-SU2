@@ -59,6 +59,7 @@ void CMultiGridIntegration::MultiGrid_Iteration(CGeometry ***geometry,
                        (config[iZone]->GetKind_Solver() == RANS)                          ||
                        (config[iZone]->GetKind_Solver() == REACTIVE_EULER)                ||
                        (config[iZone]->GetKind_Solver() == REACTIVE_NAVIER_STOKES)        ||
+                       (config[iZone]->GetKind_Solver() == REACTIVE_RANS)        ||
                        (config[iZone]->GetKind_Solver() == DISC_ADJ_EULER)                ||
                        (config[iZone]->GetKind_Solver() == DISC_ADJ_NAVIER_STOKES)        ||
                        (config[iZone]->GetKind_Solver() == DISC_ADJ_RANS));
@@ -135,7 +136,7 @@ void CMultiGridIntegration::MultiGrid_Cycle(CGeometry ***geometry,
 
   unsigned short iPreSmooth, iPostSmooth, iRKStep, iRKLimit = 1;
 
-  bool startup_multigrid = (config[iZone]->GetRestart_Flow() && ((RunTime_EqSystem == RUNTIME_FLOW_SYS)||(RunTime_EqSystem == RUNTIME_SYSTEM_SYS)) && (Iteration == 0));
+  bool startup_multigrid = (config[iZone]->GetRestart_Flow() && ((RunTime_EqSystem == RUNTIME_FLOW_SYS)||(RunTime_EqSystem == RUNTIME_REACTIVE_SYS)) && (Iteration == 0));
   unsigned short SolContainer_Position = config[iZone]->GetContainerPosition(RunTime_EqSystem);
 
   /*--- Do a presmoothing on the grid iMesh to be restricted to the grid iMesh+1 ---*/
@@ -149,11 +150,11 @@ void CMultiGridIntegration::MultiGrid_Cycle(CGeometry ***geometry,
     /*--- Time and space integration ---*/
 
     for (iRKStep = 0; iRKStep < iRKLimit; iRKStep++) {
-
+      //OCIU
+      std::cout<<" Sono in Multigridcycle e sto per fare un altro Preprocessing con "<<SolContainer_Position<<std::endl;
       /*--- Send-Receive boundary conditions, and preprocessing ---*/
-
       solver_container[iZone][iMesh][SolContainer_Position]->Preprocessing(geometry[iZone][iMesh], solver_container[iZone][iMesh], config[iZone], iMesh, iRKStep, RunTime_EqSystem, false);
-
+      std::cout<<" Sono in Multigridcycle e ho appena fatto Preprocessing con "<<SolContainer_Position<<std::endl;
       if (iRKStep == 0) {
 
         /*--- Set the old solution ---*/

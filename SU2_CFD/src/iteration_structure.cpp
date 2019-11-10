@@ -509,7 +509,7 @@ void CMeanFlowIteration::Iterate(COutput *output,
   /*--- Update global parameters ---*/
 
   switch( config_container[val_iZone]->GetKind_Solver() ) {
-  
+
     case EULER: case DISC_ADJ_EULER:
       config_container[val_iZone]->SetGlobalParam(EULER, RUNTIME_FLOW_SYS, ExtIter); break;
 
@@ -517,7 +517,7 @@ void CMeanFlowIteration::Iterate(COutput *output,
       config_container[val_iZone]->SetGlobalParam(NAVIER_STOKES, RUNTIME_FLOW_SYS, ExtIter); break;
 
     case RANS: case DISC_ADJ_RANS:
-      config_container[val_iZone]->SetGlobalParam(RANS, RUNTIME_REACTIVE_SYS, ExtIter); break;
+      config_container[val_iZone]->SetGlobalParam(RANS, RUNTIME_FLOW_SYS, ExtIter); break;
 
     /*--- NOTE: Reactive simulations additions ---*/
     case REACTIVE_EULER:
@@ -528,23 +528,37 @@ void CMeanFlowIteration::Iterate(COutput *output,
       config_container[val_iZone]->SetGlobalParam(REACTIVE_NAVIER_STOKES, RUNTIME_REACTIVE_SYS, ExtIter);
       break;
 
+    case REACTIVE_RANS:
+      config_container[val_iZone]->SetGlobalParam(REACTIVE_RANS, RUNTIME_REACTIVE_SYS, ExtIter);
+      break;
+
   }
 
   /*--- Solve the Euler, Navier-Stokes or Reynolds-averaged Navier-Stokes (RANS) equations (one iteration) ---*/
   if (config_container[val_iZone]->GetKind_Solver() == REACTIVE_EULER ||
-      config_container[val_iZone]->GetKind_Solver() == REACTIVE_NAVIER_STOKES)
+      config_container[val_iZone]->GetKind_Solver() == REACTIVE_NAVIER_STOKES){
     integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,
-                                                                        config_container, RUNTIME_REACTIVE_SYS, IntIter, val_iZone);
+                                                                        config_container, RUNTIME_REACTIVE_SYS, IntIter, val_iZone);}
+  else if (config_container[val_iZone]->GetKind_Solver() == REACTIVE_RANS ||){
+    integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,
+                                                                    config_container, RUNTIME_REACTIVE_SYS, IntIter, val_iZone);
+    config_container[val_iZone]->SetGlobalParam(REACTIVE_RANS, RUNTIME_TURB_SYS, ExtIter);
+    integration_container[val_iZone][TURB_SOL]->SingleGrid_Iteration(geometry_container, solver_container, numerics_container,
+                                                                     config_container, RUNTIME_TURB_SYS, IntIter, val_iZone);
+    //OCIU
+    std::cout<<" Dentro ad iterazione, ho creato la parte FLOW_SOL e TURB_SOL"<<std::endl;
+  }
   else
-    integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,
-                                                                    config_container, RUNTIME_FLOW_SYS, IntIter, val_iZone);
+  integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,
+                                                                  config_container, RUNTIME_FLOW_SYS, IntIter, val_iZone);
+
+
 
 
   if ((config_container[val_iZone]->GetKind_Solver() == RANS) ||
       (config_container[val_iZone]->GetKind_Solver() == DISC_ADJ_RANS)) {
 
     /*--- Solve the turbulence model ---*/
-
     config_container[val_iZone]->SetGlobalParam(RANS, RUNTIME_TURB_SYS, ExtIter);
     integration_container[val_iZone][TURB_SOL]->SingleGrid_Iteration(geometry_container, solver_container, numerics_container,
                                                                      config_container, RUNTIME_TURB_SYS, IntIter, val_iZone);
@@ -613,7 +627,7 @@ void CMeanFlowIteration::Update(COutput *output,
     /*--- Update dual time solver for the turbulence model ---*/
 
     if ((config_container[val_iZone]->GetKind_Solver() == RANS) ||
-        (config_container[val_iZone]->GetKind_Solver() == DISC_ADJ_RANS)) {
+        (config_container[val_iZone]->GetKind_Solver() == DISC_ADJ_RANS) || (config_container[val_iZone]->GetKind_Solver() == REACTIVE_RANS)) {
       integration_container[val_iZone][TURB_SOL]->SetDualTime_Solver(geometry_container[val_iZone][MESH_0], solver_container[val_iZone][MESH_0][TURB_SOL], config_container[val_iZone], MESH_0);
       integration_container[val_iZone][TURB_SOL]->SetConvergence(false);
     }

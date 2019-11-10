@@ -164,7 +164,7 @@ CDriver::CDriver(char* confFile,
 
     if ((config_container[iZone]->GetKind_Solver() == RANS) ||
         (config_container[iZone]->GetKind_Solver() == ADJ_RANS) ||
-        (config_container[iZone]->GetKind_Solver() == DISC_ADJ_RANS))
+        (config_container[iZone]->GetKind_Solver() == DISC_ADJ_RANS)|| (config_container[iZone]->GetKind_Solver() == REACTIVE_RANS))
       geometry_container[iZone][MESH_0]->ComputeWall_Distance(config_container[iZone]);
 
     /*--- Computation of positive surface area in the z-plane which is used for
@@ -331,7 +331,7 @@ CDriver::CDriver(char* confFile,
 
       if ( (config_container[iZone]->GetKind_Solver() == RANS) ||
           (config_container[iZone]->GetKind_Solver() == ADJ_RANS) ||
-          (config_container[iZone]->GetKind_Solver() == DISC_ADJ_RANS))
+          (config_container[iZone]->GetKind_Solver() == DISC_ADJ_RANS)|| (config_container[iZone]->GetKind_Solver() == REACTIVE_RANS))
         geometry_container[iZone][MESH_0]->ComputeWall_Distance(config_container[iZone]);
     }
   }
@@ -742,6 +742,8 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
       break;
+    case REACTIVE_RANS: reactive_ns = true; turbulent = true; break;
+
 
   }
 
@@ -796,8 +798,8 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
     }
     if(reactive_ns) {
       solver_container[iMGlevel][FLOW_SOL] = new CReactiveNSSolver(geometry[iMGlevel], config, iMGlevel);
-      solver_container[iMGlevel][FLOW_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config,
-                                                          iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
+      //OCIU
+      std::cout<<" Costruttore Reactive NS ok"<<std::endl;
     }
 
     // NOTE: Previous contribution
@@ -814,7 +816,9 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
       }
       else if (menter_sst) {
         solver_container[iMGlevel][TURB_SOL] = new CTurbSSTSolver(geometry[iMGlevel], config, iMGlevel);
-        solver_container[iMGlevel][FLOW_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config, iMGlevel, NO_RK_ITER, RUNTIME_FLOW_SYS, false);
+        //OCIU
+        std::cout<<" Fa il preprocessing di flow e turb in sst "<<std::endl;
+        solver_container[iMGlevel][FLOW_SOL]->Preprocessing(geometry[iMGlevel], solver_container[iMGlevel], config, iMGlevel, NO_RK_ITER, RUNTIME_REACTIVE_SYS, false);
         solver_container[iMGlevel][TURB_SOL]->Postprocessing(geometry[iMGlevel], solver_container[iMGlevel], config, iMGlevel);
       }
       if (transition) {
@@ -913,8 +917,10 @@ void CDriver::Solver_Postprocessing(CSolver ***solver_container, CGeometry **geo
     case REACTIVE_EULER:
       reactive_euler = true;
       break;
-    case REACTIVE_NAVIER_STOKES:
+    case  REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
+      break;
+    case REACTIVE_RANS: reactive_ns = true; turbulent = true;
       break;
   }
 
@@ -1029,6 +1035,9 @@ void CDriver::Integration_Preprocessing(CIntegration **integration_container,
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
       break;
+    case REACTIVE_RANS:
+      reactive_ns = true; turbulent = true;
+      break;
   }
 
   /*--- Allocate solution for a template problem ---*/
@@ -1100,6 +1109,9 @@ void CDriver::Integration_Postprocessing(CIntegration **integration_container,
       break;
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
+      break;
+    case REACTIVE_RANS:
+      reactive_ns = true; turbulent = true;
       break;
   }
 
@@ -1197,6 +1209,9 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
       break;
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
+      break;
+    case REACTIVE_RANS:
+      reactive_ns = true; turbulent = true;
       break;
   }
 
@@ -1964,6 +1979,9 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
       break;
+    case REACTIVE_RANS:
+      reactive_ns = true; turbulent = true;
+      break;
   }
 
   /*--- Assign turbulence model booleans ---*/
@@ -2374,6 +2392,11 @@ void CDriver::Iteration_Preprocessing() {
         std::cout << ": Euler/Navier-Stokes/RANS fluid iteration." << std::endl;
       iteration_container[iZone] = new CMeanFlowIteration(config_container[iZone]);
       break;
+    case REACTIVE_RANS:
+      if (rank == MASTER_NODE)
+        std::cout << ": Reactive RANS fluid iteration." << std::endl;
+      iteration_container[iZone] = new CMeanFlowIteration(config_container[iZone]);
+      break;
   }
 
 }
@@ -2656,7 +2679,8 @@ void CDriver::StartSolver() {
     /*--- Perform some external iteration preprocessing. ---*/
 
     PreprocessExtIter(ExtIter);
-
+    //OCIU
+    std::cout<<" passato ext iter"<<std::endl;
     /*--- Perform a single iteration of the chosen PDE solver. ---*/
 
     if (!fsi) {
@@ -2668,6 +2692,8 @@ void CDriver::StartSolver() {
       /*--- Run a single iteration of the problem (mean flow, wave, heat, ...). ---*/
 
       Run();
+      //OCIU
+      std::cout<<" passato run"<<std::endl;
 
       /*--- Update the solution for dual time stepping strategy ---*/
 
@@ -2729,7 +2755,7 @@ void CDriver::PreprocessExtIter(unsigned long ExtIter) {
   /*--- MANGOTURB: Set initial condition in case of restart multispecies simulation for turbulent solver too ---*/
   if(!fsi && (config_container[ZONE_0]->GetKind_Solver() == REACTIVE_EULER ||
               config_container[ZONE_0]->GetKind_Solver() == REACTIVE_NAVIER_STOKES ||
-              (config_container[ZONE_0]->GetKind_Solver() ==  RANS) ) )  {
+              (config_container[ZONE_0]->GetKind_Solver() ==  REACTIVE_RANS) ) )  {
     for(iZone = 0; iZone < nZone; ++iZone)
       solver_container[iZone][MESH_0][FLOW_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
                                                                        config_container[iZone], ExtIter);
@@ -2794,7 +2820,7 @@ bool CDriver::Monitor(unsigned long ExtIter) {
     case DISC_ADJ_EULER: case DISC_ADJ_NAVIER_STOKES: case DISC_ADJ_RANS:
       StopCalc = integration_container[ZONE_0][ADJFLOW_SOL]->GetConvergence(); break;
     /*--- NOTE: Multispecies part additions ---*/
-    case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
+    case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES: case REACTIVE_RANS:
       StopCalc = integration_container[ZONE_0][FLOW_SOL]->GetConvergence();
       break;
   }
@@ -3550,7 +3576,8 @@ void CFluidDriver::Run() {
 
     for (iZone = 0; iZone < nZone; iZone++) {
       config_container[iZone]->SetIntIter(IntIter);
-
+      //OCIU
+      std::cout<<" Dentro a RUN, sto per iniziare iterazione"<<std::endl;
       iteration_container[iZone]->Iterate(output, integration_container, geometry_container, solver_container, numerics_container, config_container, surface_movement, grid_movement, FFDBox, iZone);
     }
 
@@ -3669,8 +3696,10 @@ void CFluidDriver::ResetConvergence() {
       break;
 
     /*--- NOTE: Check convergence in case of multispecies simulations ---*/
-    case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
+    case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES: case REACTIVE_RANS:
       integration_container[ZONE_0][FLOW_SOL]->SetConvergence(false);
+      if (config_container[iZone]->GetKind_Solver() == REACTIVE_RANS) integration_container[iZone][TURB_SOL]->SetConvergence(false);
+      if(config_container[iZone]->GetKind_Trans_Model() == LM) integration_container[iZone][TRANS_SOL]->SetConvergence(false);
       break;
     }
   }

@@ -216,7 +216,16 @@ public:
 
 
 
+  //MANGOTURB
+  /*!
+  * \brief Return heat flux factor for only turbolent closure, since laminar one already implemented in SetLaminarTensorFlux.
+  */
+  su2double Get_HeatFactor(const su2double eddy_visc,const su2double temp)override{
 
+    su2double gamma = library -> ComputeFrozenGamma(temp,Ys);
+    return (gamma/(gamma-1))*Gas_Constant*(eddy_visc/Prandtl_Turb);
+
+  }
   //MANGOTURB
   /*!
   * \brief /*--- Build the closure for residual tensor of viscous residaul ---*
@@ -255,8 +264,6 @@ public:
     Dij_j = Diff_j;
   }
 
-protected:
-
   //MANGOTURB
   /*!
    * \brief Approximation of Viscous NS Jacobians in Thermochemical Non Equilibrium.
@@ -279,15 +286,9 @@ protected:
                                const Vec& val_grad_xs_norm, const Vec& val_diffusion_coeff,
                                const su2double val_dist_ij, const su2double val_dS, su2double* val_normal,
                                CConfig* config, AuxMatrix & dFdVi, AuxMatrix & dFdVj, AuxMatrix & dVdUi, AuxMatrix & dVdUj);
-   //MANGOTURB
-   /*!
-   * \brief Return heat flux factor for only turbolent closure, since laminar one already implemented in SetLaminarTensorFlux.
-   */
-   inline su2double Get_HeatFactor(const su2double eddy_visc){
 
-     return (Gamma/Gamma_Minus_One)*Gas_Constant*(eddy_visc/Prandtl_Turb);
+protected:
 
-   }
 
   /*!
    * \brief Compute the diffusive flux along a certain direction

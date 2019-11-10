@@ -197,7 +197,8 @@ enum ENUM_SOLVER {
   DISC_ADJ_NAVIER_STOKES = 37,
   /*--- NOTE: Multispecies additions ---*/
   REACTIVE_EULER = 38, /*!< \brief Definition of the Reactive Euler solver. */
-  REACTIVE_NAVIER_STOKES = 39 /*!< \brief Definition of the Reactive Navier-Stokes solver. */
+  REACTIVE_NAVIER_STOKES = 39, /*!< \brief Definition of the Reactive Navier-Stokes solver. */
+  REACTIVE_RANS = 40 /*!< \brief Definition of the Reactive RANS solver. */
 };
 /* BEGIN_CONFIG_ENUMS */
 static const map<string, ENUM_SOLVER> Solver_Map = CCreateMap<string, ENUM_SOLVER>
@@ -220,7 +221,8 @@ static const map<string, ENUM_SOLVER> Solver_Map = CCreateMap<string, ENUM_SOLVE
 ("TEMPLATE_SOLVER", TEMPLATE_SOLVER)
 /*--- NOTE: Reactive simulation addition ---*/
 ("REACTIVE_EULER", REACTIVE_EULER)
-("REACTIVE_NAVIER_STOKES", REACTIVE_NAVIER_STOKES);
+("REACTIVE_NAVIER_STOKES", REACTIVE_NAVIER_STOKES)
+("REACTIVE_RANS", REACTIVE_RANS);
 
 
 

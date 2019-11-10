@@ -444,7 +444,7 @@ public:
    * \brief Set all the primitive variables for compressible flows.
    * \param[in] config - Configuration of the particular problem.
    */
-  bool SetPrimVar(CConfig* config,su2double val_ke) override;
+  bool SetPrimVar(CConfig* config,su2double val_ke);
 
   /*!
    * \brief Set all the primitive variables form conserved variables.
@@ -749,12 +749,12 @@ public:
   bool SetStrainMag(bool val_limiter);
 
   //MANGOTURB
-  su2double* GetVorticity()const {
+  su2double* GetVorticity()const  {
     return Vorticity;
   }
 
   //MANGOTURB
-  su2double GetStrainMag()const{
+  su2double GetStrainMag()const {
     return StrainMag;
   }
 
@@ -782,7 +782,7 @@ public:
    * \brief Set all primitive variables and transport properties for compressible flows.
    * \param[in] config - Configuration of the particular problem.
    */
-  bool SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke)override;
+  bool SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke);
 
 
   //MANGOTURB

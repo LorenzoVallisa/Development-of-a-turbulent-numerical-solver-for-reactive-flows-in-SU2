@@ -2995,9 +2995,9 @@ void CTurbSSTSolver::Source_Residual(CGeometry *geometry, CSolver **solver_conta
 
     //MANGOTURB
     numerics->SetLaminarViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(),
-                           solver_container[FLOW_SOL]->node[jPoint]->GetLaminarViscosity());
+                           solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity());
     numerics->SetEddyViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity(),
-                          solver_container[FLOW_SOL]->node[jPoint]->GetEddyViscosity());
+                          solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity());
 
     /*--- Compute the source term ---*/
     numerics->ComputeResidual(Residual, Jacobian_i, NULL, config);
@@ -3269,10 +3269,10 @@ void CTurbSSTSolver::BC_Inlet(CGeometry *geometry, CSolver **solver_container, C
       visc_numerics->SetF1blending(node[iPoint]->GetF1blending(), node[iPoint]->GetF1blending());
 
       //MANGOTURB
-      numerics->SetLaminarViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(),
-                             solver_container[FLOW_SOL]->node[jPoint]->GetLaminarViscosity());
-      numerics->SetEddyViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity(),
-                            solver_container[FLOW_SOL]->node[jPoint]->GetEddyViscosity());
+      visc_numerics->SetLaminarViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(),
+                             solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity());
+      visc_numerics->SetEddyViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity(),
+                            solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity());
 
       /*--- Compute residual, and Jacobians ---*/
       visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
@@ -3361,10 +3361,10 @@ void CTurbSSTSolver::BC_Outlet(CGeometry *geometry, CSolver **solver_container, 
       visc_numerics->SetF1blending(node[iPoint]->GetF1blending(), node[iPoint]->GetF1blending());
 
       //MANGOTURB
-      numerics->SetLaminarViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(),
-                             solver_container[FLOW_SOL]->node[jPoint]->GetLaminarViscosity());
-      numerics->SetEddyViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity(),
-                            solver_container[FLOW_SOL]->node[jPoint]->GetEddyViscosity());
+      visc_numerics->SetLaminarViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(),
+                             solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity());
+      visc_numerics->SetEddyViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity(),
+                            solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity());
 
       /*--- Compute residual, and Jacobians ---*/
       visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
