@@ -364,13 +364,27 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   #endif
 
-  bool nonPhys_infty = node_infty->SetPrimVar(config);
+  //MANGOTURB
+  unsigned short turb_model = config->GetKind_Turb_Model();
+  bool tkeNeeded            = (turb_model == SST);
+  su2double val_ke = config -> GetTke_FreeStream(); //Dimensional freestream turbolent ke
+  bool nonPhys_infty;
+  bool nonPhys;
+
+  if(tkeNeeded)
+    nonPhys_infty = node_infty->SetPrimVar(config,val_ke);
+  else
+    nonPhys_infty = node_infty->SetPrimVar(config);
+
   SU2_Assert(nonPhys_infty == false, "Assigned freestream values are not compatible with physics");
 
   unsigned long counter_local = 0, counter_global;
   for(unsigned long iPoint = 0; iPoint < nPoint; ++iPoint) {
     /*--- Check current solution ---*/
-    bool nonPhys = node[iPoint]->SetPrimVar(config);
+    if(tkeNeeded)
+      nonPhys = node_infty->SetPrimVar(config,val_ke);
+    else
+      nonPhys = node_infty->SetPrimVar(config);
     /*--- If current solution is not physical use free-stream values ---*/
     if(nonPhys) {
       su2double rho, hs_Tot;
@@ -390,7 +404,8 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
       su2double dim_temp = Temperature_Inf*config->GetTemperature_Ref();
       if(US_System)
         dim_temp *= 5.0/9.0;
-      hs_Tot = library->ComputeEnthalpy(dim_temp, MassFrac_Inf)/config->GetEnergy_Ref();
+      //MANGOTURB
+      hs_Tot = (library->ComputeEnthalpy(dim_temp, MassFrac_Inf) + (tkeNeeded)*val_ke)/config->GetEnergy_Ref();
       if(US_System)
         hs_Tot *= 3.28084*3.28084;
       Solution[RHOE_INDEX_SOL] = rho*(hs_Tot + 0.5*sqvel) - Pressure_Inf;
@@ -413,6 +428,7 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
       std::cout << "Warning. The original solution contains "<< counter_global << " points that are not physical." << std::endl;
   }
 } /*--- End of Check_FreeStream_Solution() function ---*/
+
 
 //
 //
@@ -767,7 +783,6 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
           solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n();
           //MANGOTURB
           if (rans) {
-
             solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n();
           }
         }
@@ -827,6 +842,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 
    /*--- Compute the free stream energy ---*/
    Energy_FreeStream = library->ComputeEnergy(Temperature_FreeStream, MassFrac_Inf) + 0.5*ModVel_FreeStream*ModVel_FreeStream;
+   //MANGOTURB
    config->SetEnergy_FreeStream(Energy_FreeStream);
 
    /*--- Compute non dimensional quantities: Notice that the grid is in meters. ---*/
@@ -872,6 +888,12 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 
    Gas_Constant_Ref = Energy_Ref/Temperature_Ref;
    config->SetGas_Constant_Ref(Gas_Constant_Ref);
+
+   //MANGOTURB
+   su2double Gas_Constant = library->ComputeRgas(MassFrac_Inf);
+   su2double Gas_ConstantND = Gas_Constant/Gas_Constant_Ref;
+   config->SetGas_ConstantND(Gas_ConstantND);
+
 
    /*--- Divide by reference values, to compute the non-dimensional free-stream values ---*/
    Pressure_FreeStreamND = Pressure_FreeStream/Pressure_Ref;
@@ -1007,7 +1029,7 @@ unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver** solver_cont
     /*--- Compressible flow, primitive variables nSpecies + nDim + 5, (T, vx, vy, vz, P, rho, h, a, Y1,....YNs) ---*/
     //MANGOTURB
     if (tkeNeeded)
-      NonPhys = node[iPoint]->SetPrimVar(config,eddy_visc,turb_ke);
+      NonPhys = node[iPoint]->SetPrimVar(eddy_visc,turb_ke,config);//dimensional turbolent variable
     else
       NonPhys = node[iPoint]->SetPrimVar(config);
 
@@ -3399,7 +3421,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
             dim_temp *= 5.0/9.0;
           //MANGOTURB
           su2double Aux_Ent = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
-          if (tkeNeeded) Aux_Ent+= GetTke_Inf(); //Questo è non dimensionale
+          if (tkeNeeded) Aux_Ent+= GetTke_Inf(); //Questo è adimensionale
           V_inlet[H_INDEX_PRIM] =Aux_Ent;
 
 
@@ -4398,7 +4420,28 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
   bool turbulent          =(config->GetKind_Solver() == REACTIVE_RANS);
   bool tkeNeeded          = ((turbulent) && (config->GetKind_Turb_Model() == SST));
   su2double Omega_FreeStream = 0.0, Omega_FreeStreamND = 0.0;
+  su2double dim_temp = config->GetTemperature_FreeStream();
 
+  if (tkeNeeded){
+    Tke_FreeStream  = 3.0/2.0*((config->GetModVel_FreeStream())*(config->GetModVel_FreeStream())*config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
+    config->SetTke_FreeStream(Tke_FreeStream);
+    su2double Energy_FreeStream = config->GetEnergy_FreeStream() + Tke_FreeStream;
+    config->SetEnergy_FreeStream(Energy_FreeStream);
+    Tke_FreeStreamND  = 3.0/2.0*((config->GetModVel_FreeStreamND())*(config->GetModVel_FreeStreamND())*config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
+    config->SetTke_FreeStreamND(Tke_FreeStreamND);
+    su2double Energy_FreeStreamND = config->GetEnergy_FreeStreamND() + Tke_FreeStreamND;
+    config->SetEnergy_FreeStreamND(Energy_FreeStreamND);
+    su2double Energy_Ref = Energy_FreeStream/Energy_FreeStreamND;
+    config->SetEnergy_Ref(Energy_Ref);
+
+    su2double Gas_Constant_Ref = Energy_Ref/config->GetTemperature_Ref();
+    config->SetGas_Constant_Ref(Gas_Constant_Ref);
+
+    su2double Gas_Constant = library->ComputeRgas(MassFrac_Inf);
+    su2double Gas_ConstantND = Gas_Constant/Gas_Constant_Ref;
+    config->SetGas_ConstantND(Gas_ConstantND);
+
+  }
   /*--- Local variables for the adimensionalitazion of viscous contribution ---*/
   su2double Viscosity_FreeStream = 0.0;
   su2double Viscosity_Ref = 0.0, Conductivity_Ref = 0.0;
@@ -4410,7 +4453,6 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
   Conductivity_Ref = Viscosity_Ref*config->GetGas_Constant_Ref();
   config->SetConductivity_Ref(Conductivity_Ref);
 
-  su2double dim_temp = config->GetTemperature_FreeStream();
 
   bool SI_Measurement = (config->GetSystemMeasurements() == SI);
   bool US_Measurament = US_System;
@@ -4431,16 +4473,6 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
 
   /*--- Update turbolent omega, turbolent ke and consequently free stream energy in case of turbolence---*/
   if (tkeNeeded){
-    Tke_FreeStream  = 3.0/2.0*((config->GetModVel_FreeStream())*(config->GetModVel_FreeStream())*config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
-    config->SetTke_FreeStream(Tke_FreeStream);
-    su2double Energy_FreeStream = config->GetEnergy_FreeStream() + Tke_FreeStream;
-    config->SetEnergy_FreeStream(Energy_FreeStream);
-    Tke_FreeStreamND  = 3.0/2.0*((config->GetModVel_FreeStreamND())*(config->GetModVel_FreeStreamND())*config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
-    config->SetTke_FreeStreamND(Tke_FreeStreamND);
-    su2double Energy_FreeStreamND = config->GetEnergy_FreeStreamND() + Tke_FreeStreamND;
-    config->SetEnergy_FreeStreamND(Energy_FreeStreamND);
-    su2double Energy_Ref = Energy_FreeStream/Energy_FreeStreamND;
-    config->SetEnergy_Ref(Energy_Ref);
     Omega_FreeStream = (config->GetDensity_FreeStream())*Tke_FreeStream/(Viscosity_FreeStream*config->GetTurb2LamViscRatio_FreeStream());
     config->SetOmega_FreeStream(Omega_FreeStream);
     Omega_FreeStreamND = (config->GetDensity_FreeStreamND())*Tke_FreeStreamND/(Viscosity_FreeStreamND*config->GetTurb2LamViscRatio_FreeStream());
@@ -4484,13 +4516,25 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
   unsigned long ErrorCounter = SetPrimitive_Variables(solver_container, config, Output);
   unsigned long iPoint;
 
+
   //MANGOTURB
   /*--- Set Voriticity and Omega parameters ---*/
   su2double StrainMag = 0.0, Omega = 0.0, *Vorticity;
+  unsigned long ExtIter     = config->GetExtIter();
   bool limiter_visc         = config->GetViscous_Limiter_Flow();
+  bool limiter_turb         = ((config->GetSpatialOrder_Turb() == SECOND_ORDER_LIMITER) && (ExtIter <= config->GetLimiterIter()));
+  bool limiter_flow         = ((config->GetSpatialOrder_Flow() == SECOND_ORDER_LIMITER) && (ExtIter <= config->GetLimiterIter()));
+
   StrainMag_Max = 0.0, Omega_Max = 0.0;
 
 
+  /*--- Gradient computation first---*/
+  if(least_squares)
+    SetPrimitive_Gradient_LS(geometry, config);
+  else if(config->GetKind_Gradient_Method() == GREEN_GAUSS)
+    SetPrimitive_Gradient_GG(geometry, config);
+
+  /*--- Vorticity and strainmag computation only afterwards---*/
   for (iPoint = 0; iPoint < nPoint; iPoint++) {
 
     solver_container[FLOW_SOL]->node[iPoint]->SetVorticity(limiter_visc);
@@ -4508,15 +4552,15 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
 
   }
 
-  /*--- Gradient computation ---*/
-  if(least_squares)
-    SetPrimitive_Gradient_LS(geometry, config);
-  else if(config->GetKind_Gradient_Method() == GREEN_GAUSS)
-    SetPrimitive_Gradient_GG(geometry, config);
 
-  /*--- Limiter computation ---*/
-  if(limiter && iMesh == MESH_0 && !Output)
-    SetPrimitive_Limiter(geometry, config);
+  //MANGOTURB
+  // /*--- Limiter computation ---*/
+  // if(limiter && iMesh == MESH_0 && !Output)
+  //   SetPrimitive_Limiter(geometry, config);
+
+  //MANGOTURB
+  if ((iMesh == MESH_0) && (limiter_flow || limiter_turb || limiter_visc) && !Output) { SetPrimitive_Limiter(geometry, config);}
+
 
   /*--- Artificial dissipation ---*/
   if(space_centered && !Output)
@@ -4841,7 +4885,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
   su2double Mean_EddyVisc=0.0;
   bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
   su2double Prandtl_Lam = config-> GetPrandtl_Lam();
-  su2double MeanGamma =0.0;
+  su2double Gamma =0.0;
 
   su2double Area, Volume;
   su2double Local_Delta_Time, Global_Delta_Time = 1.0e6;
@@ -4907,9 +4951,9 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
     if(rans){
       su2double Prandtl_Turb = config->GetPrandtl_Turb();
       Mean_EddyVisc    = 0.5*(node[iPoint]->GetEddyViscosity() + node[jPoint]->GetEddyViscosity());
-      MeanGamma =0.5*(((node[iPoint]->GetdPdU()[RHOE_INDEX_SOL])+1)+((node[jPoint]->GetdPdU()[RHOE_INDEX_SOL])+1));
+      Gamma =node[iPoint]->GetdPdU()[RHOE_INDEX_SOL]+1;
       Lambda_1 = 4.0/3.0*(Mean_LaminarVisc+Mean_EddyVisc);
-      Lambda_2 = (1.0 + (Prandtl_Lam/Prandtl_Turb)*(Mean_EddyVisc/Mean_LaminarVisc))*(MeanGamma*Mean_LaminarVisc/Prandtl_Lam);
+      Lambda_2 = (1.0 + (Prandtl_Lam/Prandtl_Turb)*(Mean_EddyVisc/Mean_LaminarVisc))*(Gamma*Mean_LaminarVisc/Prandtl_Lam);
     }
     else {
       Lambda_1 = 4.0/3.0*Mean_LaminarVisc;
@@ -4958,9 +5002,9 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
         if(rans){
           su2double Prandtl_Turb = config->GetPrandtl_Turb();
           Mean_EddyVisc    = node[iPoint]->GetEddyViscosity();
-          MeanGamma =(((node[iPoint]->GetdPdU()[RHOE_INDEX_SOL])+1));
+          Gamma =node[iPoint]->GetdPdU()[RHOE_INDEX_SOL]+1;
           Lambda_1 = (4.0/3.0)*(Mean_LaminarVisc + Mean_EddyVisc);
-          Lambda_2 = (1.0 + (Prandtl_Lam/Prandtl_Turb)*(Mean_EddyVisc/Mean_LaminarVisc))*(MeanGamma*Mean_LaminarVisc/Prandtl_Lam);
+          Lambda_2 = (1.0 + (Prandtl_Lam/Prandtl_Turb)*(Mean_EddyVisc/Mean_LaminarVisc))*(Gamma*Mean_LaminarVisc/Prandtl_Lam);
         }
         else
         {
@@ -5095,7 +5139,7 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solver_c
 
 
     //MANGOTURB
-    /*--- Set values of turbolent kinetik energies and eddy viscosities into numerics class ---*/
+    /*--- Set values of adimensional turbolent kinetic energies and eddy viscosities into numerics class ---*/
     if (config->GetKind_Turb_Model() == SST){
       numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
                                      solver_container[TURB_SOL]->node[jPoint]->GetSolution(0));
@@ -5227,6 +5271,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         /*--- Simple Turbolent closure ---*/
         if(rans){
           su2double eddy_v = node[iPoint]->GetEddyViscosity();
+          Tj *= config->GetTemperature_Ref();
           su2double ktr_turb = visc_numerics->Get_HeatFactor(eddy_v,Tj);
           ktr+=ktr_turb;
         }

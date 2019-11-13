@@ -444,7 +444,7 @@ public:
    * \brief Set all the primitive variables for compressible flows.
    * \param[in] config - Configuration of the particular problem.
    */
-  bool SetPrimVar(CConfig* config,su2double val_ke);
+  bool SetPrimVar(CConfig* config,su2double val_ke)override;
 
   /*!
    * \brief Set all the primitive variables form conserved variables.
@@ -782,7 +782,7 @@ public:
    * \brief Set all primitive variables and transport properties for compressible flows.
    * \param[in] config - Configuration of the particular problem.
    */
-  bool SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke);
+  bool SetPrimVar(su2double eddy_visc, su2double turb_ke, CConfig* config)override;
 
 
   //MANGOTURB

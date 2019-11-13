@@ -1132,7 +1132,7 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
 /*--- Set primitive and turbulent variables ---*/
 //
 //
-bool CReactiveNSVariable::SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke) {
+bool CReactiveNSVariable::SetPrimVar(su2double eddy_visc, su2double turb_ke,CConfig* config) {
   /*--- Convert conserved to primitive variables using Euler version since primitives are the same ---*/
   bool nonPhys = CReactiveEulerVariable::SetPrimVar(config,turb_ke);
 

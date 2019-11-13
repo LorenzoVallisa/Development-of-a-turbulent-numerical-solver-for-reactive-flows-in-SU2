@@ -212,7 +212,7 @@ public:
   */
   void SST_Reactive_JacobianClosure(su2double* UnitNormal,const Vec& Mean_PrimVar,const su2double  Mean_Turbolent_KE,
                                                             const su2double Area, const su2double Mean_Eddy_Viscosity,const su2double dist_ij_2, AuxMatrix & dFdVi,
-                                                            AuxMatrix & dFdVj, const su2double Mean_Laminar_Viscosity);
+                                                            AuxMatrix & dFdVj, const su2double Mean_Laminar_Viscosity,CConfig* config);
 
 
 
@@ -222,7 +222,9 @@ public:
   */
   su2double Get_HeatFactor(const su2double eddy_visc,const su2double temp)override{
 
+    /*--- Retrieving adimensional polytropic coefficient gamma ---*/
     su2double gamma = library -> ComputeFrozenGamma(temp,Ys);
+
     return (gamma/(gamma-1))*Gas_Constant*(eddy_visc/Prandtl_Turb);
 
   }
@@ -235,7 +237,7 @@ public:
   * \param[in] Mean_Eddy_Viscosity - Turbolent viscosity.
   */
   void SST_Reactive_ResidualClosure(const Vec& Mean_PrimVar, const RealMatrix& Mean_GradPrimVar, su2double* Normal,
-                                                                const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,const su2double Mean_Laminar_Viscosity);
+                                                                const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,const su2double Mean_Laminar_Viscosity,CConfig* config);
 
 
   /*!

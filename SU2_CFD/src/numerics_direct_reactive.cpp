@@ -391,6 +391,7 @@ CAvgGradReactive_Boundary::CAvgGradReactive_Boundary(unsigned short val_nDim, un
   nPrimVar = nSpecies + nDim + 5;
   nPrimVarAvgGrad = nSpecies + nDim + 1;
 
+  //MANGOTURB
   if (config->GetKind_Turb_Model() == SST){
 
     Lewis_Turb = config -> GetLewis_Turb();
@@ -513,6 +514,56 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
                                                                   PrimVar_Grad_j[RHOS_INDEX_GRAD + iSpecies][iDim]);
   }
 
+
+  // std::cout<<"////////////////////////////////DEBUG-PRINT: Variables pre-flux-BOUNDARY//////////////////////////////"<<std::endl;
+  //
+  // std::cout<<"------------------Mean_GradPrimVar-Velocità---------------"<<std::endl;
+  //
+  // for(iDim = 0; iDim < nDim; ++iDim){
+  //   for(jDim = 0; jDim < nDim; ++jDim)
+  //     std::cout<<Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim)<<"   -    "
+  //   <<std::endl;
+  // }
+  //
+  // std::cout<<"-------------Mean_GradPrimVar-Temp-----------------"<<std::endl;
+  //
+  // for(iDim = 0; iDim < nDim; ++iDim)
+  //     std::cout<<Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim)<<"   -    "
+  // <<std::endl;
+  //
+  // std::cout<<"------------------Mean_GradPrimVar-Species---------------"<<std::endl;
+  //
+  // for(iDim = 0; iDim < nDim; ++iDim){
+  //   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+  //     std::cout<<Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim)<<"   -    "
+  // <<std::endl;
+  // }
+  //
+  // std::cout<<"-----------Mean_PrimVar---------------"<<std::endl;
+  // for(iVar = 0; iVar < nPrimVar; ++iVar)
+  // std::cout<<Mean_PrimVar[iVar]<<"   -    "
+  // <<std::endl;
+  //
+  //
+  // std::cout<<"-----------Lam_Visc---------------"<<std::endl;
+  // std::cout<<Mean_Laminar_Viscosity<<std::endl;
+  //
+  // std::cout<<"-----------cond---------------"<<std::endl;
+  // std::cout<<Mean_Thermal_Conductivity<<std::endl;
+  //
+  // std::cout<<"-----------Dij---------------"<<std::endl;
+  // std::cout<<Mean_Dij<<std::endl;
+  //
+  // std::cout<<"-----------Normal---------------"<<std::endl;
+  // for(iDim = 0; iDim < nDim; ++iDim)
+  //     std::cout<<Normal[iDim]<<"   -    "
+  // <<std::endl;
+  //
+  // std::cout<<"//////////////////////////////////////////////////////////////"<<std::endl;
+  //
+
+
+
   //MANGOTURB_init
   /*--- Set the laminar component of viscous residual tensor ---*/
   SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
@@ -526,7 +577,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
     Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
 
-    SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity,Mean_Turbolent_KE,Mean_Laminar_Viscosity);
+    SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity,Mean_Turbolent_KE,Mean_Laminar_Viscosity,config);
 
   }
 
@@ -537,6 +588,41 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     Proj_Flux_Tensor[RHOE_INDEX_SOL] += Flux_Tensor[RHOE_INDEX_SOL][iDim]*Normal[iDim];
   }
   //MANGOTURB-end
+
+
+//   std::cout<<"////////////////////////////////DEBUG-PRINT: Flux and projected flux-BOUNDARY//////////////////////////////"<<std::endl;
+//
+//   std::cout<<"------------------Flux-Tensor (velocity)---------------"<<std::endl;
+//
+//   for(iDim = 0; iDim < nDim; ++iDim){
+//     for(jDim = 0; jDim < nDim; ++jDim)
+//       std::cout<<Flux_Tensor[RHOVX_INDEX_SOL + iDim][jDim]<<"   -    "
+//   <<std::endl;
+//   }
+//
+// std::cout<<"-------------Flux-Tensor (energy)-----------------"<<std::endl;
+//
+//   for(iDim = 0; iDim < nDim; ++iDim)
+//       std::cout<<Flux_Tensor[RHOVX_INDEX_SOL][iDim]<<"   -    "
+//   <<std::endl;
+//
+// std::cout<<"------------------Proj-Flux-Tensor (energy)---------------"<<std::endl;
+//
+//
+// std::cout<<Proj_Flux_Tensor[RHOE_INDEX_SOL]<<std::endl;
+//
+//
+// for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+//   std::cout<<Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies]<<"   -    "
+// <<std::endl;
+//
+// std::cout<<"//////////////////////////////////////////////////////////////"<<std::endl;
+
+
+
+
+
+
 
   /*--- Update viscous residual with the species projected flux ---*/
   std::copy(Proj_Flux_Tensor, Proj_Flux_Tensor + nVar, val_residual);
@@ -606,7 +692,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
       Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
       Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
 
-      SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity);
+      SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity,config);
 
     }
 
@@ -633,6 +719,29 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
         }
       }
 
+      // std::cout<<"////////////////////////////////DEBUG-PRINT: dFdVi and dFdVj-BOUNDARY//////////////////////////////"<<std::endl;
+      //
+      // std::cout<<"------------------i---------------"<<std::endl;
+      //
+      // for(iVar = 0; iVar < nVar; ++iVar) {
+      //   for(jVar = 0; jVar < nVar; ++jVar)
+      //     std::cout<< dFdVi[iVar][jVar]<<"   -    "
+      // <<std::endl;
+      // }
+      // std::cout<<"------------------j---------------"<<std::endl;
+      //
+      // for(iVar = 0; iVar < nVar; ++iVar) {
+      //   for(jVar = 0; jVar < nVar; ++jVar)
+      //     std::cout<< dFdVj[iVar][jVar]<<"   -    "<<"   -    "
+      // <<std::endl;
+      // }
+      //
+      // std::cout<<"//////////////////////////////////////////////////////////////"<<std::endl;
+      //
+
+
+
+
     }
   }
 
@@ -644,7 +753,8 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
 //
 //
 void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_PrimVar,const RealMatrix& Mean_GradPrimVar, su2double* Normal,
-                                                              const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,const su2double Mean_Laminar_Viscosity){
+                                                              const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,
+                                                              const su2double Mean_Laminar_Viscosity,CConfig* config){
 
 
     /*--- Reynolds stress tensor (Boussinesq approximation) ---*/
@@ -665,7 +775,7 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
 
 
     /*--- Closure for Energy: simplest one cpGradT---*/
-    su2double temp = Mean_PrimVar[T_INDEX_PRIM];
+    su2double temp = Mean_PrimVar[T_INDEX_PRIM]*config->GetTemperature_Ref();
     su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,temp);
 
     for( iDim = 0; iDim < nDim; ++iDim) {
@@ -701,14 +811,14 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
 //
 void CAvgGradReactive_Boundary::SST_Reactive_JacobianClosure(su2double* UnitNormal,const Vec& Mean_PrimVar,const su2double  Mean_Turbolent_KE,
                                                           const su2double Area, const su2double Mean_Eddy_Viscosity,const su2double dist_ij_2, AuxMatrix & dFdVi,
-                                                          AuxMatrix & dFdVj,const su2double Mean_Laminar_Viscosity) {
+                                                          AuxMatrix & dFdVj,const su2double Mean_Laminar_Viscosity,CConfig* config) {
 
 
 unsigned short iSpecies;
 su2double theta = std::inner_product(UnitNormal, UnitNormal + nDim, UnitNormal, 0.0);
 RealVec molar_masses = library->GetMolarMasses();
 su2double M_tot = std::accumulate(molar_masses.begin(),molar_masses.end(),0.0);
-su2double temp = Mean_PrimVar[T_INDEX_PRIM];
+su2double temp = Mean_PrimVar[T_INDEX_PRIM]*config->GetTemperature_Ref();
 su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,temp);
 su2double sqrt_dist_ij_2=std::sqrt(dist_ij_2);
 
@@ -757,7 +867,7 @@ if(nDim == 2) {
 
   // Species: Fick's law partial densities
   for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-
+  /*--- Partial mass fractions are independent quantities ---*/
   dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +iSpecies] +=
   Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/Mean_PrimVar[RHO_INDEX_PRIM]*(M_tot/molar_masses[iSpecies])/sqrt_dist_ij_2*Area;
 
@@ -860,6 +970,7 @@ if(nDim == 2) {
   /*--- Common terms to both dimensional choice ---*/
   su2double aux_sum = std::inner_product(Mean_PrimVar.data() + VX_INDEX_PRIM,Mean_PrimVar.data() + VX_INDEX_PRIM + nDim, UnitNormal ,0.0);
   dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(aux_sum)*Area;
+  dFdVi[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(aux_sum)*Area;
 }
 
 
@@ -1148,8 +1259,8 @@ void CAvgGradReactive_Boundary::SetLaminarViscousProjJacs(const Vec& val_Mean_Pr
       dFdVi[iVar][jVar] = -dFdVj[iVar][jVar];
 
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-    dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*Jd(iSpecies)*Cps[iSpecies];
-    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += 0.5*Jd(iSpecies)*Cps[iSpecies];
+    dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += -0.5*Jd(iSpecies)*Cps[iSpecies];
+    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += -0.5*Jd(iSpecies)*Cps[iSpecies];
   }
 
   // Unique terms
@@ -1295,6 +1406,55 @@ if(dist_ij_2 > EPS) {
 else
 throw std::runtime_error("Error: You are trying to compute flux between a node and itself");
 
+
+// std::cout<<"////////////////////////////////DEBUG-PRINT: Variables pre-flux//////////////////////////////"<<std::endl;
+//
+// std::cout<<"------------------Mean_GradPrimVar-Velocità---------------"<<std::endl;
+//
+// for(iDim = 0; iDim < nDim; ++iDim){
+//   for(jDim = 0; jDim < nDim; ++jDim)
+//     std::cout<<Mean_GradPrimVar(VX_INDEX_AVGGRAD + jDim,iDim)<<"   -    "
+//   <<std::endl;
+// }
+//
+// std::cout<<"-------------Mean_GradPrimVar-Temp-----------------"<<std::endl;
+//
+// for(iDim = 0; iDim < nDim; ++iDim)
+//     std::cout<<Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim)<<"   -    "
+// <<std::endl;
+//
+// std::cout<<"------------------Mean_GradPrimVar-Species---------------"<<std::endl;
+//
+// for(iDim = 0; iDim < nDim; ++iDim){
+//   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+//     std::cout<<Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim)<<"   -    "
+// <<std::endl;
+// }
+//
+// std::cout<<"-----------Mean_PrimVar---------------"<<std::endl;
+// for(iVar = 0; iVar < nPrimVar; ++iVar)
+// std::cout<<Mean_PrimVar[iVar]<<"   -    "
+// <<std::endl;
+//
+//
+// std::cout<<"-----------Lam_Visc---------------"<<std::endl;
+// std::cout<<Mean_Laminar_Viscosity<<std::endl;
+//
+// std::cout<<"-----------cond---------------"<<std::endl;
+// std::cout<<Mean_Thermal_Conductivity<<std::endl;
+//
+// std::cout<<"-----------Dij---------------"<<std::endl;
+// std::cout<<Mean_Dij<<std::endl;
+//
+// std::cout<<"-----------Normal---------------"<<std::endl;
+// for(iDim = 0; iDim < nDim; ++iDim)
+//     std::cout<<Normal[iDim]<<"   -    "
+// <<std::endl;
+//
+// std::cout<<"//////////////////////////////////////////////////////////////"<<std::endl;
+
+
+
 //MANGOTURB_init
 /*--- Set the laminar component of viscous residual tensor ---*/
 SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
@@ -1308,7 +1468,8 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
     Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
 
-    SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity, Mean_Turbolent_KE,Mean_Laminar_Viscosity);
+    SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity,
+              Mean_Turbolent_KE,Mean_Laminar_Viscosity,config);
 
   }
 
@@ -1319,6 +1480,35 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     Proj_Flux_Tensor[RHOE_INDEX_SOL] += Flux_Tensor[RHOE_INDEX_SOL][iDim]*Normal[iDim];
   }
   //MANGOTURB-end
+
+
+//   std::cout<<"////////////////////////////////DEBUG-PRINT: Flux and projected flux//////////////////////////////"<<std::endl;
+//
+//   std::cout<<"------------------Flux-Tensor (velocity)---------------"<<std::endl;
+//
+//   for(iDim = 0; iDim < nDim; ++iDim){
+//     for(jDim = 0; jDim < nDim; ++jDim)
+//       std::cout<<Flux_Tensor[RHOVX_INDEX_SOL + iDim][jDim]<<"   -    "
+//   <<std::endl;
+//   }
+//
+// std::cout<<"-------------Flux-Tensor (energy)-----------------"<<std::endl;
+//
+//   for(iDim = 0; iDim < nDim; ++iDim)
+//       std::cout<<Flux_Tensor[RHOVX_INDEX_SOL][iDim]<<"   -    "
+//   <<std::endl;
+//
+// std::cout<<"------------------Proj-Flux-Tensor (energy)---------------"<<std::endl;
+//
+//
+// std::cout<<Proj_Flux_Tensor[RHOE_INDEX_SOL]<<std::endl;
+//
+//
+// for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+//   std::cout<<Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies]<<"   -    "
+// <<std::endl;
+//
+// std::cout<<"//////////////////////////////////////////////////////////////"<<std::endl;
 
 
   /*--- Update viscous residual with the species projected flux ---*/
@@ -1368,22 +1558,17 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     AuxMatrix dVdUi(nVar,RealVec(nVar));
     AuxMatrix dVdUj(nVar,RealVec(nVar));
 
-
     /*--- Compute laminar jacobian components ---*/
     SetLaminarViscousProjJacs(Mean_PrimVar, Mean_Laminar_Viscosity, Mean_Thermal_Conductivity, alpha, Grad_Xs_norm, Ds,
       std::sqrt(dist_ij_2), Area, UnitNormal, config, dFdVi, dFdVj, dVdUi, dVdUj);
 
-
       /*--- Add turbolent jacobian closure ---*/
       if (config->GetKind_Turb_Model() == SST){
-
         /*--- Local turbolent variables ---*/
         su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
         Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
         Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
-
-        SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity);
-
+        SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity,config);
       }
 
       unsigned short iDim,iVar,jVar,kVar;
@@ -1408,6 +1593,45 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
           }
         }
       }
+
+
+//       std::cout<<"////////////////////////////////DEBUG-PRINT: dFdVi and dFdVj//////////////////////////////"<<std::endl;
+//
+//       std::cout<<"------------------i---------------"<<std::endl;
+//
+//       for(iVar = 0; iVar < nVar; ++iVar) {
+//         for(jVar = 0; jVar < nVar; ++jVar)
+//           std::cout<< dFdVi[iVar][jVar]<<"   -    "
+//       <<std::endl;
+//       }
+//       std::cout<<"------------------j---------------"<<std::endl;
+//
+//       for(iVar = 0; iVar < nVar; ++iVar) {
+//         for(jVar = 0; jVar < nVar; ++jVar)
+//           std::cout<< dFdVj[iVar][jVar]<<"   -    "
+//         <<std::endl;
+//       }
+//       std::cout<<"------------------dVdUi---------------"<<std::endl;
+//       for(iVar = 0; iVar < nVar; ++iVar) {
+//         for(jVar = 0; jVar < nVar; ++jVar)
+//       std::cout<< dVdUi[iVar][jVar]<<"   -    "
+//     <<std::endl;
+//   }
+//       std::cout<<"------------------dVdUj---------------"<<std::endl;
+//   for(iVar = 0; iVar < nVar; ++iVar) {
+//     for(jVar = 0; jVar < nVar; ++jVar)
+//   std::cout<< dVdUj[iVar][jVar]<<"   -    "
+// <<std::endl;
+// }
+//
+//
+//
+//
+//       std::cout<<"//////////////////////////////////////////////////////////////"<<std::endl;
+
+
+
+
     }
   }
 
@@ -1506,6 +1730,15 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
 
      Eigen::VectorXd::Map(&omega[0],Ys.size())= library->GetMassProductionTerm();
 
+  //    std::cout<<"////////////////////////////////DEBUG-PRINT: omega //////////////////////////////"<<std::endl;
+  //
+  //
+  //    for (auto it : omega)
+  // std::cout<<it<<std::endl;
+  //
+  //   std::cout<<"//////////////////////////////////////////////////////////////////////////////////"<<std::endl;
+
+
    }
 
   /*--- Set to zero the source residual for safety ---*/
@@ -1515,6 +1748,21 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
   std::copy(omega.cbegin(), omega.cend(), val_residual + RHOS_INDEX_SOL);
   for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
     val_residual[RHOS_INDEX_SOL + iSpecies] *= -Volume/(config->GetDensity_Ref()/config->GetTime_Ref());
+
+   //  std::cout<<"////////////////////////////////DEBUG-PRINT: Residual-Temp-Rho-(Temp/rho/Time)-Ref //////////////////////////////"<<std::endl;
+   //
+   //
+   //  for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+   //  std::cout<<val_residual[RHOS_INDEX_SOL + iSpecies]<<std::endl;
+   //  std::cout<<dim_temp<<std::endl;
+   //  std::cout<<dim_rho<<std::endl;
+   //  std::cout<<config->GetTemperature_Ref()<<std::endl;
+   //  std::cout<<config->GetDensity_Ref()<<std::endl;
+   //  std::cout<<config->GetTime_Ref()<<std::endl;
+   //
+   // std::cout<<"//////////////////////////////////////////////////////////////////////////////////"<<std::endl;
+
+
   if(US_System) {
     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
       val_residual[RHOS_INDEX_SOL + iSpecies] /= 3.28084*3.28084*3.28084/0.0685218;
@@ -1556,6 +1804,14 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
 
       source_jac = library->GetSourceJacobian(dim_rho);
 
+     //  std::cout<<"////////////////////////////////DEBUG-PRINT: source_jac //////////////////////////////"<<std::endl;
+     //
+     //
+     // std::cout<<source_jac<<std::endl;
+     //
+     //
+     // std::cout<<"//////////////////////////////////////////////////////////////////////////////////"<<std::endl;
+
     }
 
     su2double fixed;
@@ -1571,5 +1827,24 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
         val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies] =
         -fixed*S_i[RHOS_INDEX_SOL + jSpecies]*Volume - source_jac(iSpecies,jSpecies + 1)*config->GetTime_Ref()*Volume;
     }
+
+//     std::cout<<"////////////////////////////////DEBUG-PRINT: val_Jacobian_i and val_Jacobian_j //////////////////////////////"<<std::endl;
+//
+//
+//    std::cout<<"--------i-----------"<<std::endl;
+// for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies){
+//   std::cout<<val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL]<<"   -    "<<std::endl;
+//   std::cout<<val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOE_INDEX_SOL]<<"   -   "<<std::endl;
+//     for(iDim = 0; iDim < nDim; ++iDim)
+//       std::cout<<val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOVX_INDEX_SOL + iDim]<<"   -   "<<std::endl;
+//     }
+//
+//     for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies){
+//       for(jSpecies = 0; jSpecies < nSpecies; ++jSpecies)
+//         std::cout<<val_Jacobian_i[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL + jSpecies]<<std::endl;
+//       }
+//
+//     std::cout<<"//////////////////////////////////////////////////////////////////////////////////////////////////"<<std::endl;
+
   } /*--- End of implicit computation ---*/
 }

@@ -5844,6 +5844,7 @@ void CConfig::SetGlobalParam(unsigned short val_solver,
           SpatialOrder_Turb);
           SetKind_TimeIntScheme(Kind_TimeIntScheme_Turb);
       }
+      break;
     case RANS:
         if (val_system == RUNTIME_FLOW_SYS) {
           SetKind_ConvNumScheme(Kind_ConvNumScheme_Flow, Kind_Centered_Flow,

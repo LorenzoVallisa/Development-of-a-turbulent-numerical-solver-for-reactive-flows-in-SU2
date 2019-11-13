@@ -1015,10 +1015,11 @@ public:
    */
   virtual bool SetPrimVar(CConfig *config);
 
-  //MANGOTURB
-  virtual bool SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke);
+  // //MANGOTURB
+  // virtual bool SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke){return true;};
 
-  virtual bool SetPrimVar(CConfig* config,su2double val_ke);
+  //MANGOTURB
+  virtual bool SetPrimVar(CConfig* config,su2double val_ke){return true;};
   /*!
    * \brief A virtual member.
    */

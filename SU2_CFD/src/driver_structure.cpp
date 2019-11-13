@@ -3568,9 +3568,10 @@ void CFluidDriver::Run() {
 
     for (iZone = 0; iZone < nZone; iZone++) {
       config_container[iZone]->SetIntIter(IntIter);
+
       //OCIU
-      std::cout<<" Dentro a CFluidDriver::Run: sto per iniziare CMeanFlowIteration::Iterate di iteration_container"<<std::endl;
-      std::cout<<" zona "<<iZone<<std::endl;
+      // std::cout<<" Dentro a CFluidDriver::Run: sto per iniziare CMeanFlowIteration::Iterate di iteration_container"<<std::endl;
+      // std::cout<<" zona "<<iZone<<std::endl;
       iteration_container[iZone]->Iterate(output, integration_container, geometry_container, solver_container, numerics_container, config_container, surface_movement, grid_movement, FFDBox, iZone);
     }
 
