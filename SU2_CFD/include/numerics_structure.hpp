@@ -58,7 +58,7 @@ using namespace std;
  * \version 5.0.0 "Raven"
  */
 class CNumerics {
-protectd:
+protected:
   unsigned short nDim, nVar;  /*!< \brief Number of dimensions and variables. */
   su2double Gamma;        /*!< \brief Fluid's Gamma constant (ratio of specific heats). */
   su2double Gamma_Minus_One;    /*!< \brief Fluids's Gamma - 1.0  . */
@@ -78,6 +78,8 @@ protectd:
   //MANGOTURB
   su2double *Grad_Tke_i;
   su2double *Grad_Tke_j;
+
+  public:
 
   su2double
   **Flux_Tensor,  /*!< \brief Flux tensor (used for viscous and inviscid purposes. */

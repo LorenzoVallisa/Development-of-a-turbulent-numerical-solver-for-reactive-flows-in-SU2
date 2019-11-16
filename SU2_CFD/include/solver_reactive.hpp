@@ -5,6 +5,7 @@
 #include "variable_reactive.hpp"
 #include <iostream>
 
+
 /*! \class CReactiveEulerSolver
  *  \brief Main class for defining a solver for multispecies (chemically reacting or not) inviscid flows.
  *  \author G. Orlando.

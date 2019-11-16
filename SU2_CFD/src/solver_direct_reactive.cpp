@@ -3583,6 +3583,11 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
 
         visc_numerics->SetEddyViscosity(solver_container[TURB_SOL]->node[iPoint]->GetmuT(),
                                     solver_container[TURB_SOL]->node[iPoint]->GetmuT());
+
+        visc_numerics->Set_Sigmak(solver_container[TURB_SOL]->node[iPoint]->Get_Sigmak());
+
+        visc_numerics->Set_GradTKE(solver_container[TURB_SOL]->node[iPoint]->GetGradient()[0],
+                              solver_container[TURB_SOL]->node[iPoint]->GetGradient()[0]);
         }
 
 
@@ -3978,6 +3983,11 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
 
           visc_numerics->SetEddyViscosity(solver_container[TURB_SOL]->node[iPoint]->GetmuT(),
                                      solver_container[TURB_SOL]->node[iPoint]->GetmuT());
+
+          visc_numerics->Set_Sigmak(solver_container[TURB_SOL]->node[iPoint]->Get_Sigmak());
+
+          visc_numerics->Set_GradTKE(solver_container[TURB_SOL]->node[iPoint]->GetGradient()[0],
+                               solver_container[TURB_SOL]->node[iPoint]->GetGradient()[0]);
         }
 
         /*--- Compute residual ---*/
@@ -5210,7 +5220,6 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
     su2double Normal[nDim], UnitNormal[nDim];
 
     //MANGOTURB
-    su2double eddy_viscosity;
     su2double Prandtl_Turb = config->GetPrandtl_Turb();
 
 
@@ -5267,24 +5276,28 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         /*--- Extract the interior temperature and the thermal conductivity for the boundary node ---*/
         Tj   = node[Point_Normal]->GetTemperature();
         ktr  = node[iPoint]->GetThermalConductivity();
+        su2double mu = node[iPoint]->GetLaminarViscosity();
+        su2double turb_closure;
 
         /*--- Apply a weak boundary condition for the energy equation.
         Compute the residual due to the prescribed heat flux. ---*/
 
         //MANGOTURB
-        /*--- Simple Turbolent closure ---*/
+        /*--- Full Turbolent closure ---*/
         if(rans){
           su2double eddy_v = node[iPoint]->GetEddyViscosity();
-          Tj *= config->GetTemperature_Ref();
-          su2double ktr_turb = visc_numerics->Get_HeatFactor(eddy_v,Tj);
-          ktr+=ktr_turb;
+          su2double sigma_k = solver_container[TURB_SOL]->node[iPoint]->Get_Sigmak();
+          su2double *tke_grad = solver_container[TURB_SOL]->node[iPoint]->GetGradient()[0];
+          for(iDim = 0; iDim < nDim; ++iDim)
+            turb_closure += tke_grad[iDim]*UnitNormal[iDim];
+          turb_closure *=(mu + eddy_v/sigma_k);
         }
 
         /*--- Compute normal gradient with finite difference approximation ---*/
-        dTdn = (Twall - Tj)/dij;
+        dTdn = -(Twall - Tj)/dij;
 
         /*--- Apply to the linear system ---*/
-        Res_Visc[RHOE_INDEX_SOL] = ktr*dTdn*Area;
+        Res_Visc[RHOE_INDEX_SOL] = ktr*dTdn*Area + turb_closure*Area;
 
         if(implicit) {
           for(iVar = 0; iVar < nVar; ++iVar)
@@ -5309,13 +5322,12 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         /*--- If the wall is moving, there are additional residual contributions
         due to pressure (p v_{wall}\cdot n) and shear stress ((tau*v_{wall}) \cdot n). ---*/
         if(grid_movement) {
-          //SONQUI
           /*--- Get the projected grid velocity at the current boundary node ---*/
           su2double ProjGridVel = std::inner_product(Vector, Vector + nDim, UnitNormal, 0.0);
 
           /*--- Retrieve other primitive quantities and viscosities ---*/
           su2double Pressure = node[iPoint]->GetPressure();
-          su2double mu = node[iPoint]->GetLaminarViscosity();
+
 
           unsigned short jDim;
           su2double Grad_Vel[nDim][nDim];

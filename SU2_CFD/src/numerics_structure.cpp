@@ -138,9 +138,6 @@ CNumerics::CNumerics(unsigned short val_nDim, unsigned short val_nVar,
 
 CNumerics::~CNumerics(void) {
 
-  delete [] Grad_Tke_i;
-  delete [] Grad_Tke_j;
-
   if (UnitNormal!= NULL) delete [] UnitNormal;
   if (UnitNormald!= NULL) delete [] UnitNormald;
 
