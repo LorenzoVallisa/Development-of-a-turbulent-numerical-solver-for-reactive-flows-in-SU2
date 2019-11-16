@@ -3750,6 +3750,8 @@ class CTurbSSTVariable : public CTurbVariable {
 protected:
   su2double sigma_om2,
   beta_star;
+  //MANGOTURB
+  su2double sigma_k;
   su2double F1,    /*!< \brief Menter blending function for blending of k-w and k-eps. */
   F2,            /*!< \brief Menter blending function for stress limiter. */
   CDkw;           /*!< \brief Cross-diffusion. */
@@ -3785,6 +3787,11 @@ public:
    * \param[in] val_density - Value of the density.
    */
   void SetBlendingFunc(su2double val_viscosity, su2double val_dist, su2double val_density);
+
+  //MANGOTUB
+  su2double Get_Sigmak(void)const{
+    return sigma_k;
+  }
 
   /*!
    * \brief Get the first blending function.

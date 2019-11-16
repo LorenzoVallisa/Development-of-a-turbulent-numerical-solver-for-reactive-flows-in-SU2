@@ -72,6 +72,8 @@ protected:
   su2double omega_turb; /*!< \brief Auxiliary variable needed for chemistry source closure. */
   //MANGOTURB
   su2double Lewis_Turb; /*!< \brief Auxiliary variable needed for chemistry source closure. */
+  //MANGOTURB
+  su2double sigma_k; /*!< \brief Auxiliary variable needed for energy closure. */
 
 public:
 
@@ -504,6 +506,11 @@ public:
    */
   void SetLaminarViscosity(su2double val_laminar_viscosity_i,
                            su2double val_laminar_viscosity_j);
+
+  //MANGOTURB
+  su2double Set_Sigmak( const su2double o_k){
+    sigma_k = o_k;
+  }
 
   /*!
    * \brief Set the thermal conductivity (translational/rotational)
