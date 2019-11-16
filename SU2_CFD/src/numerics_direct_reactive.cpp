@@ -572,12 +572,21 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
 
   if (config->GetKind_Turb_Model() == SST){
 
+    unsigned short jDim;
+
     /*--- Local turbolent variables ---*/
     su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
     Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
     Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
+    Vec Mean_GradTKEVar(nDim);
+    Mean_GradTKEVar.setZero();
 
-    SST_Reactive_ResidualClosure(Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity,Mean_Turbolent_KE,Mean_Laminar_Viscosity,config);
+    for(jDim = 0; jDim < nDim; ++jDim)
+          Mean_GradTKEVar(jDim) = 0.5*(Grad_Tke_i[jDim] + Grad_Tke_j[jDim]);
+
+
+
+    SST_Reactive_ResidualClosure(Mean_GradTKEVar,Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity,Mean_Turbolent_KE,Mean_Laminar_Viscosity,config);
 
   }
 
@@ -752,7 +761,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
 /*--- Build the closure for residual tensor of viscous residaul ---*/
 //
 //
-void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_PrimVar,const RealMatrix& Mean_GradPrimVar, su2double* Normal,
+void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tkegradvar,const Vec& Mean_PrimVar,const RealMatrix& Mean_GradPrimVar, su2double* Normal,
                                                               const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,
                                                               const su2double Mean_Laminar_Viscosity,CConfig* config){
 
@@ -761,6 +770,20 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
     unsigned short iDim,jDim,iSpecies,iVar;
     unsigned short div_vel(0.0);
     unsigned short rho(Mean_PrimVar[RHO_INDEX_PRIM]);
+
+    su2double T = Mean_PrimVar[T_INDEX_PRIM];
+    bool US_System = (config->GetSystemMeasurements() == US);
+    su2double dim_temp = T*config->GetTemperature_Ref();
+    if(US_System)
+      dim_temp *= 5.0/9.0;
+    Cps = library->ComputeCps(dim_temp);
+    for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+      Cps[iSpecies] /= config->GetGas_Constant_Ref();
+    if(US_System) {
+      for(iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+        Cps[iSpecies] *= 3.28084*3.28084*5.0/9.0;
+    }
+
 
     for(unsigned short iDim = 0; iDim < nDim; ++iDim)
     div_vel += Mean_GradPrimVar(VX_INDEX_AVGGRAD + iDim,iDim);
@@ -776,7 +799,6 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
 
     /*--- Closure for Energy: simplest one cpGradT---*/
     su2double temp = Mean_PrimVar[T_INDEX_PRIM]*config->GetTemperature_Ref();
-    su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,temp);
 
     for( iDim = 0; iDim < nDim; ++iDim) {
 
@@ -787,13 +809,26 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& Mean_Pri
         Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau_turb(iDim,jDim)*Mean_PrimVar[VX_INDEX_PRIM + jDim];
       }
 
-        Flux_Tensor[RHOE_INDEX_SOL][iDim] += heat_flux_factor*Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim);
-
       /*--- Closure for species using molar fractions as approximation ---*/
       for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
         Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*
         Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) * Normal[iDim];
       }
+
+
+      /*--- Fick's law partial densities closure --*/
+      for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+        Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb) *
+                                      hs[iSpecies]*Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim);
+      }
+
+      /*--- Fick's law partial sensible enthalpies closure --*/
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/Prandtl_Turb*std::accumulate(Cps.cbegin(),Cps.cend(),0.0)*
+                                        Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim);
+
+      /*--- Wilcox closure for turbolent ke and main stresses turbolent transport term --*/
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] += (Mean_Laminar_Viscosity + Mean_Eddy_Viscosity/sigma_k) * mean_tkegradvar(iDim);
+
 
     }
 

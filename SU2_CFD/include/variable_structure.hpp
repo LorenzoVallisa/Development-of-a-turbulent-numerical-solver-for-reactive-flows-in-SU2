@@ -128,6 +128,9 @@ public:
    */
   void SetSolution(unsigned short val_var, su2double val_solution);
 
+  //MANGOTURB
+  virtual su2double Get_Sigmak(void) const {};
+
   /*!
    * \brief Add the value of the solution vector to the previous solution (incremental approach).
    * \param[in] val_var - Index of the variable.
@@ -3789,7 +3792,7 @@ public:
   void SetBlendingFunc(su2double val_viscosity, su2double val_dist, su2double val_density);
 
   //MANGOTUB
-  su2double Get_Sigmak(void)const{
+  su2double Get_Sigmak(void) const override{
     return sigma_k;
   }
 

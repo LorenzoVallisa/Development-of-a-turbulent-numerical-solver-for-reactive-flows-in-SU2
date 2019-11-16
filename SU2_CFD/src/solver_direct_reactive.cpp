@@ -5146,6 +5146,9 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solver_c
       numerics->SetEddyViscosity(solver_container[TURB_SOL]->node[iPoint]->GetmuT(),
                                   solver_container[TURB_SOL]->node[jPoint]->GetmuT());
       numerics->Set_Sigmak(solver_container[TURB_SOL]->node[iPoint]->Get_Sigmak());
+
+      numerics->Set_GradTKE(solver_container[TURB_SOL]->node[iPoint]->GetGradient()[0],
+                            solver_container[TURB_SOL]->node[jPoint]->GetGradient()[0]);
     }
 
     /*--- Compute the residual ---*/

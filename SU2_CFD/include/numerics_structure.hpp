@@ -42,6 +42,7 @@
 #include <iostream>
 #include <limits>
 #include <cstdlib>
+//#include <memory>
 
 #include "../../Common/include/config_structure.hpp"
 #include "../../Common/include/gauss_structure.hpp"
@@ -57,7 +58,7 @@ using namespace std;
  * \version 5.0.0 "Raven"
  */
 class CNumerics {
-protected:
+protectd:
   unsigned short nDim, nVar;  /*!< \brief Number of dimensions and variables. */
   su2double Gamma;        /*!< \brief Fluid's Gamma constant (ratio of specific heats). */
   su2double Gamma_Minus_One;    /*!< \brief Fluids's Gamma - 1.0  . */
@@ -74,8 +75,9 @@ protected:
   su2double Lewis_Turb; /*!< \brief Auxiliary variable needed for chemistry source closure. */
   //MANGOTURB
   su2double sigma_k; /*!< \brief Auxiliary variable needed for energy closure. */
-
-public:
+  //MANGOTURB
+  su2double *Grad_Tke_i;
+  su2double *Grad_Tke_j;
 
   su2double
   **Flux_Tensor,  /*!< \brief Flux tensor (used for viscous and inviscid purposes. */
@@ -302,6 +304,19 @@ public:
   void SetOmegaParam(su2double omega){
     omega_turb = omega;
   }
+
+  //MANGOTURB
+  /*!
+   * \brief Set the value of the conservative variables.
+   * \param[in] val_u_i - Value of the conservative variable at point i.
+   * \param[in] val_u_j - Value of the conservative variable at point j.
+   */
+  void Set_GradTKE(su2double *grad_tke_i, su2double *grad_tke_j){
+    Grad_Tke_i = grad_tke_i;
+    Grad_Tke_j = grad_tke_j;
+  }
+
+
 
   /*!
    * \brief Set the value of the conservative variables withour reconstruction.
