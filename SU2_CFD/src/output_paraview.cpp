@@ -98,7 +98,7 @@ void COutput::SetParaview_ASCII(CConfig *config, CGeometry *geometry, unsigned s
   /*--- Special cases where a number needs to be appended to the file name. ---*/
 
   if ((Kind_Solver == EULER || Kind_Solver == NAVIER_STOKES || Kind_Solver == RANS || Kind_Solver == FEM_ELASTICITY
-       || Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES) &&
+       || Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES || Kind_Solver == REACTIVE_RANS) &&
         (val_nZone > 1) && (config->GetUnsteady_Simulation() != HARMONIC_BALANCE)) {
 
     SPRINTF (buffer, "_%d", SU2_TYPE::Int(val_iZone));
@@ -504,7 +504,7 @@ void COutput::SetParaview_ASCII(CConfig *config, CGeometry *geometry, unsigned s
     }
 
     if ((Kind_Solver == EULER) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)
-        || (Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+        || (Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == REACTIVE_RANS)) {
 
       Paraview_File << "\nSCALARS Pressure float 1\n";
       Paraview_File << "LOOKUP_TABLE default\n";
@@ -523,7 +523,7 @@ void COutput::SetParaview_ASCII(CConfig *config, CGeometry *geometry, unsigned s
       VarCounter++;
 
       /*--- NOTE: Multispecies exclution ---*/
-      if(Kind_Solver != REACTIVE_EULER && Kind_Solver != REACTIVE_NAVIER_STOKES) {
+      if(Kind_Solver != REACTIVE_EULER && Kind_Solver != REACTIVE_NAVIER_STOKES && Kind_Solver != REACTIVE_RANS) {
         Paraview_File << "\nSCALARS Temperature float 1\n";
         Paraview_File << "LOOKUP_TABLE default\n";
 
@@ -575,7 +575,7 @@ void COutput::SetParaview_ASCII(CConfig *config, CGeometry *geometry, unsigned s
 
     }
 
-    if ((Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+    if ((Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)|| (Kind_Solver == REACTIVE_RANS)) {
 
       Paraview_File << "\nSCALARS Laminar_Viscosity float 1\n";
       Paraview_File << "LOOKUP_TABLE default\n";
@@ -593,7 +593,7 @@ void COutput::SetParaview_ASCII(CConfig *config, CGeometry *geometry, unsigned s
       }
       VarCounter++;
       /*--- NOTE: Multispecies exclution ---*/
-      if(Kind_Solver != REACTIVE_NAVIER_STOKES) {
+      if(Kind_Solver != REACTIVE_NAVIER_STOKES && Kind_Solver != REACTIVE_RANS) {
         Paraview_File << "\nSCALARS Skin_Friction_Coefficient_X float 1\n";
         Paraview_File << "LOOKUP_TABLE default\n";
 
@@ -682,7 +682,7 @@ void COutput::SetParaview_ASCII(CConfig *config, CGeometry *geometry, unsigned s
 
     }
 
-    if (Kind_Solver == RANS) {
+    if (Kind_Solver == RANS || Kind_Solver == REACTIVE_RANS) {
 
       Paraview_File << "\nSCALARS Eddy_Viscosity float 1\n";
       Paraview_File << "LOOKUP_TABLE default\n";
@@ -991,7 +991,7 @@ void COutput::SetParaview_MeshASCII(CConfig *config, CGeometry *geometry, unsign
 
   /*--- Special cases where a number needs to be appended to the file name. ---*/
   if ((Kind_Solver == EULER || Kind_Solver == NAVIER_STOKES || Kind_Solver == RANS || Kind_Solver == FEM_ELASTICITY
-       || Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES) &&
+       || Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES || (Kind_Solver == REACTIVE_RANS)) &&
       (val_nZone > 1) && (config->GetUnsteady_Simulation() != HARMONIC_BALANCE)) {
     SPRINTF (buffer, "_%d", SU2_TYPE::Int(val_iZone));
     strcat(cstr, buffer);
@@ -1400,7 +1400,7 @@ void COutput::SetParaview_MeshASCII(CConfig *config, CGeometry *geometry, unsign
     }
 
     if ((Kind_Solver == EULER) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)
-        || (Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+        || (Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == REACTIVE_RANS)) {
 
       Paraview_File << "\nSCALARS Pressure float 1\n";
       Paraview_File << "LOOKUP_TABLE default\n";
@@ -1435,7 +1435,7 @@ void COutput::SetParaview_MeshASCII(CConfig *config, CGeometry *geometry, unsign
       VarCounter++;
 
       /*--- NOTE: Multispecies exclution ---*/
-      if(Kind_Solver != REACTIVE_EULER && Kind_Solver != REACTIVE_NAVIER_STOKES) {
+      if(Kind_Solver != REACTIVE_EULER && Kind_Solver != REACTIVE_NAVIER_STOKES && Kind_Solver != REACTIVE_RANS) {
         Paraview_File << "\nSCALARS Pressure_Coefficient float 1\n";
         Paraview_File << "LOOKUP_TABLE default\n";
 
@@ -1471,7 +1471,7 @@ void COutput::SetParaview_MeshASCII(CConfig *config, CGeometry *geometry, unsign
 
     }
 
-    if ((Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+    if ((Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)|| (Kind_Solver == REACTIVE_RANS)) {
 
       Paraview_File << "\nSCALARS Laminar_Viscosity float 1\n";
       Paraview_File << "LOOKUP_TABLE default\n";
@@ -1490,7 +1490,7 @@ void COutput::SetParaview_MeshASCII(CConfig *config, CGeometry *geometry, unsign
       VarCounter++;
 
       /*--- NOTE: Multispecies exclution ---*/
-      if(Kind_Solver != REACTIVE_NAVIER_STOKES) {
+      if(Kind_Solver != REACTIVE_NAVIER_STOKES && Kind_Solver != REACTIVE_RANS) {
         Paraview_File << "\nSCALARS Skin_Friction_Coefficient float 1\n";
         Paraview_File << "LOOKUP_TABLE default\n";
 
@@ -1542,7 +1542,7 @@ void COutput::SetParaview_MeshASCII(CConfig *config, CGeometry *geometry, unsign
       }
     }
 
-    if (Kind_Solver == RANS) {
+    if (Kind_Solver == RANS || Kind_Solver == REACTIVE_RANS) {
 
       Paraview_File << "\nSCALARS Eddy_Viscosity float 1\n";
       Paraview_File << "LOOKUP_TABLE default\n";

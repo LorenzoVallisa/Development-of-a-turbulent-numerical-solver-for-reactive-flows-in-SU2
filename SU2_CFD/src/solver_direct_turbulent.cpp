@@ -585,6 +585,13 @@ void CTurbSolver::Viscous_Residual(CGeometry *geometry, CSolver **solver_contain
 
     numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
 
+    // std::cout<<"///////////////////////////TURBOLENT-RESIDUAL////////////////////////////////////////////////////"<<std::endl;
+    //
+    // for (int i =0; i< nVar ; i++)
+    //   std::cout<<Residual[i]<<std::endl;
+    //
+    // std::cout<<"/////////////////////////////////////////////////////////////////////////////////////////////////"<<std::endl;
+
     /*--- Add and subtract residual, and update Jacobians ---*/
 
     LinSysRes.SubtractBlock(iPoint, Residual);

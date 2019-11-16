@@ -4469,7 +4469,7 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
 
   //MANGOTURB
   config->SetReynolds(config->GetDensity_FreeStream()*config->GetModVel_FreeStream()*config->GetLength_Reynolds()/Viscosity_FreeStream);
-
+  //std::cout<<"     Reynolds Number ->        "<<config->GetReynolds()<<"        "<<std::endl;
 
   /*--- Update turbolent omega, turbolent ke and consequently free stream energy in case of turbolence---*/
   if (tkeNeeded){

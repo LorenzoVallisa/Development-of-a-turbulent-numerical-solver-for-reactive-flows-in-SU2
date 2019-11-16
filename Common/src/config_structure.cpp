@@ -3832,7 +3832,7 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
 
     if ((Kind_Regime == COMPRESSIBLE) && (Kind_Solver != FEM_ELASTICITY) &&
         (Kind_Solver != HEAT_EQUATION) && (Kind_Solver != WAVE_EQUATION) &&
-        ((Kind_Solver != REACTIVE_EULER)) && (Kind_Solver != REACTIVE_NAVIER_STOKES) && (Kind_Solver != REACTIVE_NAVIER_STOKES)) {
+        ((Kind_Solver != REACTIVE_EULER)) && (Kind_Solver != REACTIVE_NAVIER_STOKES) && (Kind_Solver != REACTIVE_RANS)) {
       cout << "Mach number: " << Mach <<"."<< endl;
       cout << "Angle of attack (AoA): " << AoA <<" deg, and angle of sideslip (AoS): " << AoS <<" deg."<< endl;
       if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == ADJ_NAVIER_STOKES) || (Kind_Solver == REACTIVE_NAVIER_STOKES) ||

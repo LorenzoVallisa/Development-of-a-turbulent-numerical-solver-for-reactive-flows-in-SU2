@@ -142,7 +142,8 @@ namespace Framework {
   /* Source term for -th species is built by a weight through PaSR contant method . */
   double ReactingModelLibrary::GetMassProductionTerm( const unsigned short iSpecies, const double omega_turb,const double C_mu){
 
-    double omega_ith;
+    double omega_ith(0.0);
+    PaSRConstant.resize(nReactions);
 
     /*--- Assembling i-th species source production term ---*/
     for (unsigned short iReac = 0; iReac < nReactions ; iReac++)
@@ -160,7 +161,6 @@ namespace Framework {
   double ReactingModelLibrary::AssemblePaSRConstant(const unsigned short iReac,const double omega_turb,const double C_mu){
 
     double k_th;
-    PaSRConstant.resize(nReactions);
 
     /*--- Assmebling mixing time due to turbolence ---*/
     double tau_mix =  1/(C_mu*omega_turb);
@@ -290,6 +290,7 @@ namespace Framework {
   RealMatrix ReactingModelLibrary::GetTurbSourceJacobian(void){
 
     RealMatrix source_turb_jacobian(Ys.size(),Ys.size()+1);
+    source_turb_jacobian.setZero();
 
     for(unsigned short iReac=0; iReac < nReactions; iReac++ ) {
       for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {

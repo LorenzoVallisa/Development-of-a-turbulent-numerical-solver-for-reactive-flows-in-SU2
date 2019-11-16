@@ -541,6 +541,8 @@ void CMeanFlowIteration::Iterate(COutput *output,
                                                                         config_container, RUNTIME_REACTIVE_SYS, IntIter, val_iZone);
   }
   else if (config_container[val_iZone]->GetKind_Solver() == REACTIVE_RANS){
+    //OCIU
+    //std::cout<<" Nel posto giusto: sto per iniziare MultiGrid_Iteration"<<std::endl;
     integration_container[val_iZone][FLOW_SOL]->MultiGrid_Iteration(geometry_container, solver_container, numerics_container,
                                                                     config_container, RUNTIME_REACTIVE_SYS, IntIter, val_iZone);
     config_container[val_iZone]->SetGlobalParam(REACTIVE_RANS, RUNTIME_TURB_SYS, ExtIter);

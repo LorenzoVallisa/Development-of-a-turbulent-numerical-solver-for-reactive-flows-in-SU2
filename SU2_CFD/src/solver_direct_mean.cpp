@@ -7966,7 +7966,7 @@ void CEulerSolver::GetSurface_Distortion(CGeometry *geometry, CConfig *config, u
         Gamma              = config->GetGamma();
         TotalPressure_Inf  = config->GetPressure_FreeStreamND() * pow( 1.0 + Mach_Inf * Mach_Inf *
                                                                       0.5 * (Gamma - 1.0), Gamma    / (Gamma - 1.0));
-
+        std::cout<<" Cou Cou"<<std::endl;
         if (q_Mean != 0.0) DC60 = ((PT_Mean - PT_Sector_Min)*TotalPressure_Inf)/q_Mean;
         else DC60 = 0.0;
 

@@ -2685,7 +2685,10 @@ void CDriver::StartSolver() {
 
       /*--- Run a single iteration of the problem (mean flow, wave, heat, ...). ---*/
 
+
       Run();
+      //OCIU
+      // std::cout<<" "<<std::endl;
 
       /*--- Update the solution for dual time stepping strategy ---*/
 
@@ -2748,9 +2751,12 @@ void CDriver::PreprocessExtIter(unsigned long ExtIter) {
   if(!fsi && (config_container[ZONE_0]->GetKind_Solver() == REACTIVE_EULER ||
               config_container[ZONE_0]->GetKind_Solver() == REACTIVE_NAVIER_STOKES ||
               (config_container[ZONE_0]->GetKind_Solver() ==  REACTIVE_RANS) ) )  {
-    for(iZone = 0; iZone < nZone; ++iZone)
+    for(iZone = 0; iZone < nZone; ++iZone){
       solver_container[iZone][MESH_0][FLOW_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
-                                                                       config_container[iZone], ExtIter);
+                                                                                        config_container[iZone], ExtIter);
+    //OCIU
+    // std::cout<<" Passato Initial Condition"<<std::endl;
+  }
   }
 
 #ifdef HAVE_MPI
@@ -3570,8 +3576,7 @@ void CFluidDriver::Run() {
       config_container[iZone]->SetIntIter(IntIter);
 
       //OCIU
-      // std::cout<<" Dentro a CFluidDriver::Run: sto per iniziare CMeanFlowIteration::Iterate di iteration_container"<<std::endl;
-      // std::cout<<" zona "<<iZone<<std::endl;
+      //std::cout<<" Dentro a CFluidDriver::Run: sto per iniziare CMeanFlowIteration::Iterate di iteration_container"<<std::endl;
       iteration_container[iZone]->Iterate(output, integration_container, geometry_container, solver_container, numerics_container, config_container, surface_movement, grid_movement, FFDBox, iZone);
     }
 

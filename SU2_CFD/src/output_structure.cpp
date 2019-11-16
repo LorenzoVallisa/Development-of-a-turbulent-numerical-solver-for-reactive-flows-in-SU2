@@ -2029,6 +2029,7 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
                          ( config->GetKind_Solver() == ADJ_NAVIER_STOKES ) ||
                          ( config->GetKind_Solver() == ADJ_RANS          ) ||
                          ( config->GetKind_Solver() == REACTIVE_EULER    ) ||
+                         ( config->GetKind_Solver() == REACTIVE_RANS    ) ||
                          ( config->GetKind_Solver() == REACTIVE_NAVIER_STOKES ));
   bool fem = (config->GetKind_Solver() == FEM_ELASTICITY);
 
@@ -2063,6 +2064,7 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
   switch (Kind_Solver) {
     case EULER : case NAVIER_STOKES: case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES: FirstIndex = FLOW_SOL; SecondIndex = NONE; ThirdIndex = NONE; break;
     case RANS : FirstIndex = FLOW_SOL; SecondIndex = TURB_SOL; if (transition) ThirdIndex=TRANS_SOL; else ThirdIndex = NONE; break;
+    case REACTIVE_RANS : FirstIndex = FLOW_SOL; SecondIndex = TURB_SOL; ThirdIndex = NONE; break;
     case POISSON_EQUATION: FirstIndex = POISSON_SOL; SecondIndex = NONE; ThirdIndex = NONE; break;
     case WAVE_EQUATION: FirstIndex = WAVE_SOL; SecondIndex = NONE; ThirdIndex = NONE; break;
     case HEAT_EQUATION: FirstIndex = HEAT_SOL; SecondIndex = NONE; ThirdIndex = NONE; break;
@@ -2100,13 +2102,18 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
 
     /*--- Add Pressure, Temperature, Cp, Mach to the restart file ---*/
     /*--- NOTE: Multispecies addition ---*/
-    if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+    if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == REACTIVE_RANS)) {
       iVar_PressCp = nVar_Total; nVar_Total += 2;
       iVar_MachMean = nVar_Total; nVar_Total += 1;
     }
 
-    if(Kind_Solver == REACTIVE_NAVIER_STOKES) {
+    if((Kind_Solver == REACTIVE_NAVIER_STOKES)|| (Kind_Solver == REACTIVE_RANS)) {
       iVar_Lam = nVar_Total;
+      nVar_Total += 1;
+    }
+
+    if(Kind_Solver == REACTIVE_RANS) {
+      iVar_Eddy = nVar_Total;
       nVar_Total += 1;
     }
 
@@ -2489,7 +2496,7 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
 
     /*--- Communicate Pressure, Cp, and Mach ---*/
     /*--- NOTE: Multispecies addition ---*/
-    if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+    if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == REACTIVE_RANS) ) {
 
       /*--- First, loop through the mesh in order to find and store the
        value of the coefficient of pressure at any surface nodes. They
@@ -2552,7 +2559,7 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
 
     /*--- Communicate Mach---*/
     /*--- NOTE: Multispecies addition ---*/
-    if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+    if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == REACTIVE_RANS)) {
 
       /*--- Loop over this partition to collect the current variable ---*/
 
@@ -2732,7 +2739,7 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
 
     /*--- Laminar Viscosity ---*/
     /*--- NOTE: Multispecies addition ---*/
-    if (Kind_Solver == REACTIVE_NAVIER_STOKES) {
+    if ((Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == REACTIVE_RANS)) {
 
       /*--- Loop over this partition to collect the current variable ---*/
 
@@ -2995,7 +3002,7 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
 
     /*--- Communicate the Eddy Viscosity ---*/
 
-    if (Kind_Solver == RANS) {
+    if ((Kind_Solver == RANS)||(Kind_Solver == REACTIVE_RANS)) {
 
       /*--- Loop over this partition to collect the current variable ---*/
 
@@ -3552,7 +3559,7 @@ void COutput::MergeSolution(CConfig *config, CGeometry *geometry, CSolver **solv
 
             /*--- Get this variable into the temporary send buffer. ---*/
 
-            if (Kind_Solver == RANS) {
+            if (Kind_Solver == RANS || Kind_Solver == REACTIVE_RANS) {
               Buffer_Send_Var[jPoint] = solver[TURB_SOL]->OutputVariables[iPoint*nVar_Extra+jVar];
             }
             jPoint++;
@@ -3943,10 +3950,10 @@ void COutput::SetRestart(CConfig *config, CGeometry *geometry, CSolver **solver,
         restart_file << "\t\"Pressure\"\t\"Temperature\"\t\"C<sub>p</sub>\"\t\"Mach\"";
     }
     /*--- NOTE: Multispecies addition ---*/
-    if(Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES) {
+    if(Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES || Kind_Solver == REACTIVE_RANS) {
       restart_file << "\t\"Pressure\"\t\"Temperature\"\t\"Mach\"";
-      if(Kind_Solver == REACTIVE_NAVIER_STOKES)
-        restart_file << "\t\"<greek>m</greek>\"";
+      if(Kind_Solver == REACTIVE_NAVIER_STOKES || Kind_Solver == REACTIVE_RANS)
+        restart_file << "\t\"Laminar_Viscosity\"";
     }
 
     if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
@@ -3959,7 +3966,7 @@ void COutput::SetRestart(CConfig *config, CGeometry *geometry, CSolver **solver,
       }
     }
 
-    if (Kind_Solver == RANS) {
+    if (Kind_Solver == RANS || Kind_Solver == REACTIVE_RANS) {
       if (config->GetOutput_FileFormat() == PARAVIEW) {
         restart_file << "\t\"Eddy_Viscosity\"";
       } else
@@ -4145,7 +4152,7 @@ void COutput::SetConvHistory_Header(ofstream *ConvHist_file, CConfig *config) {
   bool engine        = ((config->GetnMarker_EngineInflow() != 0) || (config->GetnMarker_EngineExhaust() != 0));
   bool actuator_disk = ((config->GetnMarker_ActDiskInlet() != 0) || (config->GetnMarker_ActDiskOutlet() != 0));
   bool turbulent = ((config->GetKind_Solver() == RANS) || (config->GetKind_Solver() == ADJ_RANS) ||
-                    (config->GetKind_Solver() == DISC_ADJ_RANS));
+                    (config->GetKind_Solver() == DISC_ADJ_RANS) || (config->GetKind_Solver() == REACTIVE_RANS));
   bool frozen_turb = config->GetFrozen_Visc();
   bool inv_design = (config->GetInvDesign_Cp() || config->GetInvDesign_HeatFlux());
   bool output_1d = config->GetWrt_1D_Output();
@@ -4158,7 +4165,7 @@ void COutput::SetConvHistory_Header(ofstream *ConvHist_file, CConfig *config) {
 
   bool thermal = false; /* Flag for whether to print heat flux values */
 
-  if (config->GetKind_Solver() == RANS or config->GetKind_Solver()  == NAVIER_STOKES) {
+  if (config->GetKind_Solver() == RANS or config->GetKind_Solver()  == NAVIER_STOKES or (config->GetKind_Solver() == REACTIVE_RANS)) {
     thermal = true;
   }
 
@@ -4259,7 +4266,7 @@ void COutput::SetConvHistory_Header(ofstream *ConvHist_file, CConfig *config) {
 
   switch (config->GetKind_Solver()) {
 
-    case EULER : case NAVIER_STOKES: case RANS :
+    case EULER : case NAVIER_STOKES: case RANS : case REACTIVE_RANS:
       ConvHist_file[0] << begin << flow_coeff;
       if (thermal) ConvHist_file[0] << heat_coeff;
       if (equiv_area) ConvHist_file[0] << equivalent_area_coeff;
@@ -5104,7 +5111,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
             switch (config[val_iZone]->GetKind_Solver()) {
               case EULER : case NAVIER_STOKES: case RANS:
               case ADJ_EULER : case ADJ_NAVIER_STOKES: case ADJ_RANS:
-              case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
+              case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES: case REACTIVE_RANS :
 
                 cout << endl << "---------------------- Local Time Stepping Summary ----------------------" << endl;
 
@@ -5389,7 +5396,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
             break;
 
           /*--- NOTE: Already present functions ---*/
-          case RANS :
+          case RANS : case REACTIVE_RANS:
 
             /*--- Visualize the maximum residual ---*/
             iPointMaxResid = solver_container[val_iZone][FinestMesh][FLOW_SOL]->GetPoint_Max(0);
@@ -5421,13 +5428,13 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
             if (!Unsteady) cout << endl << " Iter" << "    Time(s)";
             else cout << endl << " IntIter" << " ExtIter";
             if (incompressible) cout << "   Res[Press]";
-            else cout << "      Res[Rho]";//, cout << "     Res[RhoE]";
+            else cout << "      Res[Rho]" << "     Res[RhoE]";
 
-            switch (config[val_iZone]->GetKind_Turb_Model()) {
-              case SA:     cout << "       Res[nu]"; break;
-              case SA_NEG: cout << "       Res[nu]"; break;
-              case SST:     cout << "     Res[kine]" << "     Res[omega]"; break;
-            }
+            // switch (config[val_iZone]->GetKind_Turb_Model()) {
+            //   case SA:     cout << "       Res[nu]"; break;
+            //   case SA_NEG: cout << "       Res[nu]"; break;
+            //   case SST:     cout << "     Res[kine]" << "     Res[omega]"; break;
+            // }
 
             if (transition) { cout << "      Res[Int]" << "       Res[Re]"; }
             else if (rotating_frame && nDim == 3 ) cout << "   CThrust(Total)" << "   CTorque(Total)" << endl;
@@ -5446,7 +5453,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
               }
             else if (actuator_disk) cout << "      CL(Total)" << "   CD-CT(Total)" << endl;
             else if (engine) cout << "      CL(Total)" << "   CD-CT(Total)" << endl;
-            else cout << "      CL(Total)" << "      CD(Total)" << endl;
+          //  else cout << "      CL(Total)" << "      CD(Total)" << endl;
 
             break;
 
@@ -5677,6 +5684,37 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
           std::cout<<std::endl;
 
           break;
+        case REACTIVE_RANS:
+        if(!DualTime_Iteration) {
+          ConvHist_file[0] << begin << direct_coeff << flow_resid << turb_resid;
+          ConvHist_file[0] << end;
+          ConvHist_file[0].flush();
+        }
+
+        if(DualTime_Iteration || !Unsteady) {
+          std::cout.precision(6);
+          std::cout.setf(std::ios::fixed, std::ios::floatfield);
+          std::cout.width(14);
+          std::cout<<std::log10(solver_container[val_iZone][FinestMesh][FLOW_SOL]->GetRes_RMS(0));
+          if(nDim == 2) {
+            std::cout.width(14);
+            std::cout<< std::log10(solver_container[val_iZone][FinestMesh][FLOW_SOL]->GetRes_RMS(3));
+          }
+          else {
+            std::cout.width(14);
+            std::cout<< std::log10(solver_container[val_iZone][FinestMesh][FLOW_SOL]->GetRes_RMS(4));
+          }
+          switch(nVar_Turb) {
+            case 1: cout.width(14); cout << log10(residual_turbulent[0]); break;
+            case 2: cout.width(14); cout << log10(residual_turbulent[0]);
+              cout.width(15); cout << log10(residual_turbulent[1]); break;
+          }
+
+        }
+
+        std::cout<<std::endl;
+
+        break;
 
         case RANS :
 
@@ -10365,7 +10403,7 @@ void COutput::SetResult_Files_Parallel(CSolver ****solver_container,
       cout << "Loading solution output data locally on each rank." << endl;
 
     switch (config[iZone]->GetKind_Solver()) {
-      case EULER : case NAVIER_STOKES: case RANS : case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES:
+      case EULER : case NAVIER_STOKES: case RANS : case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES: case REACTIVE_RANS:
         LoadLocalData_Flow(config[iZone], geometry[iZone][MESH_0], solver_container[iZone][MESH_0], iZone);
         break;
       case ADJ_EULER : case ADJ_NAVIER_STOKES : case ADJ_RANS :
@@ -10497,7 +10535,7 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
 
   switch (config->GetKind_Solver()) {
     case EULER : case NAVIER_STOKES: case REACTIVE_EULER: case REACTIVE_NAVIER_STOKES: FirstIndex = FLOW_SOL; SecondIndex = NONE; break;
-    case RANS : FirstIndex = FLOW_SOL; SecondIndex = TURB_SOL; break;
+    case RANS : case REACTIVE_RANS: FirstIndex = FLOW_SOL; SecondIndex = TURB_SOL; break;
     default: SecondIndex = NONE; break;
   }
 
@@ -10532,12 +10570,17 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
    to avoid confusion with the serial version, which still prints these
    names. Names can be set alternatively by using the commented code
    below. ---*/
-
-  for (iVar = 0; iVar < nVar_Consv_Par; iVar++) {
-    varname << "Conservative_" << iVar+1;
-    Variable_Names.push_back(varname.str());
-    varname.str("");
+  //MANGOTURB
+  std::vector<std::string> readme{"rho","rhovx","rhovy","rhoE","C4H6","H20","O2","CO","CO2"};
+  for (auto it:readme){
+    Variable_Names.push_back(it);
   }
+
+  // for (iVar = 0; iVar < nVar_Consv_Par; iVar++) {
+  //   varname << "Conservative_" << iVar+1;
+  //   Variable_Names.push_back(varname.str());
+  //   varname.str("");
+  // }
 
 //  if (incompressible) {
 //    Variable_Names.push_back("Pressure");
@@ -10551,15 +10594,15 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
 //    if (geometry->GetnDim() == 3) Variable_Names.push_back("Z-Momentum");
 //    Variable_Names.push_back("Energy");
 //  }
-//  if (SecondIndex != NONE) {
-//    if (config->GetKind_Turb_Model() == SST) {
-//      Variable_Names.push_back("TKE");
-//      Variable_Names.push_back("Omega");
-//    } else {
-//      /*--- S-A variants ---*/
-//      Variable_Names.push_back("Nu_Tilde");
-//    }
-//  }
+ if (SecondIndex != NONE) {
+   if (config->GetKind_Turb_Model() == SST) {
+     Variable_Names.push_back("TKE");
+     Variable_Names.push_back("Omega");
+   } else {
+     /*--- S-A variants ---*/
+     Variable_Names.push_back("Nu_Tilde");
+   }
+ }
 
   /*--- If requested, register the limiter and residuals for all of the
    equations in the current flow problem. ---*/
@@ -10651,7 +10694,7 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
       Variable_Names.push_back("Pressure");
     }
     /*--- NOTE: Multispecies addition ---*/
-    if(Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES) {
+    if(Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES || Kind_Solver== REACTIVE_RANS) {
       nVar_Par += 2;
       Variable_Names.push_back("Temperature");
       Variable_Names.push_back("Mach");
@@ -10663,7 +10706,7 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
       Variable_Names.push_back("Mach");
     }
 
-    if(Kind_Solver == REACTIVE_NAVIER_STOKES) {
+    if(Kind_Solver == REACTIVE_NAVIER_STOKES || Kind_Solver== REACTIVE_RANS) {
       nVar_Par += 1;
       Variable_Names.push_back("Laminar_Viscosity");
     }
@@ -10685,7 +10728,7 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
 
     /*--- Add Eddy Viscosity. ---*/
 
-    if (Kind_Solver == RANS) {
+    if (Kind_Solver == RANS){ // || Kind_Solver == REACTIVE_RANS) {
       nVar_Par += 1;
       Variable_Names.push_back("Eddy_Viscosity");
 
@@ -10868,7 +10911,7 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
         if (compressible) {
           Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetPressure(); iVar++;
           Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetTemperature(); iVar++;
-          if(Kind_Solver != REACTIVE_EULER && Kind_Solver != REACTIVE_NAVIER_STOKES)
+          if(Kind_Solver != REACTIVE_EULER && Kind_Solver != REACTIVE_NAVIER_STOKES && Kind_Solver != REACTIVE_RANS)
             Local_Data[jPoint][iVar] = (solver[FLOW_SOL]->node[iPoint]->GetPressure() - RefPressure)*factor*RefAreaCoeff; iVar++;
           Local_Data[jPoint][iVar] = sqrt(solver[FLOW_SOL]->node[iPoint]->GetVelocity2())/
           solver[FLOW_SOL]->node[iPoint]->GetSoundSpeed(); iVar++;
@@ -10880,14 +10923,14 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
           sqrt(config->GetBulk_Modulus()/(solver[FLOW_SOL]->node[iPoint]->GetDensity()*config->GetDensity_Ref())); iVar++;
         }
 
-        if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS) || Kind_Solver == REACTIVE_NAVIER_STOKES) {
+        if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS) || Kind_Solver == REACTIVE_NAVIER_STOKES || Kind_Solver == REACTIVE_RANS) {
 
           /*--- Load data for the laminar viscosity. ---*/
 
           Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(); iVar++;
 
           /*--- Load data for the skin friction, heat flux, and y-plus. ---*/
-          if(Kind_Solver != REACTIVE_NAVIER_STOKES) {
+          if(Kind_Solver != REACTIVE_NAVIER_STOKES && Kind_Solver != REACTIVE_RANS) {
             Local_Data[jPoint][iVar] = Aux_Frict_x[iPoint]; iVar++;
             Local_Data[jPoint][iVar] = Aux_Frict_y[iPoint]; iVar++;
             if (geometry->GetnDim() == 3) {
@@ -10902,12 +10945,12 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
 
         /*--- Load data for the Eddy viscosity for RANS. ---*/
 
-        if (Kind_Solver == RANS) {
+        if (Kind_Solver == RANS || Kind_Solver == REACTIVE_RANS) {
           Local_Data[jPoint][iVar] = solver[FLOW_SOL]->node[iPoint]->GetEddyViscosity(); iVar++;
         }
 
         /*--- Load data for the distance to the nearest sharp edge. ---*/
-        if(Kind_Solver != REACTIVE_NAVIER_STOKES && Kind_Solver != REACTIVE_EULER) {
+        if(Kind_Solver != REACTIVE_NAVIER_STOKES && Kind_Solver != REACTIVE_EULER && Kind_Solver != REACTIVE_RANS) {
           if (config->GetWrt_SharpEdges()) {
             Local_Data[jPoint][iVar] = geometry->node[iPoint]->GetSharpEdge_Distance(); iVar++;
           }
