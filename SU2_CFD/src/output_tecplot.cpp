@@ -89,7 +89,7 @@ void COutput::SetTecplotASCII(CConfig *config, CGeometry *geometry, CSolver **so
 
   /*--- Special cases where a number needs to be appended to the file name. ---*/
 
-  if ((Kind_Solver == EULER || Kind_Solver == NAVIER_STOKES || Kind_Solver == RANS || Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES ||
+  if ((Kind_Solver == EULER || Kind_Solver == NAVIER_STOKES || Kind_Solver == RANS || Kind_Solver == REACTIVE_EULER ||Kind_Solver == REACTIVE_RANS || Kind_Solver == REACTIVE_NAVIER_STOKES ||
        Kind_Solver == ADJ_EULER || Kind_Solver == ADJ_NAVIER_STOKES || Kind_Solver == ADJ_RANS ||
        Kind_Solver == DISC_ADJ_EULER || Kind_Solver == DISC_ADJ_NAVIER_STOKES || Kind_Solver == DISC_ADJ_RANS) &&
       (val_nZone > 1) ) {
@@ -165,24 +165,24 @@ void COutput::SetTecplotASCII(CConfig *config, CGeometry *geometry, CSolver **so
         }
       }
       /*--- NOTE: Multispecies addition ---*/
-      if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+      if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES) || (Kind_Solver == REACTIVE_RANS)) {
         Tecplot_File << ",\"Pressure\",\"Temperature\",\"Mach\"";
       }
 
-      if(Kind_Solver == REACTIVE_NAVIER_STOKES) {
+      if(Kind_Solver == REACTIVE_NAVIER_STOKES || (Kind_Solver == REACTIVE_RANS) ) {
         Tecplot_File << ", \"<greek>m</greek>\"";
       }
 
-      if ((Kind_Solver == EULER) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+      if ((Kind_Solver == EULER) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS) || (Kind_Solver == REACTIVE_RANS)) {
         Tecplot_File << ",\"Pressure\",\"Temperature\",\"C<sub>p</sub>\",\"Mach\"";
       }
 
-      if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+      if ((Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)|| (Kind_Solver == REACTIVE_RANS)) {
         if (nDim == 2) Tecplot_File << ", \"<greek>m</greek>\", \"C<sub>f</sub>_x\", \"C<sub>f</sub>_y\", \"h\", \"y<sup>+</sup>\"";
         else Tecplot_File << ", \"<greek>m</greek>\", \"C<sub>f</sub>_x\", \"C<sub>f</sub>_y\", \"C<sub>f</sub>_z\", \"h\", \"y<sup>+</sup>\"";
       }
 
-      if (Kind_Solver == RANS) {
+      if (Kind_Solver == RANS || (Kind_Solver == REACTIVE_RANS)) {
         Tecplot_File << ", \"<greek>m</greek><sub>t</sub>\"";
       }
 
@@ -491,9 +491,9 @@ void COutput::SetTecplotASCII_LowMemory(CConfig *config, CGeometry *geometry, CS
         }
       }
       /*--- NOTE: Multispecies addition ---*/
-      if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+      if ((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)|| (Kind_Solver == REACTIVE_RANS)) {
         Tecplot_File << ", \"Pressure\",\"Temperature\",\"Mach\"";
-        if(Kind_Solver == REACTIVE_NAVIER_STOKES)
+        if(Kind_Solver == REACTIVE_NAVIER_STOKES || (Kind_Solver == REACTIVE_RANS))
           Tecplot_File << ", \"<greek>m</greek>\"";
       }
 
@@ -1007,7 +1007,7 @@ void COutput::SetTecplotASCII_Parallel(CConfig *config, CGeometry *geometry, CSo
 
   /*--- Special cases where a number needs to be appended to the file name. ---*/
 
-  if ((Kind_Solver == EULER || Kind_Solver == NAVIER_STOKES || Kind_Solver == RANS || Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES ||
+  if ((Kind_Solver == EULER || Kind_Solver == NAVIER_STOKES || Kind_Solver == RANS || Kind_Solver == REACTIVE_EULER || Kind_Solver == REACTIVE_NAVIER_STOKES || (Kind_Solver == REACTIVE_RANS) ||
        Kind_Solver == ADJ_EULER || Kind_Solver == ADJ_NAVIER_STOKES || Kind_Solver == ADJ_RANS ||
        Kind_Solver == DISC_ADJ_EULER || Kind_Solver == DISC_ADJ_NAVIER_STOKES || Kind_Solver == DISC_ADJ_RANS) &&
       (val_nZone > 1) ) {
@@ -3108,18 +3108,18 @@ string COutput::AssembleVariableNames(CGeometry *geometry, CConfig *config, unsi
       }
     }
     /*--- NOTE: Multispecies addition ---*/
-    if((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)) {
+    if((Kind_Solver == REACTIVE_EULER) || (Kind_Solver == REACTIVE_NAVIER_STOKES)|| (Kind_Solver == REACTIVE_RANS)) {
       variables << "Pressure Temperature Mach ";
       *NVar += 3;
     }
 
-    if(Kind_Solver == REACTIVE_NAVIER_STOKES) {
+    if(Kind_Solver == REACTIVE_NAVIER_STOKES || (Kind_Solver == REACTIVE_RANS)) {
       variables << "Laminar_Viscosity ";
       *NVar += 1;
     }
 
 
-    if ((Kind_Solver == EULER) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS)) {
+    if ((Kind_Solver == EULER) || (Kind_Solver == NAVIER_STOKES) || (Kind_Solver == RANS) || (Kind_Solver == REACTIVE_RANS)) {
       variables << "Pressure Temperature Pressure_Coefficient Mach ";
       *NVar += 4;
     }
@@ -3135,7 +3135,7 @@ string COutput::AssembleVariableNames(CGeometry *geometry, CConfig *config, unsi
       }
     }
 
-    if (Kind_Solver == RANS) {
+    if (Kind_Solver == RANS || (Kind_Solver == REACTIVE_RANS)) {
       variables << "Eddy_Viscosity ";
       *NVar += 1;
     }
