@@ -905,11 +905,11 @@ if(nDim == 2) {
   dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +iSpecies] -=
   Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/Mean_PrimVar[RHO_INDEX_PRIM]*(M_tot/molar_masses[iSpecies])/sqrt_dist_ij_2*Area;
 
-  dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] +=
+  //dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] +=
   - Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(Mean_PrimVar[RHO_INDEX_PRIM]*Mean_PrimVar[RHO_INDEX_PRIM])*(M_tot/molar_masses[iSpecies])*
                                 theta*Mean_PrimVar[RHOS_INDEX_PRIM+iSpecies]/sqrt_dist_ij_2*Area;
 
-  dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] -=
+  //dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] -=
   - Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(Mean_PrimVar[RHO_INDEX_PRIM]*Mean_PrimVar[RHO_INDEX_PRIM])*(M_tot/molar_masses[iSpecies])*
                                 theta*Mean_PrimVar[RHOS_INDEX_PRIM+iSpecies]/sqrt_dist_ij_2*Area;
 
