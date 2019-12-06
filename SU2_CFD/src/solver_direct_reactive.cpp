@@ -5294,7 +5294,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         }
 
         /*--- Compute normal gradient with finite difference approximation ---*/
-        dTdn = -(Twall - Tj)/dij;
+        dTdn = +(Twall - Tj)/dij;
 
         /*--- Apply to the linear system ---*/
         Res_Visc[RHOE_INDEX_SOL] = ktr*dTdn*Area + turb_closure*Area;
