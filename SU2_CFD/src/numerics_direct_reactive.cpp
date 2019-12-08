@@ -577,7 +577,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     /*--- Local turbolent variables ---*/
     su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
     Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
-    Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
+    Mean_Turbolent_KE = 0.5(turb_ke_i + turb_ke_j);
     Vec Mean_GradTKEVar(nDim);
     Mean_GradTKEVar.setZero();
 
@@ -699,7 +699,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
       /*--- Local turbolent variables ---*/
       su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
       Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
-      Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
+      Mean_Turbolent_KE = 0.5(turb_ke_i + turb_ke_j);
 
       SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity,config);
 
@@ -1524,7 +1524,7 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     /*--- Local turbolent variables ---*/
     su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
     Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
-    Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
+    Mean_Turbolent_KE = 0.5(turb_ke_i + turb_ke_j);
 
     Vec Mean_GradTKEVar(nDim);
     Mean_GradTKEVar.setZero();
@@ -1631,7 +1631,7 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
         /*--- Local turbolent variables ---*/
         su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
         Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
-        Mean_Turbolent_KE = 2.0/(1.0/turb_ke_i + 1.0/turb_ke_j);
+        Mean_Turbolent_KE = 0.5(turb_ke_i + turb_ke_j);
         SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity,config);
       }
 

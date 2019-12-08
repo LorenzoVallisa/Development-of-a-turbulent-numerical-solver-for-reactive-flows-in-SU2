@@ -5290,7 +5290,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
           su2double *tke_grad = solver_container[TURB_SOL]->node[iPoint]->GetGradient()[0];
           for(iDim = 0; iDim < nDim; ++iDim)
             turb_closure += tke_grad[iDim]*UnitNormal[iDim];
-          turb_closure *=(mu + eddy_v/sigma_k);
+          turb_closure *=(mu);
         }
 
         /*--- Compute normal gradient with finite difference approximation ---*/
