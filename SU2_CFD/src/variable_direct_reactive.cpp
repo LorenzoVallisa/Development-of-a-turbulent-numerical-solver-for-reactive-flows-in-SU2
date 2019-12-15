@@ -592,7 +592,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
 
   /*--- Rename for convenience ---*/
   rho = U[RHO_INDEX_SOL];    // Density [Kg/m3]
-  rhoE = U[RHOE_INDEX_SOL] + val_ke;   // Density*total energy per unit of mass [J/m3]
+  rhoE = U[RHOE_INDEX_SOL] - val_ke;   // Density*total energy per unit of mass [J/m3]
 
   /*--- Assign mixture velocity and compute squared velocity ---*/
   sqvel = 0.0;
@@ -631,8 +631,8 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
         dim_temp *= 5.0/9.0;
         dim_temp_old *= 5.0/9.0;
       }
-      hs_old = (library->ComputeEnthalpy(dim_temp_old, Ys)+val_ke)/config->GetEnergy_Ref();
-      hs = (library->ComputeEnthalpy(dim_temp, Ys)+val_ke)/config->GetEnergy_Ref();
+      hs_old = (library->ComputeEnthalpy(dim_temp_old, Ys))/config->GetEnergy_Ref();
+      hs = (library->ComputeEnthalpy(dim_temp, Ys))/config->GetEnergy_Ref();
       if(US_System) {
         hs_old *= 3.28084*3.28084;
         hs *= 3.28084*3.28084;
@@ -664,7 +664,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
         su2double dim_temp = T*config->GetTemperature_Ref();;
         if(US_System)
           dim_temp *= 5.0/9.0;
-        hs = (library->ComputeEnthalpy(dim_temp, Ys)+val_ke)/config->GetEnergy_Ref();
+        hs = (library->ComputeEnthalpy(dim_temp, Ys))/config->GetEnergy_Ref();
         if(US_System)
           hs *= 3.28084*3.28084;
         f = T - C1 - C2*hs;
@@ -700,7 +700,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
       su2double dim_temp = T*config->GetTemperature_Ref();;
       if(US_System)
         dim_temp *= 5.0/9.0;
-      hs = (library->ComputeEnthalpy(dim_temp, Ys)+val_ke)/config->GetEnergy_Ref();
+      hs = (library->ComputeEnthalpy(dim_temp, Ys))/config->GetEnergy_Ref();
       if(US_System)
         hs *= 3.28084*3.28084;
       f = T - C1 - C2*hs;
@@ -758,7 +758,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   }
 
   /*--- Enthalpy ---*/
-  V[H_INDEX_PRIM] = (U[RHOE_INDEX_SOL] + val_ke + V[P_INDEX_PRIM])/rho;
+  V[H_INDEX_PRIM] = (U[RHOE_INDEX_SOL] + V[P_INDEX_PRIM])/rho;
 
   return nonPhys;
 }

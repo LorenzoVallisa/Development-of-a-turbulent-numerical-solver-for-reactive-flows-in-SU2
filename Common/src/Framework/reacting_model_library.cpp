@@ -207,7 +207,7 @@ namespace Framework {
     for(const auto it : Index_list)
       iReac_species.push_front(Df_rDrho_i(it,iReac)*mMasses[it]);
 
-    return -1/(*std::max_element(iReac_species.begin(),iReac_species.end()));
+    return 1/(std::fabs(*std::max_element(iReac_species.begin(),iReac_species.end())));
 
   }
 
@@ -304,7 +304,7 @@ namespace Framework {
         for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
           if(Ys[jSpecies] > 1.0e-10)
           source_turb_jacobian(iSpecies,jSpecies + 1) += fixed_contr*
-          PaSRConstant[iReac]*(Df_rDrho_i(jSpecies,iReac)*mMasses[jSpecies]);
+          PaSRConstant[iReac]*(Df_rDrho_i(jSpecies,iReac));//*mMasses[jSpecies]);
         }
       }
     }

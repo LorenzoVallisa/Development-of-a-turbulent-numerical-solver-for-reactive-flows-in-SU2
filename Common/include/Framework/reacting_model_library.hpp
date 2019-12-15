@@ -8,6 +8,7 @@
 #include <set>
 #include <tuple>
 #include <forward_list>
+#include <math.h>
 
 namespace Framework {
 

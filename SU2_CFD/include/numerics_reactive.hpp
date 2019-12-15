@@ -220,14 +220,14 @@ public:
   /*!
   * \brief Return heat flux factor for only turbolent closure, since laminar one already implemented in SetLaminarTensorFlux.
   */
-  su2double Get_HeatFactor(const su2double eddy_visc,const su2double temp)override{
-
-    /*--- Retrieving adimensional polytropic coefficient gamma ---*/
-    su2double gamma = library -> ComputeFrozenGamma(temp,Ys);
-
-    return (gamma/(gamma-1))*Gas_Constant*(eddy_visc/Prandtl_Turb);
-
-  }
+  // su2double Get_HeatFactor(const su2double eddy_visc,const su2double temp)override{
+  //
+  //   /*--- Retrieving adimensional polytropic coefficient gamma ---*/
+  //   su2double gamma = library -> ComputeFrozenGamma(temp,Ys);
+  //
+  //   return (gamma/(gamma-1))*Gas_Constant*(eddy_visc/Prandtl_Turb);
+  //
+  // }
   //MANGOTURB
   /*!
   * \brief /*--- Build the closure for residual tensor of viscous residaul ---*

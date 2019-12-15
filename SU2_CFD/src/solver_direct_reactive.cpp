@@ -405,10 +405,10 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
       if(US_System)
         dim_temp *= 5.0/9.0;
       //MANGOTURB
-      hs_Tot = (library->ComputeEnthalpy(dim_temp, MassFrac_Inf) + (tkeNeeded)*val_ke)/config->GetEnergy_Ref();
+      hs_Tot = (library->ComputeEnthalpy(dim_temp, MassFrac_Inf))/config->GetEnergy_Ref();
       if(US_System)
         hs_Tot *= 3.28084*3.28084;
-      Solution[RHOE_INDEX_SOL] = rho*(hs_Tot + 0.5*sqvel) - Pressure_Inf;
+      Solution[RHOE_INDEX_SOL] = rho*(hs_Tot + 0.5*sqvel) + (tkeNeeded)*val_ke - Pressure_Inf;
 
       node[iPoint]->SetSolution(Solution);
       node[iPoint]->SetSolution_Old(Solution);
@@ -726,7 +726,7 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
     //MANGOTURB
     /*--- Including turbulent initial conditions ---*/
     if (rans) {
-
+      //QUI Devo capire se passando array passo un pointer
       unsigned short nVar_Turb = solver_container[MESH_0][TURB_SOL]->GetnVar();
       su2double SolutionTurb[nVar_Turb];
       for (iMesh = 1; iMesh <= config->GetnMGLevels(); iMesh++) {
@@ -4293,6 +4293,9 @@ void CReactiveNSSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
   unsigned short nZone = geometry->GetnZone();
   std::string filename = config->GetSolution_FlowFileName();
   int Unst_RestartIter;
+  //MANGOTURB
+  // unsigned short turb_model = config->GetKind_Turb_Model();
+  //su2double Area_Children, Area_Parent, *Coord, *Solution_Fine, dull_val;
 
   /*--- Multizone problems require the number of the zone to be appended. ---*/
   if(nZone > 1)
@@ -4407,6 +4410,33 @@ void CReactiveNSSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
 
   /*--- Close the restart file ---*/
   restart_file.close();
+
+  //MANGOTURB
+  //PARTE MANCANTE DA LOADRESTART ORIGINALE SU2
+  /*--- MPI solution ---*/
+  //solver[MESH_0][FLOW_SOL]->Set_MPI_Solution(geometry[MESH_0], config);
+
+  /*--- Interpolate the solution down to the coarse multigrid levels ---*/
+  //
+  // for (iMesh = 1; iMesh <= config->GetnMGLevels(); iMesh++) {
+  //   for (iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); iPoint++) {
+  //     Area_Parent = geometry[iMesh]->node[iPoint]->GetVolume();
+  //     for (iVar = 0; iVar < nVar; iVar++) Solution[iVar] = 0.0;
+  //     for (iChildren = 0; iChildren < geometry[iMesh]->node[iPoint]->GetnChildren_CV(); iChildren++) {
+  //       Point_Fine = geometry[iMesh]->node[iPoint]->GetChildren_CV(iChildren);
+  //       Area_Children = geometry[iMesh-1]->node[Point_Fine]->GetVolume();
+  //       Solution_Fine = solver[iMesh-1][FLOW_SOL]->node[Point_Fine]->GetSolution();
+  //       for (iVar = 0; iVar < nVar; iVar++) {
+  //         Solution[iVar] += Solution_Fine[iVar]*Area_Children/Area_Parent;
+  //       }
+  //     }
+  //     solver[iMesh][FLOW_SOL]->node[iPoint]->SetSolution(Solution);
+  //   }
+  //   solver[iMesh][FLOW_SOL]->Set_MPI_Solution(geometry[iMesh], config);
+  // }
+
+
+
 }
 
 //
