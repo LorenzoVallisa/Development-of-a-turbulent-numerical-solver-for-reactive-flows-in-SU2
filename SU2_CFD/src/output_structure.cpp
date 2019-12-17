@@ -4360,7 +4360,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
   if (output_massflow && !output_1d) {
     switch (config[val_iZone]->GetKind_Solver()) {
       case EULER:                   case NAVIER_STOKES:                   case RANS:
-      case ADJ_EULER:               case ADJ_NAVIER_STOKES:               case ADJ_RANS:
+      case ADJ_EULER:               case ADJ_NAVIER_STOKES:               case ADJ_RANS: case REACTIVE_RANS:
         SetMassFlowRate(solver_container[val_iZone][FinestMesh][FLOW_SOL], geometry[val_iZone][FinestMesh], config[val_iZone]);
         break;
     }
@@ -4412,18 +4412,18 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
     bool inv_design = (config[val_iZone]->GetInvDesign_Cp() || config[val_iZone]->GetInvDesign_HeatFlux());
     bool transition = (config[val_iZone]->GetKind_Trans_Model() == LM);
     bool thermal = false; /* flag for whether to print heat flux values */
-    if (config[val_iZone]->GetKind_Solver() == RANS or config[val_iZone]->GetKind_Solver()  == NAVIER_STOKES) {
+    if (config[val_iZone]->GetKind_Solver() == RANS or config[val_iZone]->GetKind_Solver()  == NAVIER_STOKES || (config[val_iZone]->GetKind_Solver() == REACTIVE_RANS))  {
       thermal = true;
     }
     bool turbulent = ((config[val_iZone]->GetKind_Solver() == RANS) || (config[val_iZone]->GetKind_Solver() == ADJ_RANS) ||
-                      (config[val_iZone]->GetKind_Solver() == DISC_ADJ_RANS));
+                      (config[val_iZone]->GetKind_Solver() == DISC_ADJ_RANS)|| (config[val_iZone]->GetKind_Solver() == REACTIVE_RANS));
     bool adjoint = config[val_iZone]->GetContinuous_Adjoint() || config[val_iZone]->GetDiscrete_Adjoint();
     bool disc_adj = config[val_iZone]->GetDiscrete_Adjoint();
     bool wave = (config[val_iZone]->GetKind_Solver() == WAVE_EQUATION);
     bool heat = (config[val_iZone]->GetKind_Solver() == HEAT_EQUATION);
     bool flow = (config[val_iZone]->GetKind_Solver() == EULER) || (config[val_iZone]->GetKind_Solver() == NAVIER_STOKES) ||
     (config[val_iZone]->GetKind_Solver() == RANS) || (config[val_iZone]->GetKind_Solver() == ADJ_EULER) ||
-    (config[val_iZone]->GetKind_Solver() == ADJ_NAVIER_STOKES) || (config[val_iZone]->GetKind_Solver() == ADJ_RANS);
+    (config[val_iZone]->GetKind_Solver() == ADJ_NAVIER_STOKES) || (config[val_iZone]->GetKind_Solver() == ADJ_RANS) || (config[val_iZone]->GetKind_Solver() == REACTIVE_RANS);
 
     bool fem = (config[val_iZone]->GetKind_Solver() == FEM_ELASTICITY);          // FEM structural solver.
     bool linear_analysis = (config[val_iZone]->GetGeometricConditions() == SMALL_DEFORMATIONS);  // Linear analysis.
@@ -4590,7 +4590,7 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
 
       case EULER:                   case NAVIER_STOKES:                   case RANS:
       case ADJ_EULER:               case ADJ_NAVIER_STOKES:               case ADJ_RANS:
-      case DISC_ADJ_EULER:          case DISC_ADJ_NAVIER_STOKES:          case DISC_ADJ_RANS:
+      case DISC_ADJ_EULER:          case DISC_ADJ_NAVIER_STOKES:          case DISC_ADJ_RANS: case REACTIVE_RANS:
 
         /*--- Flow solution coefficients ---*/
         Total_CL       = solver_container[val_iZone][FinestMesh][FLOW_SOL]->GetTotal_CL();
@@ -5430,11 +5430,11 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
             if (incompressible) cout << "   Res[Press]";
             else cout << "      Res[Rho]" << "     Res[RhoE]";
 
-            // switch (config[val_iZone]->GetKind_Turb_Model()) {
-            //   case SA:     cout << "       Res[nu]"; break;
-            //   case SA_NEG: cout << "       Res[nu]"; break;
-            //   case SST:     cout << "     Res[kine]" << "     Res[omega]"; break;
-            // }
+            switch (config[val_iZone]->GetKind_Turb_Model()) {
+              case SA:     cout << "       Res[nu]"; break;
+              case SA_NEG: cout << "       Res[nu]"; break;
+              case SST:     cout << "     Res[kine]" << "     Res[omega]" <<std::endl; break;
+            }
 
             if (transition) { cout << "      Res[Int]" << "       Res[Re]"; }
             else if (rotating_frame && nDim == 3 ) cout << "   CThrust(Total)" << "   CTorque(Total)" << endl;
@@ -5710,9 +5710,11 @@ void COutput::SetConvHistory_Body(ofstream *ConvHist_file,
               cout.width(15); cout << log10(residual_turbulent[1]); break;
           }
 
+          std::cout<<std::endl;
+
         }
 
-        std::cout<<std::endl;
+
 
         break;
 
@@ -10728,7 +10730,7 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
 
     /*--- Add Eddy Viscosity. ---*/
 
-    if (Kind_Solver == RANS){ // || Kind_Solver == REACTIVE_RANS) {
+    if (Kind_Solver == RANS || Kind_Solver == REACTIVE_RANS) {
       nVar_Par += 1;
       Variable_Names.push_back("Eddy_Viscosity");
 

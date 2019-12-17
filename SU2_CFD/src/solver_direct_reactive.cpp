@@ -732,16 +732,16 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
       for (iMesh = 1; iMesh <= config->GetnMGLevels(); iMesh++) {
         for (iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); iPoint++) {
           Area_Parent = geometry[iMesh]->node[iPoint]->GetVolume();
-          for (iVar = 0; iVar < nVar_Turb; iVar++) Solution[iVar] = 0.0;
+          for (iVar = 0; iVar < nVar_Turb; iVar++) SolutionTurb[iVar] = 0.0;
           for (iChildren = 0; iChildren < geometry[iMesh]->node[iPoint]->GetnChildren_CV(); iChildren++) {
             Point_Fine = geometry[iMesh]->node[iPoint]->GetChildren_CV(iChildren);
             Area_Children = geometry[iMesh-1]->node[Point_Fine]->GetVolume();
             auto Solution_Fine = solver_container[iMesh-1][TURB_SOL]->node[Point_Fine]->GetSolution();
             for (iVar = 0; iVar < nVar_Turb; iVar++) {
-              Solution[iVar] += Solution_Fine[iVar]*Area_Children/Area_Parent;
+              SolutionTurb[iVar] += Solution_Fine[iVar]*Area_Children/Area_Parent;
             }
           }
-          solver_container[iMesh][TURB_SOL]->node[iPoint]->SetSolution(Solution);
+          solver_container[iMesh][TURB_SOL]->node[iPoint]->SetSolution(SolutionTurb);
         }
         solver_container[iMesh][TURB_SOL]->Set_MPI_Solution(geometry[iMesh], config);
         solver_container[iMesh][TURB_SOL]->Postprocessing(geometry[iMesh], solver_container[iMesh], config, iMesh);
@@ -921,6 +921,8 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 
    Delta_UnstTimeND = config->GetDelta_UnstTime()/Time_Ref;
    config->SetDelta_UnstTimeND(Delta_UnstTimeND);
+   config->SetMach(ModVel_FreeStream/SoundSpeed_FreeStream);
+
 
    /*--- Write output to the console ifthis is the master node and first domain ---*/
    if(config->GetConsole_Output_Verb() == VERB_HIGH && rank == MASTER_NODE && iMesh == MESH_0) {
@@ -974,7 +976,6 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
      /*--- Print out resulting non-dim values here. ---*/
      std::cout << "-- Resulting non-dimensional state:" << std::endl;
 
-     config->SetMach(ModVel_FreeStream/SoundSpeed_FreeStream);
      std::cout << "Mach number (non-dim): " << config->GetMach() << std::endl;
 
      std::cout << "Free-stream temperature (non-dim): " << Temperature_FreeStreamND << std::endl;
