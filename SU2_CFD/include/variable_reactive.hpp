@@ -791,7 +791,7 @@ public:
   }
 
   //MANGOTURB
-  inline su2double GetEddyViscosity(void)const{
+  inline su2double GetEddyViscosity(void) override {
     return Eddy_Viscosity;
   }
 
