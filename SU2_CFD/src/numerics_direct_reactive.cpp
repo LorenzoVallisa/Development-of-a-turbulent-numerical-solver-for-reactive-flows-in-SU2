@@ -797,14 +797,14 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
     }
 
 
-    /*--- Closure for Energy: simplest one cpGradT---*/
+
     su2double temp = Mean_PrimVar[T_INDEX_PRIM]*config->GetTemperature_Ref();
 
     for( iDim = 0; iDim < nDim; ++iDim) {
 
       for( jDim = 0; jDim < nDim; ++jDim) {
 
-        /*--- Tau_Re closure for Momentum and Energy using simplest closure for energy : cpGradT --*/
+
         Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim] += tau_turb(iDim,jDim);
         Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau_turb(iDim,jDim)*Mean_PrimVar[VX_INDEX_PRIM + jDim];
       }
@@ -921,18 +921,18 @@ if(nDim == 2) {
   //SPECIES TERM
   /*--- Partial mass fractions are independent quantities ---*/
   dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
-  Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*
-                                                M_tot/totMass_j*sigma_j/rho_j)*(molar_masses[iSpecies]/M_tot)/sqrt_dist_ij_2*Area; //Aggiunto termine Mi/M_tot (rispetto a cosa detto dal prof)
+  Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/sqrt_dist_ij_2*Area*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*
+                                                M_tot/totMass_j*sigma_j/rho_j); //*(molar_masses[iSpecies]/M_tot); //Aggiunto termine Mi/M_tot (rispetto a cosa detto dal prof)
 
   dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
   Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/sqrt_dist_ij_2*Area*(Xs_i[iSpecies]/sigma_i/rho_i +(iSpecies==jSpecies)*
-                                                M_tot/totMass_i*sigma_i/rho_i)*(molar_masses[iSpecies]/M_tot);
+                                                M_tot/totMass_i*sigma_i/rho_i); //*(molar_masses[iSpecies]/M_tot);
 
   //H-Y TERM (Termine beta)
-  dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*Area*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*
-                                                M_tot/totMass_j*sigma_j/rho_j)*(molar_masses[iSpecies]/M_tot);
-  dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*Area*(Xs_i[iSpecies]/sigma_i/rho_i +(iSpecies==jSpecies)*
-                                                M_tot/totMass_i*sigma_i/rho_i)*(molar_masses[iSpecies]/M_tot);
+  dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*
+  Area*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*M_tot/totMass_j*sigma_j/rho_j); //*(molar_masses[iSpecies]/M_tot);
+  dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*
+  Area*(Xs_i[iSpecies]/sigma_i/rho_i +(iSpecies==jSpecies)*M_tot/totMass_i*sigma_i/rho_i);//*(molar_masses[iSpecies]/M_tot);
     }
   }
 
@@ -1012,6 +1012,7 @@ if(nDim == 2) {
 
     // Species: Fick's law partial densities
     for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+
 
       //SENSIBLE TERM
       dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
@@ -1803,10 +1804,12 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
    /*--- Initializing double tensor species-reactions through library method ---*/
    library -> SetSourceTerm(dim_temp, dim_rho, Ys);
 
-   /*--- Initializing double tensor derivative of reaction source term w.r.t. species through library method ---*/
-   library -> Set_DfrDrhos(dim_temp, dim_rho);
 
-   if (config->GetKind_Turb_Model() == SST){
+
+   if (config->GetKind_Turb_Model()==SST){
+
+     /*--- Initializing double tensor derivative of reaction source term w.r.t. species through library method ---*/
+     library -> Set_DfrDrhos(dim_temp, dim_rho);
 
      omega.resize(Ys.size(),0);
 
@@ -1818,7 +1821,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
    else
    {
 
-     omega.resize(Ys.size(),0);
+     omega.resize(Ys.size(),0.0);
 
      Eigen::VectorXd::Map(&omega[0],Ys.size())= library->GetMassProductionTerm();
 

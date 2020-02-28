@@ -266,18 +266,19 @@ namespace Framework {
       back_contr = Backward_Rates[iReac]*(tmp - Kc_Derivatives[iReac]/Kc[iReac]);
       else
       back_contr = Backward_Rates[iReac]*(Betas_back[iReac] + Temps_Activation_back[iReac]/temp)/temp;
+
       ForBack_rates[iReac][0]=back_contr;
       ForBack_rates[iReac][1]=for_contr;
 
 
-      std::cout<<"////////////////////////////////DEBUG-PRINT: For_Back_Rates //////////////////////////////"<<std::endl;
-
-
-     for(int r = 0; r< nReactions; r++)
-        std::cout<<ForBack_rates[r][0]<<"      -      "<<ForBack_rates[r][1]<<std::endl;
-
-
-     std::cout<<"//////////////////////////////////////////////////////////////////////////////////"<<std::endl;
+     //  std::cout<<"////////////////////////////////DEBUG-PRINT: For_Back_Rates //////////////////////////////"<<std::endl;
+     //
+     //
+     // for(int r = 0; r< nReactions; r++)
+     //    std::cout<<ForBack_rates[r][0]<<"      -      "<<ForBack_rates[r][1]<<std::endl;
+     //
+     //
+     // std::cout<<"//////////////////////////////////////////////////////////////////////////////////"<<std::endl;
 
 
     }
@@ -304,7 +305,7 @@ namespace Framework {
         for(unsigned short jSpecies = 0; jSpecies < nSpecies; ++jSpecies) {
           if(Ys[jSpecies] > 1.0e-10)
           source_turb_jacobian(iSpecies,jSpecies + 1) += fixed_contr*
-          PaSRConstant[iReac]*(Df_rDrho_i(jSpecies,iReac));//*mMasses[jSpecies]);
+          PaSRConstant[iReac]*(Df_rDrho_i(jSpecies,iReac));
         }
       }
     }

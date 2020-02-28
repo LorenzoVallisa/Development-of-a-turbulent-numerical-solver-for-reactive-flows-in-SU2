@@ -367,7 +367,7 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
   //MANGOTURB
   unsigned short turb_model = config->GetKind_Turb_Model();
   bool tkeNeeded            = (turb_model == SST);
-  su2double val_ke = config -> GetTke_FreeStream(); //Dimensional freestream turbolent ke
+  su2double val_ke = config -> GetTke_FreeStreamND(); //Dimensional freestream turbolent ke
   bool nonPhys_infty;
   bool nonPhys;
 
@@ -382,9 +382,9 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
   for(unsigned long iPoint = 0; iPoint < nPoint; ++iPoint) {
     /*--- Check current solution ---*/
     if(tkeNeeded)
-      nonPhys = node_infty->SetPrimVar(config,val_ke);
+      nonPhys = node[iPoint]->SetPrimVar(config,val_ke);
     else
-      nonPhys = node_infty->SetPrimVar(config);
+      nonPhys = node[iPoint]->SetPrimVar(config);
     /*--- If current solution is not physical use free-stream values ---*/
     if(nonPhys) {
       su2double rho, hs_Tot;
@@ -761,7 +761,6 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
         solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n1();
         //MANGOTURB
         if (rans) {
-
           solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n();
           solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n1();
         }
@@ -921,7 +920,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 
    Delta_UnstTimeND = config->GetDelta_UnstTime()/Time_Ref;
    config->SetDelta_UnstTimeND(Delta_UnstTimeND);
-   config->SetMach(ModVel_FreeStream/SoundSpeed_FreeStream);
+
 
 
    /*--- Write output to the console ifthis is the master node and first domain ---*/
@@ -973,6 +972,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
      if(unsteady)
        std::cout << "Reference time: " << Time_Ref <<" s." << std::endl;
 
+     config->SetMach(ModVel_FreeStream/SoundSpeed_FreeStream);
      /*--- Print out resulting non-dim values here. ---*/
      std::cout << "-- Resulting non-dimensional state:" << std::endl;
 
@@ -991,7 +991,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 
      std::cout << "Magnitude (non-dim): " << ModVel_FreeStreamND << std::endl;
 
-     //std::cout << "Free-stream total energy per unit mass (non-dim): " << Energy_FreeStreamND << std::endl;
+     std::cout << "Free-stream total energy per unit mass (non-dim): " << Energy_FreeStreamND << std::endl;
 
      if(unsteady) {
        std::cout << "Total time (non-dim): " << Total_UnstTimeND << std::endl;
@@ -3363,7 +3363,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           }
 
           //MANGOTURB
-          if (tkeNeeded) Tot_Enthalpy += GetTke_Inf();
+          if (tkeNeeded) {Tot_Enthalpy += GetTke_Inf();}
           V_inlet[H_INDEX_PRIM] = Tot_Enthalpy;
 
           /*--- Set inlet state ---*/
@@ -4464,11 +4464,16 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
   su2double dim_temp = config->GetTemperature_FreeStream();
 
   if (tkeNeeded){
-    Tke_FreeStream  = 3.0/2.0*((config->GetModVel_FreeStream())*(config->GetModVel_FreeStream())*config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
+    Tke_FreeStream  = 3.0/2.0*((config->GetModVel_FreeStream())*(config->GetModVel_FreeStream())*
+    config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
+
     config->SetTke_FreeStream(Tke_FreeStream);
     su2double Energy_FreeStream = config->GetEnergy_FreeStream() + Tke_FreeStream;
     config->SetEnergy_FreeStream(Energy_FreeStream);
-    Tke_FreeStreamND  = 3.0/2.0*((config->GetModVel_FreeStreamND())*(config->GetModVel_FreeStreamND())*config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
+
+    Tke_FreeStreamND  = 3.0/2.0*((config->GetModVel_FreeStreamND())*(config->GetModVel_FreeStreamND())*
+    config->GetTurbulenceIntensity_FreeStream()*config->GetTurbulenceIntensity_FreeStream());
+
     config->SetTke_FreeStreamND(Tke_FreeStreamND);
     su2double Energy_FreeStreamND = config->GetEnergy_FreeStreamND() + Tke_FreeStreamND;
     config->SetEnergy_FreeStreamND(Energy_FreeStreamND);
@@ -4509,7 +4514,6 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
   config->SetViscosity_FreeStreamND(Viscosity_FreeStreamND);
 
   //MANGOTURB
-  config->SetReynolds(config->GetDensity_FreeStream()*config->GetModVel_FreeStream()*config->GetLength_Reynolds()/Viscosity_FreeStream);
   //std::cout<<"     Reynolds Number ->        "<<config->GetReynolds()<<"        "<<std::endl;
 
   /*--- Update turbolent omega, turbolent ke and consequently free stream energy in case of turbolence---*/
@@ -4536,9 +4540,14 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
     else if(US_Measurament)
       std::cout << " lbf/s.R."<< std::endl;
 
-    std::cout<< "Reynolds number (non-dim): " << config->GetReynolds() <<std::endl;
+      config->SetReynolds(config->GetDensity_FreeStream()*config->GetModVel_FreeStream()*config->GetLength_Reynolds()/Viscosity_FreeStream);
+      std::cout<< "Reynolds number (non-dim): " << config->GetReynolds() <<std::endl;
 
     std::cout<< "Free-stream viscosity (non-dim): " << config->GetViscosity_FreeStreamND() << std::endl;
+
+    std::cout<< "Turbolent Kinetic Energy (dim): " << config->GetTke_FreeStream() << std::endl;
+
+    std::cout<< "Turbolent Kinetic Energy (non-dim): " << config->GetTke_FreeStreamND() << std::endl;
 
     std::cout<<std::endl;
   }
@@ -4556,6 +4565,7 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
   /*--- Set the primitive variables ---*/
   unsigned long ErrorCounter = SetPrimitive_Variables(solver_container, config, Output);
   unsigned long iPoint;
+
 
 
   //MANGOTURB
@@ -4593,11 +4603,9 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
 
   }
 
-
-  //MANGOTURB
-  // /*--- Limiter computation ---*/
-  // if(limiter && iMesh == MESH_0 && !Output)
-  //   SetPrimitive_Limiter(geometry, config);
+  /*--- Limiter computation ---*/
+  if(limiter && iMesh == MESH_0 && !Output)
+    SetPrimitive_Limiter(geometry, config);
 
   //MANGOTURB
   if ((iMesh == MESH_0) && (limiter_flow || limiter_turb || limiter_visc) && !Output) { SetPrimitive_Limiter(geometry, config);}
