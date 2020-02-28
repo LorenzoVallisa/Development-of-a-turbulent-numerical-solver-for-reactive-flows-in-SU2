@@ -810,24 +810,24 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
       }
 
       /*--- Closure for species using molar fractions as approximation ---*/
-      for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-        Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*
-        Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) * Normal[iDim];
-      }
+      // for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+      //   Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*
+      //   Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim) * Normal[iDim];
+      // }
 
 
-      /*--- Fick's law partial densities closure --*/
-      for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-        Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb) *
-                                      hs[iSpecies]*Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim);
-      }
-
-      /*--- Fick's law partial sensible enthalpies closure --*/
-      Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/Prandtl_Turb*std::accumulate(Cps.cbegin(),Cps.cend(),0.0)*
-                                        Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim);
-
-      /*--- Wilcox closure for turbolent ke and main stresses turbolent transport term --*/
-      Flux_Tensor[RHOE_INDEX_SOL][iDim] += (Mean_Laminar_Viscosity + Mean_Eddy_Viscosity/sigma_k) * mean_tkegradvar(iDim);
+      // /*--- Fick's law partial densities closure --*/
+      // for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+      //   Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb) *
+      //                                 hs[iSpecies]*Mean_GradPrimVar(RHOS_INDEX_AVGGRAD + iSpecies,iDim);
+      // }
+      //
+      // /*--- Fick's law partial sensible enthalpies closure --*/
+      // Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/Prandtl_Turb*std::accumulate(Cps.cbegin(),Cps.cend(),0.0)*
+      //                                   Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim);
+      //
+      // /*--- Wilcox closure for turbolent ke and main stresses turbolent transport term --*/
+      // Flux_Tensor[RHOE_INDEX_SOL][iDim] += (Mean_Laminar_Viscosity + Mean_Eddy_Viscosity/sigma_k) * mean_tkegradvar(iDim);
 
 
     }
@@ -883,8 +883,8 @@ if(nDim == 2) {
   // Momentum : Tau_Reynolds
 
   // X-momentum
-  dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
-  dFdVi[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
+  // dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
+  // dFdVi[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
 
   dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*thetax/sqrt_dist_ij_2*Area;
   dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
@@ -892,8 +892,8 @@ if(nDim == 2) {
   dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
 
   // Y-momentum
-  dFdVj[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
-  dFdVi[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
+  // dFdVj[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
+  // dFdVi[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
 
   dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
   dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*thetay/sqrt_dist_ij_2*Area;
@@ -907,34 +907,34 @@ if(nDim == 2) {
   dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
 
   // Species: Fick's law partial densities
-  for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-
-    //SENSIBLE TERM
-    dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
-    dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] -= Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
-
-
-    for( unsigned int jSpecies = 0; jSpecies < nSpecies; ++jSpecies){
-
-
-
-  //SPECIES TERM
-  /*--- Partial mass fractions are independent quantities ---*/
-  dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
-  Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/sqrt_dist_ij_2*Area*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*
-                                                M_tot/totMass_j*sigma_j/rho_j); //*(molar_masses[iSpecies]/M_tot); //Aggiunto termine Mi/M_tot (rispetto a cosa detto dal prof)
-
-  dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
-  Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/sqrt_dist_ij_2*Area*(Xs_i[iSpecies]/sigma_i/rho_i +(iSpecies==jSpecies)*
-                                                M_tot/totMass_i*sigma_i/rho_i); //*(molar_masses[iSpecies]/M_tot);
-
-  //H-Y TERM (Termine beta)
-  dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*
-  Area*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*M_tot/totMass_j*sigma_j/rho_j); //*(molar_masses[iSpecies]/M_tot);
-  dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*
-  Area*(Xs_i[iSpecies]/sigma_i/rho_i +(iSpecies==jSpecies)*M_tot/totMass_i*sigma_i/rho_i);//*(molar_masses[iSpecies]/M_tot);
-    }
-  }
+  // for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+  //
+  //   //SENSIBLE TERM
+  //   dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
+  //   dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] -= Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
+  //
+  //
+  //   for( unsigned int jSpecies = 0; jSpecies < nSpecies; ++jSpecies){
+  //
+  //
+  //
+  // //SPECIES TERM
+  // /*--- Partial mass fractions are independent quantities ---*/
+  // dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
+  // Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/sqrt_dist_ij_2*Area*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*
+  //                                               M_tot/totMass_j*sigma_j/rho_j); //*(molar_masses[iSpecies]/M_tot); //Aggiunto termine Mi/M_tot (rispetto a cosa detto dal prof)
+  //
+  // dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
+  // Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/sqrt_dist_ij_2*Area*(Xs_i[iSpecies]/sigma_i/rho_i +(iSpecies==jSpecies)*
+  //                                               M_tot/totMass_i*sigma_i/rho_i); //*(molar_masses[iSpecies]/M_tot);
+  //
+  // //H-Y TERM (Termine beta)
+  // dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*
+  // Area*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*M_tot/totMass_j*sigma_j/rho_j); //*(molar_masses[iSpecies]/M_tot);
+  // dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*
+  // Area*(Xs_i[iSpecies]/sigma_i/rho_i +(iSpecies==jSpecies)*M_tot/totMass_i*sigma_i/rho_i);//*(molar_masses[iSpecies]/M_tot);
+  //   }
+  // }
 
 
 
@@ -1046,17 +1046,17 @@ if(nDim == 2) {
   } /*--- End of nDim = 3 ---*/
 
   /*--- Common terms to both dimensional choice ---*/
-  su2double aux_sum = std::inner_product(Mean_PrimVar.data() + VX_INDEX_PRIM,Mean_PrimVar.data() + VX_INDEX_PRIM + nDim, UnitNormal ,0.0);
-  dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(aux_sum)*Area;
-  dFdVi[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(aux_sum)*Area;
-
-  //H-Y TERM (Termine alfa)
-  for (iSpecies = 0; iSpecies<nSpecies ; iSpecies ++){
-      su2double aux_sum_1=std::inner_product(Mean_GradPrimVar.row(RHOS_INDEX_AVGGRAD+iSpecies).data(),
-                                      Mean_GradPrimVar.row(RHOS_INDEX_AVGGRAD+iSpecies).data()+nDim,UnitNormal ,0.0);
-      dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Ys[iSpecies]*Cps[iSpecies]*aux_sum_1*Area;
-      dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Ys[iSpecies]*Cps[iSpecies]*aux_sum_1*Area;
-  }
+  // su2double aux_sum = std::inner_product(Mean_PrimVar.data() + VX_INDEX_PRIM,Mean_PrimVar.data() + VX_INDEX_PRIM + nDim, UnitNormal ,0.0);
+  // dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(aux_sum)*Area;
+  // dFdVi[RHOE_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*Mean_Turbolent_KE*(aux_sum)*Area;
+  //
+  // //H-Y TERM (Termine alfa)
+  // for (iSpecies = 0; iSpecies<nSpecies ; iSpecies ++){
+  //     su2double aux_sum_1=std::inner_product(Mean_GradPrimVar.row(RHOS_INDEX_AVGGRAD+iSpecies).data(),
+  //                                     Mean_GradPrimVar.row(RHOS_INDEX_AVGGRAD+iSpecies).data()+nDim,UnitNormal ,0.0);
+  //     dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Ys[iSpecies]*Cps[iSpecies]*aux_sum_1*Area;
+  //     dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Ys[iSpecies]*Cps[iSpecies]*aux_sum_1*Area;
+  // }
 
 }
 
