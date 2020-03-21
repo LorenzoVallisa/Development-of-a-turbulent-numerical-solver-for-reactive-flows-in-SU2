@@ -1057,7 +1057,7 @@ public:
   /*!
    * \brief A virtual member.
    */
-  virtual bool SetPrimVar(su2double eddy_visc, su2double turb_ke, CFluidModel *FluidModel);
+  virtual bool SetPrimVar(su2double eddy_visc, su2double turb_ke, CFluidModel *FluidModel,CConfig *config);
 
   /*!
    * \brief A virtual member.
@@ -3302,6 +3302,9 @@ private:
   su2double Viscosity_Inf;   /*!< \brief Viscosity of the fluid at the infinity. */
   su2double Vorticity[3];    /*!< \brief Vorticity of the fluid. */
   su2double StrainMag;       /*!< \brief Magnitude of rate of strain tensor. */
+  //DEBUGPRIMVAR
+  //static constexpr bool DEBUG_PRIM_VAR=1;
+
 public:
 
   /*!
@@ -3441,7 +3444,7 @@ public:
   /*!
    * \brief Set all the primitive variables for compressible flows
    */
-  bool SetPrimVar(su2double eddy_visc, su2double turb_ke, CFluidModel *FluidModel);
+  bool SetPrimVar(su2double eddy_visc, su2double turb_ke, CFluidModel *FluidModel,CConfig *config);
   using CVariable::SetPrimVar;
 
   /*!

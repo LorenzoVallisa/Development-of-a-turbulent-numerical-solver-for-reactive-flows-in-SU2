@@ -18,6 +18,7 @@ public:
   typedef std::vector<su2double> RealVec;
   typedef su2double** SU2Matrix;
   typedef std::shared_ptr<Framework::PhysicalChemicalLibrary> LibraryPtr;
+  // static constexpr bool DEBUG_PRIM_VAR = 1;
 
 protected:
   LibraryPtr library; /*!< \brief Smart pointer to the library that computes physical-chemical properties. */
@@ -783,6 +784,8 @@ public:
    * \param[in] config - Configuration of the particular problem.
    */
   bool SetPrimVar(su2double eddy_visc, su2double turb_ke, CConfig* config)override;
+
+  bool SetPrimVar(CConfig* config, su2double val_ke)override;
 
 
   //MANGOTURB

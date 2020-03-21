@@ -408,7 +408,7 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
       hs_Tot = (library->ComputeEnthalpy(dim_temp, MassFrac_Inf))/config->GetEnergy_Ref();
       if(US_System)
         hs_Tot *= 3.28084*3.28084;
-      Solution[RHOE_INDEX_SOL] = rho*(hs_Tot + 0.5*sqvel) + (tkeNeeded)*val_ke - Pressure_Inf;
+      Solution[RHOE_INDEX_SOL] = rho*(hs_Tot + 0.5*sqvel) + (tkeNeeded)*val_ke*rho - Pressure_Inf;
 
       node[iPoint]->SetSolution(Solution);
       node[iPoint]->SetSolution_Old(Solution);
@@ -974,30 +974,8 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 
      config->SetMach(ModVel_FreeStream/SoundSpeed_FreeStream);
      /*--- Print out resulting non-dim values here. ---*/
-     std::cout << "-- Resulting non-dimensional state:" << std::endl;
-
-     std::cout << "Mach number (non-dim): " << config->GetMach() << std::endl;
-
-     std::cout << "Free-stream temperature (non-dim): " << Temperature_FreeStreamND << std::endl;
-
-     std::cout << "Free-stream pressure (non-dim): " << Pressure_FreeStreamND << std::endl;
-
-     std::cout << "Free-stream density (non-dim): " << Density_FreeStreamND << std::endl;
-
-     std::cout << "Free-stream velocity (non-dim): (";
-     for(iDim = 0; iDim < nDim; ++iDim)
-      iDim < (nDim -1) ? std::cout << Velocity_FreeStreamND[iDim] << ", " :
-                         std::cout << Velocity_FreeStreamND[iDim] << "). "<<std::endl;
-
-     std::cout << "Magnitude (non-dim): " << ModVel_FreeStreamND << std::endl;
-
-     std::cout << "Free-stream total energy per unit mass (non-dim): " << Energy_FreeStreamND << std::endl;
-
-     if(unsteady) {
-       std::cout << "Total time (non-dim): " << Total_UnstTimeND << std::endl;
-       std::cout << "Time step (non-dim): " << Delta_UnstTimeND << std::endl;
-     }
      std::cout << std::endl;
+
    }
  }
 
@@ -2857,6 +2835,27 @@ void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver
     /*--- Compute the source residual ---*/
     numerics->ComputeChemistry(Res_Sour, Jacobian_i, config);
 
+    //DEBUGSOURCE
+    if(config->Get_debug_source()){
+      std::cout<<" --------------Source Residual--------------- "<<std::endl;
+      for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+          std::cout<<Res_Sour[iVar]<<"   -   ";
+      }
+      std::cout<<std::endl;
+    }
+
+    //DEBUGSOURCE
+    if(config->Get_debug_source()){
+      std::cout<<" --------------Source Jacobian_i--------------- "<<std::endl;
+      for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+        for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+          std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+        }
+        std::cout<<std::endl;
+      }
+      std::cout<<std::endl;
+      }
+
     /*--- Check for NaNs before applying the residual to the linear system ---*/
     bool err = !std::none_of(Res_Sour, Res_Sour + nVar, [](su2double elem){return std::isnan(elem);});
     if(implicit) {
@@ -2906,6 +2905,10 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
   unsigned long iVertex, iPoint;
   unsigned short iDim;
 
+
+  bool tkeNeeded = ((config->GetKind_Solver() == REACTIVE_RANS) &&
+                    (config->GetKind_Turb_Model() == SST));
+
   su2double Area, Pressure;
   su2double Normal[nDim], UnitNormal[nDim];
 
@@ -2928,10 +2931,19 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
 
 			/*--- Retrieve the pressure on the vertex ---*/
       Pressure = node[iPoint]->GetPressure();
+      su2double Density = node[iPoint]->GetDensity();
+      su2double turb_ke = 0.0;
 
-			/*--- Compute the residual ---*/
-			for(iDim = 0; iDim < nDim; ++iDim)
-				Residual[RHOVX_INDEX_SOL + iDim] = Pressure*UnitNormal[iDim]*Area;
+      if (tkeNeeded){
+        turb_ke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);
+        // std::cout<< " TKE --------------->   "<<turb_ke<<"     "<<std::endl;
+      }
+
+      /*--- Compute the residual ---*/
+      for(iDim = 0; iDim < nDim; ++iDim)
+      Residual[RHOVX_INDEX_SOL + iDim] = Pressure*UnitNormal[iDim]*Area + 2.0/3.0*Density*turb_ke*UnitNormal[iDim]*Area;
+
+
 
       /*--- Correction to energy due to mowing wall: extra term due to pressure contribution ---*/
       su2double ProjGridVel = 0.0;
@@ -2943,6 +2955,15 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
 
       /*--- Add value to the residual ---*/
   		LinSysRes.AddBlock(iPoint, Residual);
+
+      //DEBUGVISCOUS
+      if(config->Get_debug_visc_bound()){
+        std::cout<<" --------------Euler Residual--------------- "<<std::endl;
+        for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+            std::cout<<Residual[iVar]<<"   -   ";
+        }
+        std::cout<<std::endl;
+      }
 
       if(implicit) {
         unsigned short iVar, jVar;
@@ -2968,6 +2989,20 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
 
         Jacobian.AddBlock(iPoint, iPoint, Jacobian_i);
       }
+
+      //DEBUGVISCOUS
+      if(config->Get_debug_visc_bound()){
+        std::cout<<" --------------Euler Jacobian_i--------------- "<<std::endl;
+        for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+          for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+            std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+          }
+          std::cout<<std::endl;
+        }
+        std::cout<<std::endl;
+      }
+
+
 
     } /*--- End of if Geometry() ---*/
 
@@ -3376,6 +3411,18 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
             V_inlet[VX_INDEX_PRIM + iDim] = Vel_Mag*Flow_Dir[iDim];
           std::copy(Ys.cbegin(), Ys.cend(), V_inlet + RHOS_INDEX_PRIM);
 
+
+          //DEBUGVISCOUS
+          if(config->Get_debug_visc_bound()){
+            std::cout<<" --------------INLET Primitive--------------- "<<std::endl;
+            std::cout<< " T ------>"<<V_inlet[T_INDEX_PRIM]<<std::endl;
+            std::cout<< " vx ------>"<<V_inlet[VX_INDEX_PRIM]<<std::endl;
+            std::cout<< " vy ------>"<<V_inlet[VX_INDEX_PRIM + 1]<<std::endl;
+            std::cout<< " P ------>"<<V_inlet[P_INDEX_PRIM]<<std::endl;
+            std::cout<< " rho ------>"<<V_inlet[RHO_INDEX_PRIM]<<std::endl;
+            std::cout<< " h ------>"<<V_inlet[H_INDEX_PRIM]<<std::endl;
+          }
+
           break;
         }
 
@@ -3594,6 +3641,27 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
 
         /*--- Compute residual ---*/
         visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------inlet Residual--------------- "<<std::endl;
+          for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+              std::cout<<Residual[iVar]<<"   -    ";
+          }
+          std::cout<<std::endl;
+        }
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------Inlet Jacobian_i--------------- "<<std::endl;
+          for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+            for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+              std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+            }
+            std::cout<<std::endl;
+          }
+          std::cout<<std::endl;
+        }
 
         /*--- Check for NaNs before applying the residual to the linear system ---*/
         err = !std::none_of(Residual, Residual + nVar, [](su2double elem){return std::isnan(elem);});
@@ -3856,11 +3924,28 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         //MANGOTURB
         V_outlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref() + (tkeNeeded)*GetTke_Inf();
 
+
         if(US_System)
           V_outlet[H_INDEX_PRIM] *= 3.28084*3.28084;
         V_outlet[H_INDEX_PRIM] += 0.5*Velocity2;
         V_outlet[A_INDEX_PRIM] = SoundSpeed;
         std::copy(Ys.cbegin(), Ys.cend(), V_outlet + RHOS_INDEX_PRIM);
+
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------outlet Primitive--------------- "<<std::endl;
+          std::cout<< " T ------>"<<V_outlet[T_INDEX_PRIM]<<std::endl;
+          std::cout<< " vx ------>"<<V_outlet[VX_INDEX_PRIM]<<std::endl;
+          std::cout<< " vy ------>"<<V_outlet[VX_INDEX_PRIM + 1]<<std::endl;
+          std::cout<< " P ------>"<<V_outlet[P_INDEX_PRIM]<<std::endl;
+          std::cout<< " rho ------>"<<V_outlet[RHO_INDEX_PRIM]<<std::endl;
+          std::cout<< " h ------>"<<V_outlet[H_INDEX_PRIM]<<std::endl;
+        }
+
+
+
+
       } /*--- End subsonic outlet preliminary computations ---*/
 
       /*--- Set primitives and grid movement in the convective numerics class ---*/
@@ -3993,6 +4078,27 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
 
         /*--- Compute residual ---*/
         visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------Outlet Residual--------------- "<<std::endl;
+          for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+              std::cout<<Residual[iVar]<<"   -   ";
+          }
+          std::cout<<std::endl;
+        }
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------Outlet Jacobian_i--------------- "<<std::endl;
+          for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+            for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+              std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+            }
+            std::cout<<std::endl;
+          }
+          std::cout<<std::endl;
+        }
 
         /*--- Check for NaNs before applying the residual to the linear system ---*/
         err = !std::none_of(Residual, Residual + nVar, [](su2double elem){return std::isnan(elem);});
@@ -4528,19 +4634,76 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
   if(config->GetConsole_Output_Verb() == VERB_HIGH && rank == MASTER_NODE && iMesh == MESH_0) {
     std::cout.precision(6);
 
-    std::cout<< "Reference viscosity: " << config->GetViscosity_Ref();
-    if(SI_Measurement)
-      std::cout << " N.s/m^2."<< std::endl;
-    else if(US_Measurament)
-      std::cout<< " lbf.s/ft^2."<< std::endl;
+    // std::cout<< "Reference viscosity: " << config->GetViscosity_Ref();
+    // if(SI_Measurement)
+    //   std::cout << " N.s/m^2."<< std::endl;
+    // else if(US_Measurament)
+    //   std::cout<< " lbf.s/ft^2."<< std::endl;
+    //
+    // std::cout << "Reference conductivity: " << config->GetConductivity_Ref();
+    // if(SI_Measurement)
+    //   std::cout << " W/m.K."<< std::endl;
+    // else if(US_Measurament)
+    //   std::cout << " lbf/s.R."<< std::endl;
+    std::cout << "-- Resulting non-dimensional state:" << std::endl;
 
-    std::cout << "Reference conductivity: " << config->GetConductivity_Ref();
-    if(SI_Measurement)
-      std::cout << " W/m.K."<< std::endl;
-    else if(US_Measurament)
-      std::cout << " lbf/s.R."<< std::endl;
+    cout << "Prandtl: " << config->GetPrandtl_Lam()<< endl;
 
-      config->SetReynolds(config->GetDensity_FreeStream()*config->GetModVel_FreeStream()*config->GetLength_Reynolds()/Viscosity_FreeStream);
+    std::cout << "Mach number (non-dim): " << config->GetMach() << std::endl;
+
+    std::cout << "Free-stream pressure (non-dim): " << config->GetPressure_FreeStreamND() << std::endl;
+
+    cout << "Free-stream static pressure: " << config->GetPressure_FreeStream();
+    if (config->GetSystemMeasurements() == SI) cout << " Pa." << endl;
+    else if (config->GetSystemMeasurements() == US) cout << " psf." << endl;
+
+    // cout << "Free-stream total pressure: " << config->GetPressure_FreeStream() * pow( 1.0+Mach*Mach*0.5*(Gamma-1.0), Gamma/(Gamma-1.0) );
+    // if (config->GetSystemMeasurements() == SI) cout << " Pa." << endl;
+    // else if (config->GetSystemMeasurements() == US) cout << " psf." << endl;
+
+
+    std::cout << "Free-stream temperature (non-dim): " << config->GetTemperature_FreeStreamND() << std::endl;
+
+    cout << "Free-stream temperature: " << config->GetTemperature_FreeStream();
+    if (config->GetSystemMeasurements() == SI) cout << " K." << endl;
+    else if (config->GetSystemMeasurements() == US) cout << " R." << endl;
+
+
+    std::cout << "Free-stream density (non-dim): " << config->GetDensity_FreeStreamND() << std::endl;
+    cout << "Free-stream density: " << config->GetDensity_FreeStream();
+    if (config->GetSystemMeasurements() == SI) cout << " kg/m^3." << endl;
+    else if (config->GetSystemMeasurements() == US) cout << " slug/ft^3." << endl;
+
+
+    std::cout << "Free-stream velocity (non-dim): (";
+    for(unsigned iDim = 0; iDim < nDim; ++iDim)
+     iDim < (nDim -1) ? std::cout << config->GetVelocity_FreeStreamND()[iDim] << ", " :
+                        std::cout << config->GetVelocity_FreeStreamND()[iDim] << "). "<<std::endl;
+    if (nDim == 2) {
+      cout << "Free-stream velocity: (" << config->GetVelocity_FreeStream()[0] << ", ";
+      cout << config->GetVelocity_FreeStream()[1] << ")";
+    }
+
+    std::cout << "Magnitude (non-dim): " << config->GetModVel_FreeStreamND() << std::endl;
+
+    cout << "Magnitude: "   << config->GetModVel_FreeStream();
+    if (config->GetSystemMeasurements() == SI) cout << " m/s (" << config->GetModVel_FreeStream()*1.94384 << " KTS)." << endl;
+    else if (config->GetSystemMeasurements() == US) cout << " ft/s (" << config->GetModVel_FreeStream()*0.592484 << " KTS)." << endl;
+
+
+    std::cout << "Free-stream total energy per unit mass (non-dim): " << config->GetEnergy_FreeStreamND() << std::endl;
+
+    cout << "Free-stream total energy per unit mass: " << config->GetEnergy_FreeStream();
+    if (config->GetSystemMeasurements() == SI) cout << " m^2/s^2." << endl;
+    else if (config->GetSystemMeasurements() == US) cout << " ft^2/s^2." << endl;
+
+    cout << "Specific gas constant (non-dim): " << config->GetGas_ConstantND() << endl;
+
+
+    std::cout << "Total time (non-dim): " << config->GetTotal_UnstTimeND() << std::endl;
+    std::cout << "Time step (non-dim): " << config->GetDelta_UnstTimeND() << std::endl;
+
+          config->SetReynolds(config->GetDensity_FreeStream()*config->GetModVel_FreeStream()*config->GetLength_Reynolds()/Viscosity_FreeStream);
       std::cout<< "Reynolds number (non-dim): " << config->GetReynolds() <<std::endl;
 
     std::cout<< "Free-stream viscosity (non-dim): " << config->GetViscosity_FreeStreamND() << std::endl;
@@ -4548,6 +4711,9 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
     std::cout<< "Turbolent Kinetic Energy (dim): " << config->GetTke_FreeStream() << std::endl;
 
     std::cout<< "Turbolent Kinetic Energy (non-dim): " << config->GetTke_FreeStreamND() << std::endl;
+
+    cout << "Free-stream specific dissipation: " << config->GetOmega_FreeStream() << endl;
+    cout << "Free-stream specific dissipation (non-dim): " << config->GetOmega_FreeStreamND() << endl;
 
     std::cout<<std::endl;
   }
@@ -4990,6 +5156,14 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
 
     /*--- Inviscid contribution ---*/
     Lambda = (std::abs(Mean_ProjVel) + Mean_SoundSpeed)*Area;
+
+    //DEBUGTIME
+    if(config->Get_debug_time()){
+
+    std::cout<<" --------------Inviscid--------------- "<<std::endl;
+    std::cout<< " L -----------> "<<Lambda<<std::endl;
+  }
+
     if(geometry->node[iPoint]->GetDomain())
       node[iPoint]->AddMax_Lambda_Inv(Lambda);
     if(geometry->node[jPoint]->GetDomain())
@@ -5008,6 +5182,17 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
       Lambda_1 = 4.0/3.0*Mean_LaminarVisc;
       Lambda_2 = Mean_ThermalCond/Mean_CV;
     }
+
+    //DEBUGTIME
+    if(config->Get_debug_time()){
+
+    std::cout<<" --------------Viscid--------------- "<<std::endl;
+    std::cout<< " L1 -----------> "<<Lambda_1<<std::endl;
+    std::cout<< " L2 ------------> "<<Lambda_2<<std::endl;
+    std::cout<< " LTot -------------> "<<(Lambda_1 + Lambda_2)*Area*Area/Mean_Density<<std::endl;
+
+  }
+
 
   	Lambda = (Lambda_1 + Lambda_2)*Area*Area/Mean_Density;
   	if(geometry->node[iPoint]->GetDomain())
@@ -5186,7 +5371,6 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solver_c
     /*--- Set species binary diffusion coefficients at node i and j ---*/
     numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[jPoint]->GetDiffusionCoeff());
 
-
     //MANGOTURB
     /*--- Set values of adimensional turbolent kinetic energies and eddy viscosities into numerics class ---*/
     if (config->GetKind_Turb_Model() == SST){
@@ -5201,6 +5385,9 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solver_c
     }
 
     /*--- Compute the residual ---*/
+    if(config->Get_debug_visc_flow()){
+      std::cout<<" -----------------EDGE---------------"<<iEdge<<std::endl;
+    }
     numerics->ComputeResidual(Res_Visc, Jacobian_i, Jacobian_j, config);
 
 

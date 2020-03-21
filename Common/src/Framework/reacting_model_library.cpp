@@ -718,10 +718,12 @@ namespace Framework {
     return rhoUdiff;
   }
 
+
   //
   //
   /* This function computes the effective diffusion coefficients for each species. */
   RealVec ReactingModelLibrary::GetDiffCoeffs(const double temp, const double pressure, const RealVec& ys) {
+
     /*--- Compute binary diffusion coefficients and mole fractions ---*/
     Dij = GetDij_SM(temp,pressure);
     SetMolarFromMass(ys);

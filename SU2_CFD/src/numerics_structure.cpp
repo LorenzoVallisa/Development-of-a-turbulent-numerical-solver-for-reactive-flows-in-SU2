@@ -1623,7 +1623,7 @@ void CNumerics::GetViscousProjFlux(su2double *val_primvar,
                   su2double **val_gradprimvar, su2double val_turb_ke,
                   su2double *val_normal,
                   su2double val_laminar_viscosity,
-                  su2double val_eddy_viscosity) {
+                  su2double val_eddy_viscosity,CConfig* config) {
 
 
   unsigned short iVar, iDim, jDim;
@@ -1633,6 +1633,57 @@ void CNumerics::GetViscousProjFlux(su2double *val_primvar,
   total_viscosity = val_laminar_viscosity + val_eddy_viscosity;
   Cp = (Gamma / Gamma_Minus_One) * Gas_Constant;
   heat_flux_factor = Cp * (val_laminar_viscosity/Prandtl_Lam + val_eddy_viscosity/Prandtl_Turb);
+
+  //DEBUGVISCOUS
+  if(config->Get_debug_visc_flow()){
+
+
+
+    std::cout<<" --------------Laminar Flux_Tensor--------------- "<<std::endl;
+    su2double tau_pd[nDim][nDim];
+
+    for (iDim = 0 ; iDim < nDim; iDim++){
+      for (jDim = 0 ; jDim < nDim; jDim++){
+        tau_pd[iDim][jDim] = val_laminar_viscosity*( val_gradprimvar[jDim+1][iDim] + val_gradprimvar[iDim+1][jDim] )
+        - TWO3*val_laminar_viscosity*div_vel*delta[iDim][jDim];
+      }
+    }
+
+    for (iDim = 0 ; iDim < nDim; iDim++){
+      for (jDim = 0 ; jDim < nDim; jDim++){
+        std::cout<<tau_pd[jDim][iDim]<<"   -   ";
+      }
+      std::cout<<std::endl;
+    }
+
+    std::cout<<tau_pd[0][0]*val_primvar[1] + tau_pd[0][1]*val_primvar[2]+ Cp * (val_laminar_viscosity/Prandtl_Lam)*val_gradprimvar[0][0]<<"   -   "<<
+    tau_pd[1][0]*val_primvar[1] + tau_pd[1][1]*val_primvar[2]+ Cp * (val_laminar_viscosity/Prandtl_Lam)*val_gradprimvar[0][1]<<std::endl;
+
+  }
+
+  //DEBUGVISCOUS
+  if(config->Get_debug_visc_flow()){
+
+
+
+    std::cout<<" --------------Turbolent add-on--------------- "<<std::endl;
+
+    std::cout<<" rho -----------> "<<Density<<std::endl;
+    std::cout<<" TKE -----------> "<<val_turb_ke<<std::endl;
+    std::cout<<" Cp -----------> "<<Cp<<std::endl;
+    std::cout<<" PrT -----------> "<<Prandtl_Turb<<std::endl;
+    std::cout<<" mu_t -----------> "<<val_eddy_viscosity<<std::endl;
+    std::cout<<" T_Grad -----------> "<<val_gradprimvar[0][0]<<"   -   "
+              <<val_gradprimvar[0][1]<<std::endl;
+    std::cout<<" Velocities -----------> "<<val_primvar[1]<<"   -   "
+                        <<val_primvar[2]<<std::endl;
+    std::cout<<" Grad_Vel-----------> "<<val_gradprimvar[1][0]<<"   -   "
+              <<val_gradprimvar[1][1]<<std::endl;
+    std::cout<<val_gradprimvar[2][0]<<"   -   "
+              <<val_gradprimvar[2][1]<<std::endl;
+  }
+
+
 
   div_vel = 0.0;
   for (iDim = 0 ; iDim < nDim; iDim++)
@@ -1674,6 +1725,28 @@ void CNumerics::GetViscousProjFlux(su2double *val_primvar,
     Flux_Tensor[4][2] = tau[2][0]*val_primvar[1] + tau[2][1]*val_primvar[2] + tau[2][2]*val_primvar[3] +
         heat_flux_factor*val_gradprimvar[0][2];
   }
+
+
+  //DEBUGVISCOUS
+  if(config->Get_debug_visc_flow()){
+
+
+
+    std::cout<<" --------------Laminar+Turbolent Flux_Tensor--------------- "<<std::endl;
+
+    for (jDim = 0 ; jDim < nDim; jDim++){
+      for (iDim = 0 ; iDim < nDim; iDim++){
+        std::cout<<Flux_Tensor[1 + jDim][iDim]<<"   -   ";
+      }
+      std::cout<<std::endl;
+    }
+
+    std::cout<<Flux_Tensor[3][0]<<"   -   "<<Flux_Tensor[3][1]<<std::endl;
+
+  }
+
+
+
   for (iVar = 0; iVar < nVar; iVar++) {
     Proj_Flux_Tensor[iVar] = 0.0;
     for (iDim = 0; iDim < nDim; iDim++)

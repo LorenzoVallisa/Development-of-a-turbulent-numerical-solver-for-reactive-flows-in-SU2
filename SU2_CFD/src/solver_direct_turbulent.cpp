@@ -2742,6 +2742,20 @@ CTurbSSTSolver::CTurbSSTSolver(CGeometry *geometry, CConfig *config, unsigned sh
   /*--- Eddy viscosity, initialized without stress limiter at the infinity ---*/
   muT_Inf = rhoInf*kine_Inf/omega_Inf;
 
+  //DEBUGTURBVAR
+
+  if(config->Get_debug_turbvar()){
+
+  std::cout<<" --------------Consturctor SST--------------- "<<std::endl;
+  std::cout<< " mut_inf -----------> "<<muT_Inf<<std::endl;
+  std::cout<< " omega_inf ------------> "<<omega_Inf<<std::endl;
+  std::cout<< " kine_inf -------------> "<<kine_Inf<<std::endl;
+  std::cout<< " rho_inf ------------> "<< rhoInf<<std::endl;
+  std::cout<<" vel_inf ------------------>"<<VelInf<<std::endl;
+  std::cout<<" mu_lam_inf ------------------>"<<muLamInf<<std::endl;
+
+}
+
   /*--- Restart the solution from file information ---*/
   if (!restart || (iMesh != MESH_0)) {
     for (iPoint = 0; iPoint < nPoint; iPoint++)
@@ -2949,6 +2963,18 @@ void CTurbSSTSolver::Postprocessing(CGeometry *geometry, CSolver **solver_contai
     zeta = min(1.0/omega, a1/(strMag*F2));
     muT = min(max(rho*kine*zeta,0.0),1.0);
     node[iPoint]->SetmuT(muT);
+
+    if(config->Get_debug_turbvar()){
+
+    std::cout<<" --------------Postprocessing SST--------------- "<<std::endl;
+    std::cout<< " kine -----------> "<<kine<<std::endl;
+    std::cout<< " omega ------------> "<<omega<<std::endl;
+    std::cout<< " strMag -------------> "<<strMag<<std::endl;
+    std::cout<< " rho ------------> "<< rho<<std::endl;
+    std::cout<<" mu ------------------>"<<mu<<std::endl;
+    std::cout<<" muT ------------------>"<<muT<<std::endl;
+
+  }
 
   }
 

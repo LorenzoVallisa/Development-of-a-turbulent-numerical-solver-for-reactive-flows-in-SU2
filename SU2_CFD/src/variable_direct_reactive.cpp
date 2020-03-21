@@ -282,6 +282,7 @@ bool CReactiveEulerVariable::SetPrimVar(CConfig* config) {
 
 
 
+
 //MANGOTURB
 //
 //
@@ -592,7 +593,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
 
   /*--- Rename for convenience ---*/
   rho = U[RHO_INDEX_SOL];    // Density [Kg/m3]
-  rhoE = U[RHOE_INDEX_SOL] - val_ke;   // Density*total energy per unit of mass [J/m3]
+  rhoE = U[RHOE_INDEX_SOL] - rho*val_ke;   // Density*total energy per unit of mass [J/m3]
 
   /*--- Assign mixture velocity and compute squared velocity ---*/
   sqvel = 0.0;
@@ -759,6 +760,19 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
 
   /*--- Enthalpy ---*/
   V[H_INDEX_PRIM] = (U[RHOE_INDEX_SOL] + V[P_INDEX_PRIM])/rho;
+
+  //DEBUGPRIMVAR
+  if(config->Get_debug_primvar()){
+
+  std::cout<<" --------------Cons2PrimVar--------------- "<<std::endl;
+  std::cout<< " Enthalpy -----------> "<<V[H_INDEX_PRIM]<<std::endl;
+  std::cout<< " SoundSpeed ------------> "<<V[A_INDEX_PRIM]<<std::endl;
+  std::cout<< " Pressure -------------> "<<V[P_INDEX_PRIM]<<std::endl;
+  std::cout<< " Temperature ------------> "<< V[T_INDEX_PRIM]<<std::endl;
+  std::cout<<" Density ------------------>"<<V[RHO_INDEX_PRIM]<<std::endl;
+
+}
+
 
   return nonPhys;
 }
@@ -1083,9 +1097,48 @@ bool CReactiveNSVariable::SetStrainMag(bool val_limiter) {
 }
 
 
+//MANGOTURB
+//
+//
+//
+bool CReactiveNSVariable::SetPrimVar(CConfig* config, su2double val_ke) {
+  /*--- Convert conserved to primitive variables using Euler version since primitives are the same ---*/
+  bool nonPhys = CReactiveEulerVariable::SetPrimVar(config,val_ke);
+
+  su2double dim_temp, dim_press;
+  dim_temp = Primitive[T_INDEX_PRIM]*config->GetTemperature_Ref();
+  dim_press = Primitive[P_INDEX_PRIM]*config->GetPressure_Ref()/101325.0;
+  if(US_System) {
+    dim_temp *= 5.0/9.0;
+    dim_press *= 47.8803;
+  }
+
+  /*--- Compute transport properties --- */
+  Ys = GetMassFractions();
+  Laminar_Viscosity = library->ComputeEta(dim_temp, Ys)/config->GetViscosity_Ref();
+  if(US_System)
+    Laminar_Viscosity *= 0.02088553108;
+  Thermal_Conductivity = library->ComputeLambda(dim_temp, Ys)/config->GetConductivity_Ref();
+  if(US_System)
+    Thermal_Conductivity *= 0.12489444444;
+  /*--- Compute binary diffusion coefficents. NOTE: The empirical formula employed in the library should return it in cm2/s ---*/
+  Diffusion_Coeffs = library->GetDij_SM(dim_temp, dim_press)/(config->GetVelocity_Ref()*config->GetLength_Ref()*1.0e4);
+  if(US_System)
+    Diffusion_Coeffs *= 3.28084*3.28084;
+
+    //DEBUGPRIMVAR
+    if(config->Get_debug_primvar()){
+
+    std::cout<<" --------------SetPrimVar--------------- "<<std::endl;
+    std::cout<< " Mu -----------> "<<Laminar_Viscosity<<std::endl;
+    std::cout<< " k  ------------> "<<Thermal_Conductivity<<std::endl;
+    std::cout<< " Mu_t -------------> "<<GetEddyViscosity()<<std::endl;
 
 
+  }
 
+  return nonPhys;
+}
 
 
 
@@ -1159,6 +1212,17 @@ bool CReactiveNSVariable::SetPrimVar(su2double eddy_visc, su2double turb_ke,CCon
   Diffusion_Coeffs = library->GetDij_SM(dim_temp, dim_press)/(config->GetVelocity_Ref()*config->GetLength_Ref()*1.0e4);
   if(US_System)
     Diffusion_Coeffs *= 3.28084*3.28084;
+
+    //DEBUGPRIMVAR
+    if(config->Get_debug_primvar()){
+
+    std::cout<<" --------------SetPrimVar--------------- "<<std::endl;
+    std::cout<< " Mu -----------> "<<Laminar_Viscosity<<std::endl;
+    std::cout<< " k  ------------> "<<Thermal_Conductivity<<std::endl;
+    std::cout<< " Mu_t -------------> "<<GetEddyViscosity()<<std::endl;
+
+
+  }
 
   return nonPhys;
 }

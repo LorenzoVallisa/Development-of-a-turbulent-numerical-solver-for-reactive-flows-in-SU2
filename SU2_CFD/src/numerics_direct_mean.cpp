@@ -3412,7 +3412,7 @@ void CAvgGrad_Flow::ComputeResidual(su2double *val_residual, su2double **val_Jac
 
   /*--- Get projected flux tensor ---*/
 
-  GetViscousProjFlux(Mean_PrimVar, Mean_GradPrimVar, Mean_turb_ke, Normal, Mean_Laminar_Viscosity, Mean_Eddy_Viscosity);
+  GetViscousProjFlux(Mean_PrimVar, Mean_GradPrimVar, Mean_turb_ke, Normal, Mean_Laminar_Viscosity, Mean_Eddy_Viscosity,config);
 
   /*--- Update viscous residual ---*/
 
@@ -3657,12 +3657,24 @@ void CAvgGradCorrected_Flow::ComputeResidual(su2double *val_residual, su2double 
 
   /*--- Get projected flux tensor ---*/
 
-  GetViscousProjFlux(Mean_PrimVar, Mean_GradPrimVar, Mean_turb_ke, Normal, Mean_Laminar_Viscosity, Mean_Eddy_Viscosity);
+  GetViscousProjFlux(Mean_PrimVar, Mean_GradPrimVar, Mean_turb_ke, Normal, Mean_Laminar_Viscosity, Mean_Eddy_Viscosity,config);
 
   /*--- Save residual value ---*/
 
   for (iVar = 0; iVar < nVar; iVar++)
     val_residual[iVar] = Proj_Flux_Tensor[iVar];
+
+    //DEBUGVISCOUS
+
+    if(config->Get_debug_visc_flow()){
+
+      std::cout<<" --------------FLOW Proj_Flux_Tensor--------------- "<<std::endl;
+      for (unsigned short iVar = 0; iVar < nVar; iVar++)
+            std::cout<<Proj_Flux_Tensor[iVar]<<"   -   ";
+      std::cout<<std::endl;
+
+  }
+
 
   /*--- Compute the implicit part ---*/
 
@@ -3682,6 +3694,29 @@ void CAvgGradCorrected_Flow::ComputeResidual(su2double *val_residual, su2double 
     }
 
   }
+
+  //DEBUGVISCOUS
+  if(config->Get_debug_visc_flow()){
+
+    std::cout<<" --------------FLOW Jacobian_i--------------- "<<std::endl;
+    for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+      for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+        std::cout<<val_Jacobian_i[iVar][jVar]<<"   -   ";
+      }
+      std::cout<<std::endl;
+    }
+    std::cout<<std::endl;
+
+    std::cout<<" --------------FLOW Jacobian_j--------------- "<<std::endl;
+    for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+      for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+        std::cout<<val_Jacobian_j[iVar][jVar]<<"   -   ";
+      }
+      std::cout<<std::endl;
+    }
+    std::cout<<std::endl;
+}
+
 
   AD::SetPreaccOut(val_residual, nVar);
   AD::EndPreacc();

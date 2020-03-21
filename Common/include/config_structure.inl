@@ -39,6 +39,18 @@ inline su2double CConfig::GetCFL_AdaptParam(unsigned short val_index) { return C
 
 inline bool CConfig::GetCFL_Adapt(void) { return CFL_Adapt; }
 
+inline bool CConfig::Get_debug_primvar(void) { return debug_pv;}
+
+inline bool CConfig::Get_debug_turbvar(void) {return debug_tv;}
+
+inline bool CConfig::Get_debug_time(void) {return debug_time;}
+
+inline bool CConfig::Get_debug_visc_flow(void) {return debug_v_flow;}
+
+inline bool CConfig::Get_debug_visc_bound(void) {return debug_v_bound;}
+
+inline bool CConfig::Get_debug_source(void) {return debug_s;}
+
 inline void CConfig::SetInflow_Mach(unsigned short val_imarker, su2double val_fanface_mach) { Inflow_Mach[val_imarker] = val_fanface_mach; }
 
 inline void CConfig::SetInflow_Pressure(unsigned short val_imarker, su2double val_fanface_pressure) { Inflow_Pressure[val_imarker] = val_fanface_pressure; }

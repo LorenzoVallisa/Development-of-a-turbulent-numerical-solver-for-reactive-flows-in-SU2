@@ -451,6 +451,10 @@ public:
    //MANGOTURB
    void SetOmega_Max(su2double val_omega_max) { Omega_Max = val_omega_max; }
 
+   inline su2double GetStrainMag_Max(void) { return StrainMag_Max; }
+
+   inline su2double GetOmega_Max(void) { return Omega_Max; }
+
   /*!
    * \brief Set the gradient of primitive variables using weighted least squares.
    * \param[in] geometry - Geometrical definition of the problem.

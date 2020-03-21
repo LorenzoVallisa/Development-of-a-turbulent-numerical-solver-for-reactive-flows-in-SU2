@@ -706,6 +706,18 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
   addDoubleOption("BULK_MODULUS", Bulk_Modulus, 1.42E5);
   /* DESCRIPTION: Artifical compressibility factor  */
   addDoubleOption("ARTCOMP_FACTOR", ArtComp_Factor, 1.0);
+  //DEBUGPRIMVAR
+  addBoolOption("DEBUG_PRIM_VAR", debug_pv, false);
+  //DEBUGTURBVAR
+  addBoolOption("DEBUG_TURB_VAR", debug_tv, false);
+  //DEBUGTIME
+  addBoolOption("DEBUG_TIME", debug_time, false);
+  //DEBUGVISCOUS
+  addBoolOption("DEBUG_VISCOUS_FLOW", debug_v_flow, false);
+  //DEBUGVISCOUS
+  addBoolOption("DEBUG_VISCOUS_BOUND", debug_v_bound, false);
+  //DEBUGSOURCE
+  addBoolOption("DEBUG_SOURCE", debug_s, false);
   /*!\brief MACH_NUMBER  \n DESCRIPTION:  Mach number (non-dimensional, based on the free-stream values). 0.0 by default \ingroup Config*/
   addDoubleOption("MACH_NUMBER", Mach, 0.0);
   /*!\brief INIT_OPTION \n DESCRIPTION: Init option to choose between Reynolds or thermodynamics quantities for initializing the solution \n OPTIONS: see \link InitOption_Map \endlink \n DEFAULT REYNOLDS \ingroup Config*/

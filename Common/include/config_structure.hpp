@@ -68,6 +68,8 @@ using namespace std;
 class CConfig {
 private:
   /*--- NOTE: New information to be read from config ---*/
+  //DEBUGPRIMVAR
+  bool debug_pv,debug_tv,debug_time,debug_v_flow,debug_s,debug_v_bound;
   std::string  Library_Name;           /*!< \brief Name of library for physical-chemical options.*/
   std::string  Config_File_Lib;        /*!< \brief Name of the file to configure the library.*/
   std::string  Library_Path;           /*!< \brief Name of the library to look for files to configure the library.*/
@@ -1691,6 +1693,24 @@ public:
    * \return Laminar Prandtl number.
    */
   su2double GetPrandtl_Lam(void);
+
+  //DEBUGPRIMVAR
+  bool Get_debug_primvar(void);
+
+  //DEBUGTURBVAR
+  bool Get_debug_turbvar(void);
+
+  //DEBUGTIME
+  bool Get_debug_time(void);
+
+  //DEBUGVISCOUS
+  bool Get_debug_visc_flow(void);
+
+  //DEBUGSOURCE
+  bool Get_debug_source(void);
+
+  //DEBUGVISCOUS
+  bool Get_debug_visc_bound(void);
 
   /*!
    * \brief Get the value of the turbolent Lewis number.

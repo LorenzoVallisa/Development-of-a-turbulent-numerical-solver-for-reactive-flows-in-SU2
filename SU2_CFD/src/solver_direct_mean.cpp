@@ -5088,6 +5088,27 @@ void CEulerSolver::Source_Residual(CGeometry *geometry, CSolver **solver_contain
       /*--- Compute the rotating frame source residual ---*/
       numerics->ComputeResidual(Residual, Jacobian_i, config);
 
+      //DEBUGVISCOUS
+      if(config->Get_debug_source()){
+        std::cout<<" --------------Source Residual--------------- "<<std::endl;
+        for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+            std::cout<<Residual[iVar]<<"   -   ";
+        }
+        std::cout<<std::endl;
+      }
+
+      //DEBUGVISCOUS
+      if(config->Get_debug_source()){
+        std::cout<<" --------------Source Jacobian_i--------------- "<<std::endl;
+        for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+          for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+            std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+          }
+          std::cout<<std::endl;
+        }
+        std::cout<<std::endl;
+      }
+
       /*--- Add the source residual to the total ---*/
       LinSysRes.AddBlock(iPoint, Residual);
 
@@ -10173,6 +10194,17 @@ void CEulerSolver::BC_Euler_Wall(CGeometry *geometry, CSolver **solver_container
 
       LinSysRes.AddBlock(iPoint, Residual);
 
+      //DEBUGVISCOUS
+      if(config->Get_debug_visc_bound()){
+        std::cout<<" --------------Euler Residual--------------- "<<std::endl;
+        for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+            std::cout<<Residual[iVar]<<"   -   ";
+        }
+        std::cout<<std::endl;
+      }
+
+
+
       /*--- Form Jacobians for implicit computations ---*/
 
       if (implicit) {
@@ -10223,6 +10255,19 @@ void CEulerSolver::BC_Euler_Wall(CGeometry *geometry, CSolver **solver_container
         Jacobian.AddBlock(iPoint, iPoint, Jacobian_i);
 
       }
+
+      //DEBUGVISCOUS
+      if(config->Get_debug_visc_bound()){
+        std::cout<<" --------------Euler Jacobian_i--------------- "<<std::endl;
+        for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+          for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+            std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+          }
+          std::cout<<std::endl;
+        }
+        std::cout<<std::endl;
+      }
+
     }
   }
 
@@ -12031,6 +12076,17 @@ void CEulerSolver::BC_Inlet(CGeometry *geometry, CSolver **solver_container,
           V_inlet[nDim+2] = Density;
           V_inlet[nDim+3] = Energy + Pressure/Density;
 
+          //DEBUGVISCOUS
+          if(config->Get_debug_visc_bound()){
+            std::cout<<" --------------INLET Primitive--------------- "<<std::endl;
+            std::cout<< " T ------>"<<Temperature<<std::endl;
+            std::cout<< " vx ------>"<<Velocity[0]<<std::endl;
+            std::cout<< " vy ------>"<<Velocity[1]<<std::endl;
+            std::cout<< " P ------>"<<Pressure<<std::endl;
+            std::cout<< " rho ------>"<<Density<<std::endl;
+            std::cout<< " h ------>"<<Energy + Pressure/Density<<std::endl;
+          }
+
           break;
 
           /*--- Mass flow has been specified at the inlet. ---*/
@@ -12145,6 +12201,29 @@ void CEulerSolver::BC_Inlet(CGeometry *geometry, CSolver **solver_container,
         /*--- Compute and update residual ---*/
 
         visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------Inlet Residual--------------- "<<std::endl;
+          for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+              std::cout<<Residual[iVar]<<"   -   ";
+          }
+          std::cout<<std::endl;
+        }
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------Inlet Jacobian_i--------------- "<<std::endl;
+          for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+            for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+              std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+            }
+            std::cout<<std::endl;
+          }
+          std::cout<<std::endl;
+        }
+
+
         LinSysRes.SubtractBlock(iPoint, Residual);
 
         /*--- Jacobian contribution for implicit integration ---*/
@@ -12275,6 +12354,18 @@ void CEulerSolver::BC_Outlet(CGeometry *geometry, CSolver **solver_container,
         V_outlet[nDim+2] = Density;
         V_outlet[nDim+3] = Energy + Pressure/Density;
 
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------outet Primitive--------------- "<<std::endl;
+          std::cout<< " T ------>"<<Pressure / ( Gas_Constant * Density)<<std::endl;
+          std::cout<< " vx ------>"<<Velocity[0]<<std::endl;
+          std::cout<< " vy ------>"<<Velocity[1]<<std::endl;
+          std::cout<< " P ------>"<<Pressure<<std::endl;
+          std::cout<< " rho ------>"<<Density<<std::endl;
+          std::cout<< " h ------>"<<Energy + Pressure/Density<<std::endl;
+        }
+
       }
 
       /*--- Set various quantities in the solver class ---*/
@@ -12319,6 +12410,28 @@ void CEulerSolver::BC_Outlet(CGeometry *geometry, CSolver **solver_container,
 
         /*--- Compute and update residual ---*/
         visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------Outlet Residual--------------- "<<std::endl;
+          for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+              std::cout<<Residual[iVar]<<"   -   ";
+          }
+          std::cout<<std::endl;
+        }
+
+        //DEBUGVISCOUS
+        if(config->Get_debug_visc_bound()){
+          std::cout<<" --------------Outlet Jacobian_i--------------- "<<std::endl;
+          for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+            for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+              std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+            }
+            std::cout<<std::endl;
+          }
+          std::cout<<std::endl;
+        }
+
         LinSysRes.SubtractBlock(iPoint, Residual);
 
         /*--- Jacobian contribution for implicit integration ---*/
@@ -15618,7 +15731,9 @@ void CNSSolver::Preprocessing(CGeometry *geometry, CSolver **solver_container, C
 
   /*--- Update the angle of attack at the far-field for fixed CL calculations. ---*/
 
-  if (fixed_cl) { SetFarfield_AoA(geometry, solver_container, config, iMesh, Output); }
+  if (fixed_cl) {
+    std::cout<<"-------------------------------------------------------1"<<std::endl;
+    SetFarfield_AoA(geometry, solver_container, config, iMesh, Output); }
 
   /*--- Set the primitive variables ---*/
 
@@ -15626,11 +15741,14 @@ void CNSSolver::Preprocessing(CGeometry *geometry, CSolver **solver_container, C
 
   /*--- Compute the engine properties ---*/
 
-  if (engine) { GetPower_Properties(geometry, config, iMesh, Output); }
+  if (engine) {
+    std::cout<<"-------------------------------------------------------2"<<std::endl;
+    GetPower_Properties(geometry, config, iMesh, Output); }
 
   /*--- Compute the control volume properties ---*/
 
   if (marker_analyze) {
+    std::cout<<"-------------------------------------------------------3"<<std::endl;
      GetSurface_Properties(geometry, NULL, NULL, config, iMesh, Output);
     GetSurface_Distortion(geometry, config, iMesh, Output);
   }
@@ -15638,23 +15756,30 @@ void CNSSolver::Preprocessing(CGeometry *geometry, CSolver **solver_container, C
   /*--- Compute the actuator disk properties and distortion levels ---*/
 
   if (actuator_disk) {
+    std::cout<<"-------------------------------------------------------4"<<std::endl;
     Set_MPI_ActDisk(solver_container, geometry, config);
     SetActDisk_BCThrust(geometry, solver_container, config, iMesh, Output);
   }
 
   /*--- Compute Interface MPI ---*/
 
-  if (interface) { Set_MPI_Interface(geometry, config); }
+  if (interface) {
+    std::cout<<"-------------------------------------------------------5"<<std::endl;
+    Set_MPI_Interface(geometry, config); }
 
   /*--- Compute NearField MPI ---*/
 
-  if (nearfield) { Set_MPI_Nearfield(geometry, config); }
+  if (nearfield) {
+    std::cout<<"-------------------------------------------------------6"<<std::endl;
+    Set_MPI_Nearfield(geometry, config); }
 
   /*--- Artificial dissipation ---*/
 
   if (center && !Output) {
+    std::cout<<"-------------------------------------------------------7"<<std::endl;
     SetMax_Eigenvalue(geometry, config);
     if ((center_jst) && (iMesh == MESH_0)) {
+      std::cout<<"-------------------------------------------------------8"<<std::endl;
       SetDissipation_Switch(geometry, config);
       SetUndivided_Laplacian(geometry, config);
     }
@@ -15674,7 +15799,7 @@ void CNSSolver::Preprocessing(CGeometry *geometry, CSolver **solver_container, C
   /*--- Compute the limiter in case we need it in the turbulence model
    or to limit the viscous terms (check this logic with JST and 2nd order turbulence model) ---*/
 
-  if ((iMesh == MESH_0) && (limiter_flow || limiter_turb || limiter_adjflow || limiter_visc) && !Output) { SetPrimitive_Limiter(geometry, config);
+  if ((iMesh == MESH_0) && (limiter_flow || limiter_turb || limiter_adjflow || limiter_visc) && !Output) { std::cout<<"-------------------------------------------------------9"<<std::endl; SetPrimitive_Limiter(geometry, config);
     //  if (compressible && !ideal_gas) SetSecondary_Limiter(geometry, config);
   }
 
@@ -15747,7 +15872,7 @@ unsigned long CNSSolver::SetPrimitive_Variables(CSolver **solver_container, CCon
 
     /*--- Compressible flow, primitive variables nDim+5, (T, vx, vy, vz, P, rho, h, c, lamMu, eddyMu, ThCond, Cp) ---*/
 
-    RightSol = node[iPoint]->SetPrimVar(eddy_visc, turb_ke, FluidModel);
+    RightSol = node[iPoint]->SetPrimVar(eddy_visc, turb_ke, FluidModel,config);
     node[iPoint]->SetSecondaryVar(FluidModel);
 
     if (!RightSol) { node[iPoint]->SetNon_Physical(true); ErrorCounter++; }
@@ -15816,6 +15941,13 @@ void CNSSolver::SetTime_Step(CGeometry *geometry, CSolver **solver_container, CC
     /*--- Inviscid contribution ---*/
 
     Lambda = fabs(Mean_ProjVel) + Mean_SoundSpeed ;
+    //DEBUGTIME
+    if(config->Get_debug_time()){
+
+    std::cout<<" --------------Inviscid--------------- "<<std::endl;
+    std::cout<< " L -----------> "<<Lambda<<std::endl;
+  }
+
     if (geometry->node[iPoint]->GetDomain()) node[iPoint]->AddMax_Lambda_Inv(Lambda);
     if (geometry->node[jPoint]->GetDomain()) node[jPoint]->AddMax_Lambda_Inv(Lambda);
 
@@ -15827,6 +15959,16 @@ void CNSSolver::SetTime_Step(CGeometry *geometry, CSolver **solver_container, CC
     Lambda_1 = (4.0/3.0)*(Mean_LaminarVisc + Mean_EddyVisc);
     //TODO (REAL_GAS) removing Gamma it cannot work with FLUIDPROP
     Lambda_2 = (1.0 + (Prandtl_Lam/Prandtl_Turb)*(Mean_EddyVisc/Mean_LaminarVisc))*(Gamma*Mean_LaminarVisc/Prandtl_Lam);
+    //DEBUGTIME
+    if(config->Get_debug_time()){
+
+    std::cout<<" --------------Viscid--------------- "<<std::endl;
+    std::cout<< " L1 -----------> "<<Lambda_1<<std::endl;
+    std::cout<< " L2 ------------> "<<Lambda_2<<std::endl;
+    std::cout<< " LTot -------------> "<<(Lambda_1 + Lambda_2)*Area*Area/Mean_Density<<std::endl;
+
+  }
+
     Lambda = (Lambda_1 + Lambda_2)*Area*Area/Mean_Density;
 
     if (geometry->node[iPoint]->GetDomain()) node[iPoint]->AddMax_Lambda_Visc(Lambda);
@@ -15996,6 +16138,10 @@ void CNSSolver::Viscous_Residual(CGeometry *geometry, CSolver **solver_container
                                      solver_container[TURB_SOL]->node[jPoint]->GetSolution(0));
 
     /*--- Compute and update residual ---*/
+
+    if(config->Get_debug_visc_flow()){
+      std::cout<<" -----------------EDGE---------------"<<iEdge<<std::endl;
+    }
 
     numerics->ComputeResidual(Res_Visc, Jacobian_i, Jacobian_j, config);
 
