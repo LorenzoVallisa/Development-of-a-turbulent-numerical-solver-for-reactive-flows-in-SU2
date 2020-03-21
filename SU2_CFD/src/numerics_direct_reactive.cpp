@@ -765,7 +765,7 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
       // }
       //
       // /*--- Fick's law partial sensible enthalpies closure --*/
-      Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/Prandtl_Turb*(std::accumulate(Cps.cbegin(),Cps.cend(),0.0)/3)*
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/Prandtl_Turb*(std::accumulate(Cps.cbegin(),Cps.cend(),0.0)/nSpecies)*
                                          Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim);
       //
       // /*--- Wilcox closure for turbolent ke and main stresses turbolent transport term --*/

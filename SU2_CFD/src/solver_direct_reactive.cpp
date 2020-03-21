@@ -3985,6 +3985,18 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
       /*--- Compute the residual using an upwind scheme ---*/
       conv_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
 
+      //DEBUGVISCOUS
+      // if(config->Get_debug_visc_bound()){
+      //   std::cout<<" --------------Outlet Jacobian_i Convective Contribution--------------- "<<std::endl;
+      //   for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+      //     for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+      //       std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+      //     }
+      //     std::cout<<std::endl;
+      //   }
+      //   std::cout<<std::endl;
+      // }
+
       /*--- Check for NaNs before applying the residual to the linear system ---*/
       bool err = !std::none_of(Residual, Residual + nVar, [](su2double elem){return std::isnan(elem);});
       if(implicit) {
@@ -4090,7 +4102,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
 
         //DEBUGVISCOUS
         if(config->Get_debug_visc_bound()){
-          std::cout<<" --------------Outlet Jacobian_i--------------- "<<std::endl;
+          std::cout<<" --------------Outlet Jacobian_i Viscous Contribution--------------- "<<std::endl;
           for (unsigned short iVar = 0; iVar < nVar; iVar++) {
             for (unsigned short jVar = 0; jVar < nVar; jVar++) {
               std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";

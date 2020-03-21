@@ -12377,6 +12377,18 @@ void CEulerSolver::BC_Outlet(CGeometry *geometry, CSolver **solver_container,
       /*--- Compute the residual using an upwind scheme ---*/
       conv_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
 
+      // //DEBUGVISCOUS
+      // if(config->Get_debug_visc_bound()){
+      //   std::cout<<" --------------Outlet Jacobian_i Convective Contribution--------------- "<<std::endl;
+      //   for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+      //     for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+      //       std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+      //     }
+      //     std::cout<<std::endl;
+      //   }
+      //   std::cout<<std::endl;
+      // }
+
       /*--- Update residual value ---*/
       LinSysRes.AddBlock(iPoint, Residual);
 
@@ -12422,7 +12434,7 @@ void CEulerSolver::BC_Outlet(CGeometry *geometry, CSolver **solver_container,
 
         //DEBUGVISCOUS
         if(config->Get_debug_visc_bound()){
-          std::cout<<" --------------Outlet Jacobian_i--------------- "<<std::endl;
+          std::cout<<" --------------Outlet Jacobian_i Viscous Contribution--------------- "<<std::endl;
           for (unsigned short iVar = 0; iVar < nVar; iVar++) {
             for (unsigned short jVar = 0; jVar < nVar; jVar++) {
               std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
