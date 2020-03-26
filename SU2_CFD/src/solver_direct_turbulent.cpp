@@ -1008,6 +1008,9 @@ void CTurbSolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfig *
   bool dual_time = ((config->GetUnsteady_Simulation() == DT_STEPPING_1ST) ||
                     (config->GetUnsteady_Simulation() == DT_STEPPING_2ND));
   bool time_stepping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
+  //MANGOTURB
+  bool reactive = (config->GetKind_Solver() == REACTIVE_RANS);
+
   string UnstExt, text_line;
   ifstream restart_file;
   string restart_filename = config->GetSolution_FlowFileName();
@@ -1050,10 +1053,23 @@ void CTurbSolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfig *
 
   unsigned short skipVars = 0;
 
-  if (compressible) {
-    if (nDim == 2) skipVars += 6;
-    if (nDim == 3) skipVars += 8;
+  //MANGOTURB
+  if( reactive && compressible ){
+
+    if(reactive){
+
+      if (nDim == 2) skipVars = 6 + (config->GetnSpecies());
+      if (nDim == 3) skipVars = 8 + (config->GetnSpecies());
+
+    }
+    else {
+
+      if (nDim == 2) skipVars += 6;
+      if (nDim == 3) skipVars += 8;
+
+    }
   }
+
   if (incompressible) {
     if (nDim == 2) skipVars += 5;
     if (nDim == 3) skipVars += 7;

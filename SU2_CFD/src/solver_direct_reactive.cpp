@@ -4535,26 +4535,6 @@ void CReactiveNSSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
   /*--- MPI solution ---*/
   //solver[MESH_0][FLOW_SOL]->Set_MPI_Solution(geometry[MESH_0], config);
 
-  /*--- Interpolate the solution down to the coarse multigrid levels ---*/
-  //
-  // for (iMesh = 1; iMesh <= config->GetnMGLevels(); iMesh++) {
-  //   for (iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); iPoint++) {
-  //     Area_Parent = geometry[iMesh]->node[iPoint]->GetVolume();
-  //     for (iVar = 0; iVar < nVar; iVar++) Solution[iVar] = 0.0;
-  //     for (iChildren = 0; iChildren < geometry[iMesh]->node[iPoint]->GetnChildren_CV(); iChildren++) {
-  //       Point_Fine = geometry[iMesh]->node[iPoint]->GetChildren_CV(iChildren);
-  //       Area_Children = geometry[iMesh-1]->node[Point_Fine]->GetVolume();
-  //       Solution_Fine = solver[iMesh-1][FLOW_SOL]->node[Point_Fine]->GetSolution();
-  //       for (iVar = 0; iVar < nVar; iVar++) {
-  //         Solution[iVar] += Solution_Fine[iVar]*Area_Children/Area_Parent;
-  //       }
-  //     }
-  //     solver[iMesh][FLOW_SOL]->node[iPoint]->SetSolution(Solution);
-  //   }
-  //   solver[iMesh][FLOW_SOL]->Set_MPI_Solution(geometry[iMesh], config);
-  // }
-
-
 
 }
 
@@ -5444,10 +5424,6 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
     if(config->GetExtIter() == 0)
     SU2_Assert(Vector != NULL,"The array to store velocity for boundary conditions has not been allocated");
 
-    //MANGOTURB
-    bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
-
-
 
     /*--- Local variables ---*/
     unsigned short iDim, iVar, jVar;
@@ -5458,7 +5434,15 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
     su2double Normal[nDim], UnitNormal[nDim];
 
     //MANGOTURB
+    bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
+    RealVec aux_enthalpy,aux_Cp;
     su2double Prandtl_Turb = config->GetPrandtl_Turb();
+    su2double Lewis_Turb = config->GetLewis_Turb();
+    su2double dim_temp;
+    unsigned short nSpecies = config->GetnSpecies();
+    su2double turb_closure = 0.0;
+    su2double turb_ktr = 0.0;
+    su2double turb_jac = 0.0;
 
 
 
@@ -5467,6 +5451,20 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
 
     /*--- Retrieve the specified wall temperature ---*/
     Twall = config->GetIsothermal_Temperature(Marker_Tag)/config->GetTemperature_Ref();
+
+    //MANGOTURB
+    dim_temp =Twall*config->GetTemperature_Ref();
+
+    if(US_System)
+    dim_temp *= 5.0/9.0;
+
+    aux_Cp= library->ComputeCps(dim_temp);
+
+    aux_enthalpy = library->ComputePartialEnthalpy(dim_temp);
+
+
+
+
 
     /*--- Loop over boundary points to calculate energy flux ---*/
     for(iVertex = 0; iVertex < geometry->nVertex[val_marker]; ++iVertex) {
@@ -5515,7 +5513,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         Tj   = node[Point_Normal]->GetTemperature();
         ktr  = node[iPoint]->GetThermalConductivity();
         su2double mu = node[iPoint]->GetLaminarViscosity();
-        su2double turb_closure;
+
 
         /*--- Apply a weak boundary condition for the energy equation.
         Compute the residual due to the prescribed heat flux. ---*/
@@ -5523,13 +5521,59 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         //MANGOTURB
         /*--- Full Turbolent closure ---*/
         if(rans){
+          turb_closure = 0.0;
+          turb_ktr = 0.0;
+
           su2double eddy_v = node[iPoint]->GetEddyViscosity();
-          su2double sigma_k = solver_container[TURB_SOL]->node[iPoint]->Get_Sigmak();
-          su2double *tke_grad = solver_container[TURB_SOL]->node[iPoint]->GetGradient()[0];
-          for(iDim = 0; iDim < nDim; ++iDim)
-            turb_closure += tke_grad[iDim]*UnitNormal[iDim];
-          turb_closure *=(mu);
-        }
+          //
+          // su2double sigma_k = solver_container[TURB_SOL]->node[iPoint]->Get_Sigmak();
+          //
+          // su2double *tke_grad = solver_container[TURB_SOL]->node[iPoint]->GetGradient()[0];
+          //
+          // for(iDim = 0; iDim < nDim; ++iDim)
+          //   turb_closure += tke_grad[iDim]*UnitNormal[iDim];
+          //
+          // turb_closure *=(mu);
+          //
+          turb_closure += eddy_v/Prandtl_Turb*(std::accumulate(aux_Cp.cbegin(),aux_Cp.cend(),0.0)/nSpecies)*
+                          (Twall - Tj)/dij;
+
+          //
+          for( unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies){
+            //
+            // su2double *rho_s_grad = solver_container[FLOW_SOL]->node[iPoint]->GetGradient()[RHOS_INDEX_SOL+iSpecies];
+            // //
+            //    turb_closure += eddy_v/(Prandtl_Turb+Lewis_Turb)*aux_enthalpy[iSpecies]*std::inner_product(
+            //      rho_s_grad,rho_s_grad+nDim,UnitNormal,0.0);
+            //
+            su2double aux_ys = solver_container[FLOW_SOL]->node[iPoint]->GetSolution()[RHOS_INDEX_SOL+iSpecies];
+
+            turb_ktr +=eddy_v/(Prandtl_Turb)*aux_Cp[iSpecies]*aux_ys;
+
+            // turb_ktr += eddy_v/(Prandtl_Turb+Lewis_Turb)*aux_Cp[iSpecies]*aux_ys*std::inner_product(
+            //     rho_s_grad,rho_s_grad+nDim,UnitNormal,0.0);
+          }
+          //DEBUGVISCOUS
+          if(config->Get_debug_visc_bound()){
+
+            std::cout<<" --------------BC Isothermal--------------- "<<std::endl;
+
+            std::cout<<" Species ----> ";
+            for( unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+              std::cout<<solver_container[FLOW_SOL]->node[iPoint]->GetSolution()[RHOS_INDEX_SOL+iSpecies]<<"   -   ";
+            std::cout<<std::endl;
+            std::cout<<" Cps ----> ";
+            for( unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
+            std::cout<<aux_Cp[iSpecies]<<"   -   ";
+            std::cout<<std::endl;
+            std::cout<<" mut  "<<eddy_v<<std::endl;
+
+
+            }
+
+          }
+
+
 
         /*--- Compute normal gradient with finite difference approximation ---*/
         dTdn = +(Twall - Tj)/dij;
@@ -5550,7 +5594,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
 
           auto dTdU = node[Point_Normal]->GetdTdU();
           Jacobian_i[RHOE_INDEX_SOL][RHO_INDEX_SOL] = -ktr*dTdU[RHO_INDEX_SOL]/dij*Area;
-          Jacobian_i[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = -ktr*dTdU[RHOE_INDEX_SOL]/dij*Area;
+          Jacobian_i[RHOE_INDEX_SOL][RHOE_INDEX_SOL] = -ktr*dTdU[RHOE_INDEX_SOL]/dij*Area - turb_ktr*dTdU[RHOE_INDEX_SOL]/dij*Area;
           for(unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies)
           Jacobian_i[RHOE_INDEX_SOL][RHOS_INDEX_SOL + iSpecies] = -ktr*dTdU[RHOS_INDEX_SOL + iSpecies]/dij*Area;
 
