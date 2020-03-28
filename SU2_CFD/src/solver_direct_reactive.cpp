@@ -4533,7 +4533,7 @@ void CReactiveNSSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
   //MANGOTURB
   //PARTE MANCANTE DA LOADRESTART ORIGINALE SU2
   /*--- MPI solution ---*/
-  //solver[MESH_0][FLOW_SOL]->Set_MPI_Solution(geometry[MESH_0], config);
+  Set_MPI_Solution(geometry, config);
 
 
 }

@@ -544,6 +544,9 @@ namespace Framework  {
     */
     virtual RealMatrix GetSourceJacobian(const double rho)=0;
 
+    virtual Eigen::MatrixXd Get_Df_rDrho_i( void )const = 0;
+
+    virtual std::vector<double> Get_k_PASR( void )const =0;
 
 
 

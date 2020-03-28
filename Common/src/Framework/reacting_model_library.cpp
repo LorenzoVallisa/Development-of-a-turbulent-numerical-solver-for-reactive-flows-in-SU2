@@ -168,7 +168,10 @@ namespace Framework {
     /*--- Assembling slowest combustion time for r reaction---*/
     double tau_comb_r = GetTimeCombustion_r(iReac);
 
-    k_th = tau_comb_r/(tau_comb_r + tau_mix);
+    if(isinf(tau_comb_r))
+      k_th = 1.0;
+    else
+      k_th = tau_comb_r/(tau_comb_r + tau_mix);
 
     /*--- Saving value for future purposes ---*/
     PaSRConstant[iReac] = k_th;
@@ -204,8 +207,10 @@ namespace Framework {
       Index_list.push_front(iSpecies);
     }
 
+
     for(const auto it : Index_list)
       iReac_species.push_front(Df_rDrho_i(it,iReac)*mMasses[it]);
+
 
     return 1/(std::fabs(*std::max_element(iReac_species.begin(),iReac_species.end())));
 

@@ -2615,6 +2615,9 @@ CTurbSSTSolver::CTurbSSTSolver(CGeometry *geometry, CConfig *config, unsigned sh
   bool dual_time = ((config->GetUnsteady_Simulation() == DT_STEPPING_1ST) ||
                     (config->GetUnsteady_Simulation() == DT_STEPPING_2ND));
   bool time_stepping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
+  //MANGOTURB
+  bool reactive = (config->GetKind_Solver() == REACTIVE_RANS);
+  unsigned short nSpecies = config->GetnSpecies();
 
   int rank = MASTER_NODE;
 #ifdef HAVE_MPI
@@ -2840,14 +2843,37 @@ CTurbSSTSolver::CTurbSSTSolver(CGeometry *geometry, CConfig *config, unsigned sh
 
         iPoint_Local = Global2Local[iPoint_Global];
 
-        if (compressible) {
-          if (nDim == 2) point_line >> index >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> Solution[0] >> Solution[1];
-          if (nDim == 3) point_line >> index >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> Solution[0] >> Solution[1];
+        //MANGOTURB
+        if( reactive && compressible ){
+
+          if(reactive){
+
+            if (nDim == 2){
+              point_line >> index >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val;
+              for (unsigned short iSpecies = 0; iSpecies < nSpecies ; iSpecies++)
+              point_line >> dull_val;
+              point_line >> Solution[0] >> Solution[1];
+            }
+            if (nDim == 3){
+              point_line >> index >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val;
+              for (unsigned short iSpecies = 0; iSpecies < nSpecies ; iSpecies++)
+              point_line >> dull_val;
+              point_line >> Solution[0] >> Solution[1];
+            }
+          }
+          else{
+
+            if (nDim == 2) point_line >> index >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> Solution[0] >> Solution[1];
+            if (nDim == 3) point_line >> index >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> Solution[0] >> Solution[1];
+
+          }
         }
         if (incompressible) {
           if (nDim == 2) point_line >> index >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> Solution[0] >> Solution[1];
           if (nDim == 3) point_line >> index >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> Solution[0] >> Solution[1];
         }
+
+        // std::cout<<" TKE - > "<<Solution[0]<<" Omega - > "<<Solution[1]<<std::endl;
 
         /*--- Instantiate the solution at this node, note that the muT_Inf should recomputed ---*/
         node[iPoint_Local] = new CTurbSSTVariable(Solution[0], Solution[1], muT_Inf, nDim, nVar, constants, config);

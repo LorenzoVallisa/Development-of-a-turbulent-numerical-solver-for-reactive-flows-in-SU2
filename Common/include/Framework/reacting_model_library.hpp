@@ -648,6 +648,14 @@ namespace Framework {
      */
     void SetSourceTerm(const double temp, const double rho, const RealVec& ys) override;
 
+    Eigen::MatrixXd Get_Df_rDrho_i( void )const override{
+      return Df_rDrho_i;
+    }
+
+    std::vector<double> Get_k_PASR( void )const override {
+      return PaSRConstant;
+    }
+
 
 
   protected:

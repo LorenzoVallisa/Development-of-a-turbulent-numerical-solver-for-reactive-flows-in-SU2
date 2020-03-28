@@ -106,6 +106,7 @@ protected:
       Mean_PrimVar;       /*!< \brief Mean primitive variables. */
 
   RealMatrix Mean_GradPrimVar;    /*!< \brief Mean value of the gradient. */
+  RealMatrix Mean_Mass_Grads;
 
   RealVec Xs_i,               /*!< \brief Auxiliary vector for mole fractions at point i. */
           Xs_j;               /*!< \brief Auxiliary vector for mole fractions at point j. */
@@ -198,6 +199,9 @@ public:
  void SetLaminarTensorFlux(const Vec& val_primvar, const RealMatrix& val_grad_primvar, su2double* val_normal,
                                                     const su2double & val_viscosity, const su2double & val_thermal_conductivity,
                                                     const RealMatrix& val_Dij, CConfig* config);
+
+
+ RealMatrix Get_Molar2MassGrad_Operator(void);
 
   //MANGOTURB
   /*!
