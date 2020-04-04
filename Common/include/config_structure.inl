@@ -51,6 +51,8 @@ inline bool CConfig::Get_debug_visc_bound(void) {return debug_v_bound;}
 
 inline bool CConfig::Get_debug_source(void) {return debug_s;}
 
+inline double CConfig::Get_PaSR_LB(void) {return PaSR_lb;}
+
 inline void CConfig::SetInflow_Mach(unsigned short val_imarker, su2double val_fanface_mach) { Inflow_Mach[val_imarker] = val_fanface_mach; }
 
 inline void CConfig::SetInflow_Pressure(unsigned short val_imarker, su2double val_fanface_pressure) { Inflow_Pressure[val_imarker] = val_fanface_pressure; }

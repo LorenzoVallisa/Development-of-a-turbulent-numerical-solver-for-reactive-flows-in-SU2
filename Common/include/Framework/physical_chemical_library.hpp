@@ -512,7 +512,7 @@ namespace Framework  {
       * \param[in] C_mu - Turbolent parameter needed for closure
       * \param[out] k - Weight used to build turbolent source term for every species
     */
-    virtual double GetMassProductionTerm(const unsigned short iSpecies, const double omega_turb,const double C_mu) = 0;
+    virtual double GetMassProductionTerm(const unsigned short iSpecies) = 0;
 
     //MAGNOTURB
     /*!
@@ -547,6 +547,8 @@ namespace Framework  {
     virtual Eigen::MatrixXd Get_Df_rDrho_i( void )const = 0;
 
     virtual std::vector<double> Get_k_PASR( void )const =0;
+
+    virtual void AssemblePaSRConstant(const double omega_turb,const double C_mu, const double PaSR_lb) =0;
 
 
 

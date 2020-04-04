@@ -70,6 +70,7 @@ private:
   /*--- NOTE: New information to be read from config ---*/
   //DEBUGPRIMVAR
   bool debug_pv,debug_tv,debug_time,debug_v_flow,debug_s,debug_v_bound;
+  double PaSR_lb;
   std::string  Library_Name;           /*!< \brief Name of library for physical-chemical options.*/
   std::string  Config_File_Lib;        /*!< \brief Name of the file to configure the library.*/
   std::string  Library_Path;           /*!< \brief Name of the library to look for files to configure the library.*/
@@ -1711,6 +1712,9 @@ public:
 
   //DEBUGVISCOUS
   bool Get_debug_visc_bound(void);
+
+  //MANGOTURB
+  double Get_PaSR_LB(void);
 
   /*!
    * \brief Get the value of the turbolent Lewis number.

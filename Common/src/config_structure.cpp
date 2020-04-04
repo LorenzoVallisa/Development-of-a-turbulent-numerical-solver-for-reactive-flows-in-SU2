@@ -604,6 +604,9 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
 
   /*!\brief TEMPERATURE_MAX\n DESCRIPTION: Maximum temperature for secant method \ingroup Config*/
   addDoubleOption("TEMPERATURE_MAX", Tmax, 6000.0);
+  //MANGOTURB
+  /*!\brief PaSR K relazation factor \n DESCRIPTION: Maximum temperature for secant method \ingroup Config*/
+  addDoubleOption("PASR_LB", PaSR_lb, 1.0);
 
   /*!\brief TEMPERATURE_MIN\n DESCRIPTION: Minimum temperature for secant method \ingroup Config*/
   addDoubleOption("TEMPERATURE_MIN", Tmin, 200.0);

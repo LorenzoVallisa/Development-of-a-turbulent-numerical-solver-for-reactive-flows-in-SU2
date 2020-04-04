@@ -2835,26 +2835,26 @@ void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver
     /*--- Compute the source residual ---*/
     numerics->ComputeChemistry(Res_Sour, Jacobian_i, config);
 
-    //DEBUGSOURCE
-    if(config->Get_debug_source()){
-      std::cout<<" --------------Source Residual--------------- "<<std::endl;
-      for (unsigned short iVar = 0; iVar < nVar; iVar++) {
-          std::cout<<Res_Sour[iVar]<<"   -   ";
-      }
-      std::cout<<std::endl;
-    }
-
-    //DEBUGSOURCE
-    if(config->Get_debug_source()){
-      std::cout<<" --------------Source Jacobian_i--------------- "<<std::endl;
-      for (unsigned short iVar = 0; iVar < nVar; iVar++) {
-        for (unsigned short jVar = 0; jVar < nVar; jVar++) {
-          std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
-        }
-        std::cout<<std::endl;
-      }
-      std::cout<<std::endl;
-      }
+    // //DEBUGSOURCE
+    // if(config->Get_debug_source()){
+    //   std::cout<<" --------------Source Residual--------------- "<<std::endl;
+    //   for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+    //       std::cout<<Res_Sour[iVar]<<"   -   ";
+    //   }
+    //   std::cout<<std::endl;
+    // }
+    //
+    // //DEBUGSOURCE
+    // if(config->Get_debug_source()){
+    //   std::cout<<" --------------Source Jacobian_i--------------- "<<std::endl;
+    //   for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+    //     for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+    //       std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+    //     }
+    //     std::cout<<std::endl;
+    //   }
+    //   std::cout<<std::endl;
+    //   }
 
     /*--- Check for NaNs before applying the residual to the linear system ---*/
     bool err = !std::none_of(Res_Sour, Res_Sour + nVar, [](su2double elem){return std::isnan(elem);});

@@ -753,6 +753,12 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
     for( iDim = 0; iDim < nDim; ++iDim)
         Mean_Mass_Grads.col(iDim) = M_tilde.colPivHouseholderQr().solve(Mean_GradPrimVar.col(iDim).segment(RHOS_INDEX_AVGGRAD,nSpecies));
 
+        for (iSpecies = 0 ; iSpecies < nSpecies ; iSpecies++){
+          for ( iDim = 0; iDim < nDim; ++iDim ){
+            if(Mean_Mass_Grads(iSpecies,iDim) < 1e-5)
+            Mean_Mass_Grads(iSpecies,iDim)=0.0;
+          }
+        }
 
 
     //DEBUGVISCOUS
@@ -984,18 +990,18 @@ if(nDim == 2) {
 
       //MASS CLOSURE
       dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
-      Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
+      (iSpecies==jSpecies)*Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
 
       dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
-      Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
+      (iSpecies==jSpecies)*Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
 
     }
 
     //MASS CLOSURE
-    dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]/rho_j*
+    dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*Ys[iSpecies]/rho_j*
     theta/sqrt_dist_ij_2*Area;
 
-    dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]/rho_i*
+    dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*Ys[iSpecies]/rho_i*
     theta/sqrt_dist_ij_2*Area;
 
 
@@ -1824,12 +1830,14 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
 
      /*--- Initializing double tensor derivative of reaction source term w.r.t. species through library method ---*/
      library -> Set_DfrDrhos(dim_temp, dim_rho);
+     double PaSR_lb = config-> Get_PaSR_LB();
+     library->AssemblePaSRConstant(omega_turb,C_mu,PaSR_lb);
 
-     omega.resize(Ys.size(),0);
+     omega.resize(Ys.size(),0.0);
 
      /*--- Turbolent source term for every species ---*/
      for (iSpecies = 0; iSpecies < nSpecies; iSpecies++)
-        omega[iSpecies] = library -> GetMassProductionTerm(iSpecies,omega_turb,C_mu);
+        omega[iSpecies] = library -> GetMassProductionTerm(iSpecies);
 
     }
    else
@@ -1844,18 +1852,24 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
    //DEBUGVISCOUS
    if(config->Get_debug_source()){
 
-     std::cout<<" --------------------OMEGA--------------"<<std::endl;
-     for (const auto & val:omega)
-          std::cout<<val<<"   -   ";
-     std::cout<<std::endl;
-     std::cout<<" --------------------Df_rDrho_i--------------"<<std::endl;
-     Eigen::MatrixXd dfdrho = library->Get_Df_rDrho_i();
-     std::cout<<dfdrho<<std::endl;
+     // std::cout<<" --------------------OMEGA--------------"<<std::endl;
+     // // for (const auto & val:omega)
+     // //      std::cout<<val<<"   -   ";
+     // // std::cout<<std::endl;
+     // for (unsigned int i = 0; i< omega.size(); i++)
+     //      std::cout<<omega[i]<<"   -   ";
+     // std::cout<<std::endl;
+     //
+     // std::cout<<" --------------------Df_rDrho_i--------------"<<std::endl;
+     // Eigen::MatrixXd dfdrho = library->Get_Df_rDrho_i();
+     // std::cout<<dfdrho<<std::endl;
+     if (config->GetKind_Turb_Model() == SST){
      std::cout<<" --------------------PaSR Constants--------------"<<std::endl;
-     RealVec k_PASR = library->Get_k_PASR();
-     for (const auto & val:k_PASR)
-          std::cout<<val<<"   -   ";
+     std::vector<double> k_PASR = library->Get_k_PASR();
+     for (const auto & kk:k_PASR)
+          std::cout<<kk<<"   -   ";
      std::cout<<std::endl;
+   }
 
    }
 
@@ -1897,17 +1911,17 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
       val_Jacobian_i[RHOE_INDEX_SOL][iVar] = 0.0;
     }
 
-    //MANGOTURB
-    /*--- Setting derivative of backward and forward rates w.r.t. Temperature ---*/
+    // //MANGOTURB
+    // /*--- Setting derivative of backward and forward rates w.r.t. Temperature ---*/
     library->Set_BackFor_Contr(dim_temp, dim_rho);
 
     if (config->GetKind_Turb_Model() == SST){
 
-      source_jac = library-> GetTurbSourceJacobian();
-
-    }
-    else
-    {
+    //   source_jac = library-> GetTurbSourceJacobian();
+    //
+    // }
+    // else
+    // {
 
       source_jac = library->GetSourceJacobian(dim_rho);
 

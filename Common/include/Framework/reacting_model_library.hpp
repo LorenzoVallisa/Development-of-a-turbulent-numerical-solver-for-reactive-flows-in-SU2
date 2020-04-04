@@ -592,7 +592,7 @@ namespace Framework {
       * \param[in] C_mu - Turbolent parameter needed for closure
       * \param[out] k - Weight used to build turbolent source term for every species
     */
-    double GetMassProductionTerm(const unsigned short iSpecies, const double omega_turb,const double C_mu) override;
+    double GetMassProductionTerm(const unsigned short iSpecies) override;
 
     //MANGOTURB
     /*!
@@ -602,7 +602,7 @@ namespace Framework {
       * \param[in] C_mu - Turbolent parameter needed for closure
       * \param[out] k - Weight used to build turbolent source term for every species
     */
-    double AssemblePaSRConstant(const unsigned short iReac,const double omega_turb,const double C_mu);
+    void AssemblePaSRConstant(const double omega_turb,const double C_mu, const double PaSR_lb) override;
 
     //MANGOTURB
     /*!

@@ -140,14 +140,14 @@ namespace Framework {
   //
   //
   /* Source term for -th species is built by a weight through PaSR contant method . */
-  double ReactingModelLibrary::GetMassProductionTerm( const unsigned short iSpecies, const double omega_turb,const double C_mu){
+  double ReactingModelLibrary::GetMassProductionTerm( const unsigned short iSpecies){
 
-    double omega_ith(0.0);
-    PaSRConstant.resize(nReactions);
+    double omega_ith = 0.0;
+
 
     /*--- Assembling i-th species source production term ---*/
     for (unsigned short iReac = 0; iReac < nReactions ; iReac++)
-    omega_ith += (AssemblePaSRConstant(iReac,omega_turb,C_mu))*omega_i_r(iSpecies,iReac);
+    omega_ith += PaSRConstant[iReac]*omega_i_r(iSpecies,iReac);
 
     return omega_ith;
 
@@ -158,25 +158,33 @@ namespace Framework {
   //
   //
   /* Assemble the PaSR constant for the turbolence model . */
-  double ReactingModelLibrary::AssemblePaSRConstant(const unsigned short iReac,const double omega_turb,const double C_mu){
+  void ReactingModelLibrary::AssemblePaSRConstant(const double omega_turb,const double C_mu, const double PaSR_lb){
 
-    double k_th;
+    PaSRConstant.resize(nReactions);
+
+
 
     /*--- Assmebling mixing time due to turbolence ---*/
     double tau_mix =  1/(C_mu*omega_turb);
 
-    /*--- Assembling slowest combustion time for r reaction---*/
-    double tau_comb_r = GetTimeCombustion_r(iReac);
+    for (unsigned short iReac = 0; iReac < nReactions ; iReac++){
 
-    if(isinf(tau_comb_r))
-      k_th = 1.0;
-    else
-      k_th = tau_comb_r/(tau_comb_r + tau_mix);
+      double k_th;
 
-    /*--- Saving value for future purposes ---*/
-    PaSRConstant[iReac] = k_th;
+      /*--- Assembling slowest combustion time for r reaction---*/
+      double tau_comb_r = GetTimeCombustion_r(iReac);
 
-    return k_th;
+      if(isinf(tau_comb_r))
+        k_th = 1.0;
+      else if ((tau_comb_r/(tau_comb_r + tau_mix)) < PaSR_lb)
+        k_th = PaSR_lb;
+      else
+        k_th = tau_comb_r/(tau_comb_r + tau_mix);
+
+      /*--- Saving value for future purposes ---*/
+      PaSRConstant[iReac] = k_th;
+    }
+
 
   }
 
@@ -198,21 +206,22 @@ namespace Framework {
   /* Compute the smallest reaction time for each reaction among all species. */
   double ReactingModelLibrary::GetTimeCombustion_r(const unsigned short iReac){
 
-    std::forward_list<unsigned short> Index_list;
-    std::forward_list<double> iReac_species;
+    std::vector<unsigned short> Index_list;
+    std::vector<double> iReac_species;
 
     /*--- Searching for species taking part into iReac reaction ---*/
     for(unsigned short iSpecies = 0; iSpecies < nSpecies; iSpecies++){
       if(Stoich_Coeffs_Products(iSpecies,iReac) || Stoich_Coeffs_Reactants(iSpecies,iReac))
-      Index_list.push_front(iSpecies);
+      Index_list.push_back(iSpecies);
     }
 
 
     for(const auto it : Index_list)
-      iReac_species.push_front(Df_rDrho_i(it,iReac)*mMasses[it]);
+      iReac_species.push_back(std::fabs(Df_rDrho_i(it,iReac)*mMasses[it]));
 
+    double highest_derivative = *std::max_element(iReac_species.begin(),iReac_species.end());
 
-    return 1/(std::fabs(*std::max_element(iReac_species.begin(),iReac_species.end())));
+    return 1/highest_derivative;
 
   }
 
