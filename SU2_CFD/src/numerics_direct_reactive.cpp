@@ -210,7 +210,7 @@ void CUpwReactiveAUSM::ComputeResidual(su2double* val_residual, su2double** val_
       }
     }
 
-    /*--- Set derivatives of Mach number ---*/
+    // /*--- Set derivatives of Mach number ---*/
     su2double Mach_Left_Der[nVar], Mach_Right_Der[nVar];
 
     for(iVar = 0; iVar < nVar; ++iVar) {
@@ -617,7 +617,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     /*--- Add turbolent jacobian closure ---*/
     if (config->GetKind_Turb_Model() == SST){
 
-      /*--- Local turbolent variables ---*/
+      // /*--- Local turbolent variables ---*/
       su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
       Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
       Mean_Turbolent_KE = 0.5*(turb_ke_i + turb_ke_j);
@@ -755,7 +755,7 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
 
         for (iSpecies = 0 ; iSpecies < nSpecies ; iSpecies++){
           for ( iDim = 0; iDim < nDim; ++iDim ){
-            if(Mean_Mass_Grads(iSpecies,iDim) < 1e-5)
+            if(Mean_Mass_Grads(iSpecies,iDim) < 1e-6)
             Mean_Mass_Grads(iSpecies,iDim)=0.0;
           }
         }
@@ -952,7 +952,7 @@ if(nDim == 2) {
   dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
   dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
   dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] -= pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
-  dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+  dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
 
   // Species: Fick's law partial densities
   for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
@@ -990,10 +990,10 @@ if(nDim == 2) {
 
       //MASS CLOSURE
       dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
-      (iSpecies==jSpecies)*Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
+      (iSpecies==jSpecies)*Mean_Eddy_Viscosity*Ys[iSpecies]/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
 
       dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
-      (iSpecies==jSpecies)*Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
+      (iSpecies==jSpecies)*Mean_Eddy_Viscosity*Ys[iSpecies]/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
 
     }
 
@@ -1698,7 +1698,7 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
         Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
         Mean_Turbolent_KE = 0.5*(turb_ke_i + turb_ke_j);
         SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity,config);
-      }
+       }
 
       unsigned short iDim,iVar,jVar,kVar;
       /*--- Common terms: Proj_Flux_Tensor, if turbolence is active, contains Reynolds stress tensor as well ---*/
@@ -1917,11 +1917,11 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
 
     if (config->GetKind_Turb_Model() == SST){
 
-    //   source_jac = library-> GetTurbSourceJacobian();
-    //
-    // }
-    // else
-    // {
+      source_jac = library-> GetTurbSourceJacobian();
+
+    }
+    else
+    {
 
       source_jac = library->GetSourceJacobian(dim_rho);
 
