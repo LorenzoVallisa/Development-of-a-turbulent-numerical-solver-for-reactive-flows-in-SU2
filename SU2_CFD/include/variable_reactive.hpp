@@ -440,10 +440,11 @@ public:
    */
   bool SetPrimVar(CConfig* config) override;
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
   /*!
    * \brief Set all the primitive variables for compressible flows.
    * \param[in] config - Configuration of the particular problem.
+   * \param[in] val_ke - Value of turbulent kinetic energy.
    */
   bool SetPrimVar(CConfig* config,su2double val_ke)override;
 
@@ -455,12 +456,13 @@ public:
    */
   bool Cons2PrimVar(CConfig* config, su2double* U, su2double* V);
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
   /*!
    * \brief Set all the primitive variables form conserved variables.
    * \param[in] config - Configuration of the particular problem.
    * \param[in] U - Storage of conservative variables.
    * \param[in] V - Storage of primitive variables.
+   * \param[in] val_ke - Turbulent kinetic energy .
    */
   bool Cons2PrimVar(CConfig* config, su2double* U, su2double* V,su2double val_ke);
 
@@ -661,7 +663,7 @@ protected:
   su2double  Thermal_Conductivity;   /*!< \brief Thermal conductivity of the gas mixture. */
   RealMatrix Diffusion_Coeffs;      /*!< \brief Binary diffusion coefficients of the mixture. */
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
   su2double Eddy_Viscosity;
   su2double Vorticity[3];
   su2double StrainMag;
@@ -743,18 +745,30 @@ public:
                       unsigned short val_nprimvarlim, LibraryPtr lib_ptr, CConfig* config);
 
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
+  /*!
+   * \brief Set vorticity computed by turbulent solver.
+   */
   bool SetVorticity(bool val_limiter);
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
+  /*!
+   * \brief Set strainmag computed by turbulent solver.
+   */
   bool SetStrainMag(bool val_limiter);
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
+  /*!
+   * \brief Get vorticity computed by turbulent solver.
+   */
   su2double* GetVorticity(void) {
     return Vorticity;
   }
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
+  /*!
+   * \brief Get strainmag computed by turbulent solver.
+   */
   su2double GetStrainMag(void){
     return StrainMag;
   }
@@ -778,9 +792,11 @@ public:
    */
   bool SetPrimVar(CConfig* config) override;
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
   /*!
    * \brief Set all primitive variables and transport properties for compressible flows.
+   * \param[in] eddy_visc - Eddy viscosity added to variable passed by solvers
+   * \param[in] turb_ke - Trubulent KE viscosity added to variable passed by solvers
    * \param[in] config - Configuration of the particular problem.
    */
   bool SetPrimVar(su2double eddy_visc, su2double turb_ke, CConfig* config)override;
@@ -788,12 +804,18 @@ public:
   bool SetPrimVar(CConfig* config, su2double val_ke)override;
 
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
+  /*!
+   * \brief Set eddy viscosity of the mixture.
+   */
   inline void SetEddyViscosity( const su2double eddy ){
     Eddy_Viscosity=eddy;
   }
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
+  /*!
+   * \brief Get eddy viscosity of the mixture.
+   */
   inline su2double GetEddyViscosity(void) override {
     return Eddy_Viscosity;
   }

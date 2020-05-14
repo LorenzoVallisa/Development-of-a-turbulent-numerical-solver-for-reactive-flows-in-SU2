@@ -742,6 +742,7 @@ void CDriver::Solver_Preprocessing(CSolver ***solver_container, CGeometry **geom
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
       break;
+    /*--- MANGOTURB: Multispecies turbulent simultions additions ---*/
     case REACTIVE_RANS: reactive_ns = true; turbulent = true; break;
 
 
@@ -916,6 +917,7 @@ void CDriver::Solver_Postprocessing(CSolver ***solver_container, CGeometry **geo
     case  REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
       break;
+    /*--- MANGOTURB: Multispecies turbulent simultions additions ---*/
     case REACTIVE_RANS: reactive_ns = true; turbulent = true;
       break;
   }
@@ -1031,6 +1033,7 @@ void CDriver::Integration_Preprocessing(CIntegration **integration_container,
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
       break;
+    /*--- MANGOTURB: Multispecies turbulent simultions additions ---*/
     case REACTIVE_RANS:
       reactive_ns = true; turbulent = true;
       break;
@@ -1106,6 +1109,7 @@ void CDriver::Integration_Postprocessing(CIntegration **integration_container,
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
       break;
+    /*--- MANGOTURB: Multispecies turbulent simultions additions ---*/ 
     case REACTIVE_RANS:
       reactive_ns = true; turbulent = true;
       break;
@@ -1206,6 +1210,7 @@ void CDriver::Numerics_Preprocessing(CNumerics ****numerics_container,
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
       break;
+    /*--- MANGOTURB: Multispecies turbulent simultions additions ---*/
     case REACTIVE_RANS:
       reactive_ns = true; turbulent = true;
       break;
@@ -1975,6 +1980,7 @@ void CDriver::Numerics_Postprocessing(CNumerics ****numerics_container,
     case REACTIVE_NAVIER_STOKES:
       reactive_ns = true;
       break;
+    /*--- MANGOTURB: Multispecies turbulent simultions additions ---*/
     case REACTIVE_RANS:
       reactive_ns = true; turbulent = true;
       break;
@@ -2388,6 +2394,7 @@ void CDriver::Iteration_Preprocessing() {
         std::cout << ": Euler/Navier-Stokes/RANS fluid iteration." << std::endl;
       iteration_container[iZone] = new CMeanFlowIteration(config_container[iZone]);
       break;
+    /*--- MANGOTURB: Multispecies turbulent simultions additions ---*/
     case REACTIVE_RANS:
       if (rank == MASTER_NODE)
         std::cout << ": Reactive RANS fluid iteration." << std::endl;
@@ -2687,8 +2694,6 @@ void CDriver::StartSolver() {
 
 
       Run();
-      //OCIU
-      // std::cout<<" "<<std::endl;
 
       /*--- Update the solution for dual time stepping strategy ---*/
 
@@ -2754,8 +2759,6 @@ void CDriver::PreprocessExtIter(unsigned long ExtIter) {
     for(iZone = 0; iZone < nZone; ++iZone){
       solver_container[iZone][MESH_0][FLOW_SOL]->SetInitialCondition(geometry_container[iZone], solver_container[iZone],
                                                                                         config_container[iZone], ExtIter);
-    //OCIU
-    // std::cout<<" Passato Initial Condition"<<std::endl;
   }
   }
 
@@ -3575,8 +3578,6 @@ void CFluidDriver::Run() {
     for (iZone = 0; iZone < nZone; iZone++) {
       config_container[iZone]->SetIntIter(IntIter);
 
-      //OCIU
-      //std::cout<<" Dentro a CFluidDriver::Run: sto per iniziare CMeanFlowIteration::Iterate di iteration_container"<<std::endl;
       iteration_container[iZone]->Iterate(output, integration_container, geometry_container, solver_container, numerics_container, config_container, surface_movement, grid_movement, FFDBox, iZone);
     }
 

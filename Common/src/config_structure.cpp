@@ -2868,6 +2868,7 @@ void CConfig::SetPostprocessing(unsigned short val_software, unsigned short val_
       (Kind_Turb_Model != NONE))
     Kind_Solver = RANS;
 
+  /*---MANGOTURB: Turbulent solver for multispecies simulations initialised  ---*/
   if ((Kind_Solver == REACTIVE_NAVIER_STOKES) &&
       (Kind_Turb_Model != NONE))
     Kind_Solver = REACTIVE_RANS;

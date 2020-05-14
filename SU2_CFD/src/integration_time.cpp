@@ -154,9 +154,6 @@ void CMultiGridIntegration::MultiGrid_Cycle(CGeometry ***geometry,
 
       /*--- Send-Receive boundary conditions, and preprocessing ---*/
       solver_container[iZone][iMesh][SolContainer_Position]->Preprocessing(geometry[iZone][iMesh], solver_container[iZone][iMesh], config[iZone], iMesh, iRKStep, RunTime_EqSystem, false);
-      //OCIU
-      // std::cout<<" Sono in CMultiGridIntegration::MultiGrid_Cycle e ho appena fatto Solver_Preprocessing"<<std::endl;
-      // std::cout<<" In totale ho "<<iRKLimit<<" iterazioni " <<std::endl;
 
       if (iRKStep == 0) {
 
@@ -175,10 +172,7 @@ void CMultiGridIntegration::MultiGrid_Cycle(CGeometry ***geometry,
       }
 
       /*--- Space integration ---*/
-      //OCIU
-      //std::cout<<" Sto per fare un integrazione spaziale"<<std::endl;
       Space_Integration(geometry[iZone][iMesh], solver_container[iZone][iMesh], numerics_container[iZone][iMesh][SolContainer_Position], config[iZone], iMesh, iRKStep, RunTime_EqSystem);
-      //std::cout<<"Fatta un integrazione spaziale"<<std::endl;
       /*--- Time integration, update solution using the old solution plus the solution increment ---*/
 
       Time_Integration(geometry[iZone][iMesh], solver_container[iZone][iMesh], config[iZone], iRKStep, RunTime_EqSystem, Iteration);

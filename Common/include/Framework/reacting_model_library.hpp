@@ -576,7 +576,7 @@ namespace Framework {
     */
     void ReadExtraData_BackwardExponent(std::string line);
 
-    //MANGOTURB
+    /*---MANGOTURB: Library update to include turbulent closures   ---*/
     /*!
       * \brief Tensor of derivative of source term for the r-th reaction w.r.t. density of the i-th species.
       * \param[in] temp - Dimensional temperature read form the node on which the iteration is running
@@ -584,65 +584,57 @@ namespace Framework {
     */
     void Set_DfrDrhos(const double temp, const double rho) override;
 
-    //MANGOTURB
+    /*---MANGOTURB: Library update to include turbulent closures   ---*/
     /*!
       * \brief Source term for -th species is built by a weight through PaSR contant method.
       * \param[in] iSpecies - Species of which i want to build the source term
-      * \param[in] omega_turb - Solution of turbolent problem, needed for closures
-      * \param[in] C_mu - Turbolent parameter needed for closure
-      * \param[out] k - Weight used to build turbolent source term for every species
     */
     double GetMassProductionTerm(const unsigned short iSpecies) override;
 
-    //MANGOTURB
+    /*---MANGOTURB: Library update to include turbulent closures   ---*/
     /*!
       * \brief Assemble the PaSR constant for the turbolence model.
-      * \param[in] iReac - Reaction
       * \param[in] omega_turb - Solution of turbolent problem, needed for closures
       * \param[in] C_mu - Turbolent parameter needed for closure
-      * \param[out] k - Weight used to build turbolent source term for every species
+      * \param[out] PaSR_lb - Lower bound for PaSR constant
     */
     void AssemblePaSRConstant(const double omega_turb,const double C_mu, const double PaSR_lb) override;
 
-    //MANGOTURB
+    /*---MANGOTURB: Library update to include turbulent closures   ---*/
     /*!
       * \brief Compute the smallest reaction time for each reaction among all species.
       * \param[in] iReac - Reaction
-      * \param[out] tau_c_r - Return smallest reaction time for r-th reaction among all species involved into reaction
     */
     double GetTimeCombustion_r(const unsigned short iReac);
 
-    //MAGNOTURB
+    /*---MANGOTURB: Library update to include turbulent closures   ---*/
     /*!
     * \brief This function computes the omega term in laminar case.
-    * \param[out] tau_c_r - Return smallest reaction time for r-th reaction among all species involved into reaction
     */
     Eigen::VectorXd GetMassProductionTerm(void) override;
 
-    //MAGNOTURB
+    /*---MANGOTURB: Library update to include turbulent closures   ---*/
     /*!
     * \brief Set derivative of backward and forward rates w.r.t. Temperature.
     * \param[in] temp - Temperature at the node
     * \param[in] rho - Density at the node
-    * \param[out] dk/dT - Return derivative of backward and forward rates w.r.t. Temperature
     */
     void Set_BackFor_Contr(const double temp, const double rho) override;
 
-    //MANGOTURB
+    /*---MANGOTURB: Library update to include turbulent closures   ---*/
     /*!
-    * \brief Compute part of the turbolent Jacobian associated to source term (only species chemical reactions).
-    * \param[out] temp - PArt of jacobian tensor (Missing the transformation operator from compound derivative split)
+    * \brief Compute part of the turbolent Jacobian associated to source term (only species chemical reactions).)
     */
     RealMatrix GetTurbSourceJacobian(void) override;
 
-    //MANGOTURB
+    /*---MANGOTURB: Library update to include turbulent closures   ---*/
     /*!
     * \brief Compute part of Jacobian in laminar case associated to source term(only species chemical reactions).
-    * \param[out] temp - Part of jacobian tensor (Missing the transformation operator from compound derivative split)
+    * \param[out] rho - Density
     */
     RealMatrix GetSourceJacobian(const double rho) override;
 
-    //MANGOTURB
+    /*---MANGOTURB: Library update to include turbulent closures   ---*/
     /*!
      * \brief This function computes the omega_i_r double tensor species-reactions term.
      */
@@ -660,19 +652,13 @@ namespace Framework {
 
   protected:
 
-    //MANGOTURB
     Eigen::MatrixXd omega_i_r; /*!< \brief Matrix storing every species-reactions combination. */
 
-    //MAGNOTURB
     Eigen::MatrixXd Df_rDrho_i; /*!< \brief Matrix storing derivative of source term per reaction f_r w.r.t every species. */
 
-    //MAGNOTURB
     std::vector<double> PaSRConstant; /*!< \brief PaSR constant for each reaction. */
 
-    //MAGNOTURB
     std::vector<std::array<double,2>> ForBack_rates; /*!< \brief Auxiliary template to store back/forth reaction coefficients derivative w.r.t. Temperature. */
-
-
 
     std::map<std::string,unsigned short> Species_Names;  /*!< \brief Names of species in the mixture. */
 

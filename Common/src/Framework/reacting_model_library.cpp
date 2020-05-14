@@ -92,7 +92,7 @@ namespace Framework {
     std::transform(Xs.begin(), Xs.end(), Xs.begin(), std::bind1st(std::multiplies<double>(),massTot));
   }
 
-  //MANGOTURB
+  /*---MANGOTURB: Library update to include turbulent closures   ---*/
   //
   //
   /* This function computes the omega_i_r double tensor species-reactions term. */
@@ -115,7 +115,7 @@ namespace Framework {
 
 
 
-  //MANGOTURB
+  /*---MANGOTURB: Library update to include turbulent closures   ---*/
   //
   //
   /* Tensor of derivative of source term for the r-th reaction w.r.t. density of the i-th species . */
@@ -136,7 +136,7 @@ namespace Framework {
   }
 
 
-  //MANGOTURB
+  /*---MANGOTURB: Library update to include turbulent closures   ---*/
   //
   //
   /* Source term for -th species is built by a weight through PaSR contant method . */
@@ -154,7 +154,7 @@ namespace Framework {
   }
 
 
-  //MANGOTURB
+  /*---MANGOTURB: Library update to include turbulent closures   ---*/
   //
   //
   /* Assemble the PaSR constant for the turbolence model . */
@@ -174,6 +174,7 @@ namespace Framework {
       /*--- Assembling slowest combustion time for r reaction---*/
       double tau_comb_r = GetTimeCombustion_r(iReac);
 
+      /*--- Here is enforced the external lower bound for the PaSR constant ---*/
       if(isinf(tau_comb_r))
         k_th = 1.0;
       else if ((tau_comb_r/(tau_comb_r + tau_mix)) < PaSR_lb)
@@ -188,7 +189,7 @@ namespace Framework {
 
   }
 
-  //MAGNOTURB
+  /*---MANGOTURB: Library update to include turbulent closures   ---*/
   //
   //
   /* This function computes the omega term in laminar case. */
@@ -200,7 +201,7 @@ namespace Framework {
 
   }
 
-  //MANGOTURB
+  /*---MANGOTURB: Library update to include turbulent closures   ---*/
   //
   //
   /* Compute the smallest reaction time for each reaction among all species. */
@@ -225,7 +226,7 @@ namespace Framework {
 
   }
 
-  //MANGOTURB
+  /*---MANGOTURB: Library update to include turbulent closures   ---*/
   //
   //
   /*--- Set derivative of backward and forward rates w.r.t. Temperature ---*/
@@ -284,21 +285,10 @@ namespace Framework {
       ForBack_rates[iReac][0]=back_contr;
       ForBack_rates[iReac][1]=for_contr;
 
-
-     //  std::cout<<"////////////////////////////////DEBUG-PRINT: For_Back_Rates //////////////////////////////"<<std::endl;
-     //
-     //
-     // for(int r = 0; r< nReactions; r++)
-     //    std::cout<<ForBack_rates[r][0]<<"      -      "<<ForBack_rates[r][1]<<std::endl;
-     //
-     //
-     // std::cout<<"//////////////////////////////////////////////////////////////////////////////////"<<std::endl;
-
-
     }
   }
 
-  //MANGOTURB
+  /*---MANGOTURB: Library update to include turbulent closures   ---*/
   //
   //
   /*--- Compute Jacobian in case of turbolence ---*/
@@ -328,7 +318,7 @@ namespace Framework {
 
   }
 
-  //MANGOTURB
+  /*---MANGOTURB: Library update to include turbulent closures   ---*/
   //
   //
   /*--- Compute Jacobian in laminar case ---*/

@@ -86,8 +86,6 @@ public:
   using RealMatrix = CReactiveNSVariable::RealMatrix;
   using LibraryPtr = CReactiveEulerVariable::LibraryPtr;
   using Vec = Eigen::VectorXd;
-
-  //MANGOTURB
   using AuxMatrix = std::vector<std::vector<su2double>>;
 
 protected:
@@ -185,7 +183,7 @@ public:
   void ComputeResidual(su2double* val_residual, su2double** val_Jacobian_i, su2double** val_Jacobian_j, CConfig* config) override;
 
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
 /*!
  * \brief Compute projection of the viscous fluxes solving Stefan-Maxwell equations.
  * \param[in] val_primvar - Primitive variables.
@@ -203,7 +201,7 @@ public:
 
  RealMatrix Get_Molar2MassGrad_Operator(void);
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
   /*!
   * \brief /*--- Build the closure for Jacobian tensor of viscous residaul ---*
   * \param[in] Mean_PrimVar - Primitive variables.
@@ -213,6 +211,8 @@ public:
   * \param[in] dist_ij_2 - Nodes distance
   * \param[in] dFdVi - Auxiliary matrix
   * \param[in] dFdVj -  Auxiliary matrix
+  * \param[in] Mean_Laminar_Viscosity - Laminar viscosity
+  * \param[in] config -  Definition of the particular problem
   */
   void SST_Reactive_JacobianClosure(su2double* UnitNormal,const Vec& Mean_PrimVar,const su2double  Mean_Turbolent_KE,
                                                             const su2double Area, const su2double Mean_Eddy_Viscosity,const su2double dist_ij_2, AuxMatrix & dFdVi,
@@ -220,25 +220,17 @@ public:
 
 
 
-  //MANGOTURB
-  /*!
-  * \brief Return heat flux factor for only turbolent closure, since laminar one already implemented in SetLaminarTensorFlux.
-  */
-  // su2double Get_HeatFactor(const su2double eddy_visc,const su2double temp)override{
-  //
-  //   /*--- Retrieving adimensional polytropic coefficient gamma ---*/
-  //   su2double gamma = library -> ComputeFrozenGamma(temp,Ys);
-  //
-  //   return (gamma/(gamma-1))*Gas_Constant*(eddy_visc/Prandtl_Turb);
-  //
-  // }
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
   /*!
   * \brief /*--- Build the closure for residual tensor of viscous residaul ---*
+  * \param[in] mean_tkegradvar - Vector of gradients of turbulent kinetic energies
   * \param[in] Mean_PrimVar - Primitive variables.
-  * \param[in] Mean_Turbolent_KE - Turbolent kinetic energy
+  * \param[in] Mean_GradPrimVar - Vector of gradients of primitive variables
   * \param[in] UnitNormal - Normal vector, the norm of the vector is the area of the face.
   * \param[in] Mean_Eddy_Viscosity - Turbolent viscosity.
+  * \param[in] Mean_Turbolent_KE - Mean TKE
+  * \param[in] Mean_Laminar_Viscosity - Laminar viscosity.
+  * \param[in] config - Definition of the particular problem
   */
   void SST_Reactive_ResidualClosure(const Vec& mean_tkegradvar,const Vec& Mean_PrimVar, const RealMatrix& Mean_GradPrimVar, su2double* Normal,
                                                                 const su2double Mean_Eddy_Viscosity, const su2double Mean_Turbolent_KE,const su2double Mean_Laminar_Viscosity,CConfig* config);
@@ -270,7 +262,7 @@ public:
     Dij_j = Diff_j;
   }
 
-  //MANGOTURB
+    /*--- MANGOTURB: Turbulent add-on ---*/
   /*!
    * \brief Approximation of Viscous NS Jacobians in Thermochemical Non Equilibrium.
    * \param[in] val_Mean_PrimVar - Mean value of the primitive variables.

@@ -1713,7 +1713,9 @@ public:
   //DEBUGVISCOUS
   bool Get_debug_visc_bound(void);
 
-  //MANGOTURB
+  /*!
+   * \brief Get the value of the PaSR constant lower bound.
+   */
   double Get_PaSR_LB(void);
 
   /*!

@@ -968,6 +968,10 @@ void CAvgGrad_TurbSST::ComputeResidual(su2double *val_residual, su2double **Jaco
   AD::SetPreaccIn(TurbVar_Grad_i, nVar, nDim); AD::SetPreaccIn(TurbVar_Grad_j, nVar, nDim);
   AD::SetPreaccIn(F1_i); AD::SetPreaccIn(F1_j);
 
+  /*--- MANGOTURB: Original laminar reactive variable do NOT forsee a storage
+  for eddy_viscosity and TKE variables within mean flow primitive variables, hence those are retrieved through setters
+  and getters implmented in the turbulent solver-variable class  ---*/
+
   if (incompressible) {
     AD::SetPreaccIn(V_i, nDim+5); AD::SetPreaccIn(V_j, nDim+5);
 
@@ -986,6 +990,8 @@ void CAvgGrad_TurbSST::ComputeResidual(su2double *val_residual, su2double **Jaco
   sigma_kine_j  = F1_j*sigma_k1 + (1.0 - F1_j)*sigma_k2;
   sigma_omega_i = F1_i*sigma_om1 + (1.0 - F1_i)*sigma_om2;
   sigma_omega_j = F1_j*sigma_om1 + (1.0 - F1_j)*sigma_om2;
+
+
 
   /*--- Compute mean effective viscosity ---*/
   diff_i_kine  = Laminar_Viscosity_i + sigma_kine_i*Eddy_Viscosity_i;
@@ -1082,6 +1088,10 @@ void CAvgGradCorrected_TurbSST::ComputeResidual(su2double *val_residual, su2doub
   AD::SetPreaccIn(TurbVar_Grad_i, nVar, nDim); AD::SetPreaccIn(TurbVar_Grad_j, nVar, nDim);
   AD::SetPreaccIn(TurbVar_i, nVar); AD::SetPreaccIn(TurbVar_j ,nVar);
   AD::SetPreaccIn(F1_i); AD::SetPreaccIn(F1_j);
+
+  /*--- MANGOTURB: Original laminar reactive variable do NOT forsee a storage
+  for eddy_viscosity and TKE variables within mean flow primitive variables, hence those are retrieved through setters
+  and getters implmented in the turbulent solver-variable class  ---*/
 
   if (incompressible) {
     AD::SetPreaccIn(V_i, nDim+5); AD::SetPreaccIn(V_j, nDim+5);

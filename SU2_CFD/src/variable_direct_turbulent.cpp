@@ -148,7 +148,6 @@ CTurbSSTVariable::CTurbSSTVariable(su2double val_kine, su2double val_omega, su2d
   Solution[0] = val_kine;     Solution_Old[0] = val_kine;
   Solution[1] = val_omega;  Solution_Old[1] = val_omega;
 
-  //MANGOTURB
   sigma_k = constants[0];
   sigma_om2 = constants[3];
   beta_star = constants[6];

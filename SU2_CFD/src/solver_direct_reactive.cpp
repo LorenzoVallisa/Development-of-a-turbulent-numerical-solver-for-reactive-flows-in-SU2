@@ -43,7 +43,6 @@ CReactiveEulerSolver::CReactiveEulerSolver(): CSolver(), nSpecies(), nPrimVarLim
   Max_Delta_Time = 0.0;
   Min_Delta_Time = 1.E6;
 
-  //MANGOTURB
   Eddy_Viscosity=0.0;
 
   nPoint = 0;
@@ -69,7 +68,6 @@ CReactiveEulerSolver::CReactiveEulerSolver(CGeometry* geometry, CConfig* config,
   nVarGrad = 0;
   IterLinSolver = 0;
 
-  //MANGOTURB
   Eddy_Viscosity= 0.0;
 
 
@@ -364,10 +362,10 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   #endif
 
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   unsigned short turb_model = config->GetKind_Turb_Model();
   bool tkeNeeded            = (turb_model == SST);
-  su2double val_ke = config -> GetTke_FreeStreamND(); //Dimensional freestream turbolent ke
+  su2double val_ke = config -> GetTke_FreeStreamND();
   bool nonPhys_infty;
   bool nonPhys;
 
@@ -404,7 +402,7 @@ void CReactiveEulerSolver::Check_FreeStream_Solution(CConfig* config) {
       su2double dim_temp = Temperature_Inf*config->GetTemperature_Ref();
       if(US_System)
         dim_temp *= 5.0/9.0;
-      //MANGOTURB
+      /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
       hs_Tot = (library->ComputeEnthalpy(dim_temp, MassFrac_Inf))/config->GetEnergy_Ref();
       if(US_System)
         hs_Tot *= 3.28084*3.28084;
@@ -698,7 +696,7 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
   unsigned long iPoint, Point_Fine;
   unsigned short iMesh, iChildren, iVar;
   su2double Area_Children, Area_Parent, Solution[nVar];
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
 
   bool restart = (config->GetRestart() || config->GetRestart_Flow());
@@ -723,10 +721,10 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
       }
       solver_container[iMesh][FLOW_SOL]->Set_MPI_Solution(geometry[iMesh], config);
     }
-    //MANGOTURB
+    /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
     /*--- Including turbulent initial conditions ---*/
     if (rans) {
-      //QUI Devo capire se passando array passo un pointer
+
       unsigned short nVar_Turb = solver_container[MESH_0][TURB_SOL]->GetnVar();
       su2double SolutionTurb[nVar_Turb];
       for (iMesh = 1; iMesh <= config->GetnMGLevels(); iMesh++) {
@@ -759,7 +757,7 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
       for(iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint) {
         solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n();
         solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n1();
-        //MANGOTURB
+        /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
         if (rans) {
           solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n();
           solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n1();
@@ -771,7 +769,7 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
       /*--- Load an additional restart file for a 2nd-order restart ---*/
       solver_container[MESH_0][FLOW_SOL]->LoadRestart(geometry, solver_container, config, SU2_TYPE::Int(config->GetUnst_RestartIter() - 1));
 
-      //MANGOTURB
+      /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
       /*--- Load an additional restart file for the turbulence model ---*/
       if (rans)
         solver_container[MESH_0][TURB_SOL]->LoadRestart(geometry, solver_container, config, SU2_TYPE::Int(config->GetUnst_RestartIter()-1));
@@ -780,7 +778,7 @@ void CReactiveEulerSolver::SetInitialCondition(CGeometry** geometry, CSolver*** 
       for(iMesh = 0; iMesh <= config->GetnMGLevels(); ++iMesh) {
         for(iPoint = 0; iPoint < geometry[iMesh]->GetnPoint(); ++iPoint){
           solver_container[iMesh][FLOW_SOL]->node[iPoint]->Set_Solution_time_n();
-          //MANGOTURB
+          /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
           if (rans) {
             solver_container[iMesh][TURB_SOL]->node[iPoint]->Set_Solution_time_n();
           }
@@ -841,7 +839,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 
    /*--- Compute the free stream energy ---*/
    Energy_FreeStream = library->ComputeEnergy(Temperature_FreeStream, MassFrac_Inf) + 0.5*ModVel_FreeStream*ModVel_FreeStream;
-   //MANGOTURB
+   /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
    config->SetEnergy_FreeStream(Energy_FreeStream);
 
    /*--- Compute non dimensional quantities: Notice that the grid is in meters. ---*/
@@ -870,7 +868,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    Velocity_Ref = std::sqrt(Pressure_Ref/Density_Ref);
    config->SetVelocity_Ref(Velocity_Ref);
 
-   //MANGOTURB
+   /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
    su2double Omega_Ref=0.0;
    Omega_Ref         = Velocity_Ref/Length_Ref;
    config->SetOmega_Ref(Omega_Ref);
@@ -888,7 +886,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
    Gas_Constant_Ref = Energy_Ref/Temperature_Ref;
    config->SetGas_Constant_Ref(Gas_Constant_Ref);
 
-   //MANGOTURB
+   /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
    su2double Gas_Constant = library->ComputeRgas(MassFrac_Inf);
    su2double Gas_ConstantND = Gas_Constant/Gas_Constant_Ref;
    config->SetGas_ConstantND(Gas_ConstantND);
@@ -987,7 +985,7 @@ void CReactiveEulerSolver::SetNondimensionalization(CGeometry* geometry, CConfig
 unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver** solver_container, CConfig* config, bool Output) {
 
 
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   su2double eddy_visc = 0.0, turb_ke = 0.0;
   unsigned short turb_model = config->GetKind_Turb_Model();
   bool tkeNeeded            = (turb_model == SST);
@@ -996,7 +994,7 @@ unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver** solver_cont
   bool NonPhys = false;
 
   for(iPoint = 0; iPoint < nPoint; ++iPoint) {
-    //MANGOTURB-//INCOMPLETO
+    /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
     if (turb_model != NONE) {
       eddy_visc = solver_container[TURB_SOL]->node[iPoint]->GetmuT();
       if (tkeNeeded) turb_ke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);
@@ -1006,7 +1004,7 @@ unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver** solver_cont
     node[iPoint]->SetNon_Physical(false);
 
     /*--- Compressible flow, primitive variables nSpecies + nDim + 5, (T, vx, vy, vz, P, rho, h, a, Y1,....YNs) ---*/
-    //MANGOTURB
+    /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
     if (tkeNeeded)
       NonPhys = node[iPoint]->SetPrimVar(eddy_visc,turb_ke,config);//dimensional turbolent variable
     else
@@ -1036,23 +1034,6 @@ unsigned long CReactiveEulerSolver::SetPrimitive_Variables(CSolver** solver_cont
   }
 
   return ErrorCounter;
-  //MANGOTURB
-  // unsigned short turb_model = config->GetKind_Turb_Model();
-  // bool tkeNeeded            = (turb_model == SST);
-  // su2double eddy_visc = 0.0, turb_ke = 0.0;
-  //
-  // /*--- Retrieve the value of the kinetic energy (if need it) ---*/
-  //
-  // if (turb_model != NONE) {
-  //   eddy_visc = solver_container[TURB_SOL]->node[iPoint]->GetmuT();
-  //   if (tkeNeeded) turb_ke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);
-  // }
-  //DUBBI nel solver originale eddy_visc è una delle primitive,che viene immagazzinata dal solver e bisogna capire dove viene usata
-  // Nel solver originale turb_ke viene usata in static energy che viene presa da fluid model per costruire variabili tipi pressione e tempreatura
-  //in caso di gas ideale (Bisogna vedere DOVE viene usata da orlando per costruire queste variabili)
-
-
-
 
 }
 
@@ -2826,7 +2807,7 @@ void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver
     /*--- Load the volume of the dual mesh cell ---*/
     numerics->SetVolume(geometry->node[iPoint]->GetVolume());
 
-    //MANGOTURB
+    //*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
     /*--- Load turbolent variables for source closure ---*/
     if (config->GetKind_Turb_Model() == SST){
       numerics->SetOmegaParam(solver_container[TURB_SOL]->node[iPoint]->GetSolution(1));
@@ -2835,26 +2816,26 @@ void CReactiveEulerSolver::Source_Residual(CGeometry* geometry, CSolver** solver
     /*--- Compute the source residual ---*/
     numerics->ComputeChemistry(Res_Sour, Jacobian_i, config);
 
-    // //DEBUGSOURCE
-    // if(config->Get_debug_source()){
-    //   std::cout<<" --------------Source Residual--------------- "<<std::endl;
-    //   for (unsigned short iVar = 0; iVar < nVar; iVar++) {
-    //       std::cout<<Res_Sour[iVar]<<"   -   ";
-    //   }
-    //   std::cout<<std::endl;
-    // }
-    //
-    // //DEBUGSOURCE
-    // if(config->Get_debug_source()){
-    //   std::cout<<" --------------Source Jacobian_i--------------- "<<std::endl;
-    //   for (unsigned short iVar = 0; iVar < nVar; iVar++) {
-    //     for (unsigned short jVar = 0; jVar < nVar; jVar++) {
-    //       std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
-    //     }
-    //     std::cout<<std::endl;
-    //   }
-    //   std::cout<<std::endl;
-    //   }
+    /*--- MANGOTURB: Debug structure 8 ---*/
+    if(config->Get_debug_source()){
+      std::cout<<" --------------Source Residual--------------- "<<std::endl;
+      for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+          std::cout<<Res_Sour[iVar]<<"   -   ";
+      }
+      std::cout<<std::endl;
+    }
+
+    /*--- MANGOTURB: Debug structure 9 ---*/
+    if(config->Get_debug_source()){
+      std::cout<<" --------------Source Jacobian_i--------------- "<<std::endl;
+      for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+        for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+          std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+        }
+        std::cout<<std::endl;
+      }
+      std::cout<<std::endl;
+      }
 
     /*--- Check for NaNs before applying the residual to the linear system ---*/
     bool err = !std::none_of(Res_Sour, Res_Sour + nVar, [](su2double elem){return std::isnan(elem);});
@@ -2956,7 +2937,7 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
       /*--- Add value to the residual ---*/
   		LinSysRes.AddBlock(iPoint, Residual);
 
-      //DEBUGVISCOUS
+      /*--- MANGOTURB: Debug structure 19 ---*/
       if(config->Get_debug_visc_bound()){
         std::cout<<" --------------Euler Residual--------------- "<<std::endl;
         for (unsigned short iVar = 0; iVar < nVar; iVar++) {
@@ -2990,7 +2971,7 @@ void CReactiveEulerSolver::BC_Euler_Wall(CGeometry* geometry, CSolver** solver_c
         Jacobian.AddBlock(iPoint, iPoint, Jacobian_i);
       }
 
-      //DEBUGVISCOUS
+      /*--- MANGOTURB: Debug structure 20 ---*/
       if(config->Get_debug_visc_bound()){
         std::cout<<" --------------Euler Jacobian_i--------------- "<<std::endl;
         for (unsigned short iVar = 0; iVar < nVar; iVar++) {
@@ -3248,7 +3229,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
   unsigned short iDim;
   unsigned long iVertex, iPoint, Point_Normal;
 
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   bool tkeNeeded = ((config->GetKind_Solver() == REACTIVE_RANS) &&
                     (config->GetKind_Turb_Model() == SST));
 
@@ -3397,7 +3378,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
               throw std::runtime_error("Convergence not achieved for bisection method in inlet boundary condition");
           }
 
-          //MANGOTURB
+          /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
           if (tkeNeeded) {Tot_Enthalpy += GetTke_Inf();}
           V_inlet[H_INDEX_PRIM] = Tot_Enthalpy;
 
@@ -3412,7 +3393,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           std::copy(Ys.cbegin(), Ys.cend(), V_inlet + RHOS_INDEX_PRIM);
 
 
-          //DEBUGVISCOUS
+          /*--- MANGOTURB: Debug structure 21 ---*/
           if(config->Get_debug_visc_bound()){
             std::cout<<" --------------INLET Primitive--------------- "<<std::endl;
             std::cout<< " T ------>"<<V_inlet[T_INDEX_PRIM]<<std::endl;
@@ -3467,7 +3448,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           dim_temp = V_inlet[T_INDEX_PRIM]*config->GetTemperature_Ref();
           if(US_System)
             dim_temp *= 5.0/9.0;
-          //MANGOTURB
+          /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
           su2double Aux_Ent = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref();
           if (tkeNeeded) Aux_Ent+= GetTke_Inf(); //Questo è adimensionale
           V_inlet[H_INDEX_PRIM] =Aux_Ent;
@@ -3504,7 +3485,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           dim_temp = Temperature*config->GetTemperature_Ref();
           if(US_System)
             dim_temp *= 5.0/9.0;
-          //MANGOTURB
+          /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
           V_inlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref() + (tkeNeeded)*GetTke_Inf();
 
           if(US_System)
@@ -3623,7 +3604,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
         /*--- Species binary coefficients ---*/
         visc_numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
 
-        //MANGOTURB
+        /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
         if (config->GetKind_Turb_Model() == SST){
 
         visc_numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
@@ -3642,7 +3623,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
         /*--- Compute residual ---*/
         visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
 
-        //DEBUGVISCOUS
+        /*--- MANGOTURB: Debug structure 10 ---*/
         if(config->Get_debug_visc_bound()){
           std::cout<<" --------------inlet Residual--------------- "<<std::endl;
           for (unsigned short iVar = 0; iVar < nVar; iVar++) {
@@ -3651,7 +3632,7 @@ void CReactiveEulerSolver::BC_Inlet(CGeometry* geometry, CSolver** solver_contai
           std::cout<<std::endl;
         }
 
-        //DEBUGVISCOUS
+        /*--- MANGOTURB: Debug strucutre 11 ---*/
         if(config->Get_debug_visc_bound()){
           std::cout<<" --------------Inlet Jacobian_i--------------- "<<std::endl;
           for (unsigned short iVar = 0; iVar < nVar; iVar++) {
@@ -3837,7 +3818,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
   bool viscous = config->GetViscous();
   bool gravity = config->GetGravityForce();
 
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   bool tkeNeeded = ((config->GetKind_Solver() == REACTIVE_RANS) &&
                     (config->GetKind_Turb_Model() == SST));
 
@@ -3921,7 +3902,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         dim_temp = Temperature*config->GetTemperature_Ref();
         if(US_System)
           dim_temp *= 5.0/9.0;
-        //MANGOTURB
+        /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
         V_outlet[H_INDEX_PRIM] = library->ComputeEnthalpy(dim_temp, Ys)/config->GetEnergy_Ref() + (tkeNeeded)*GetTke_Inf();
 
 
@@ -3932,7 +3913,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         std::copy(Ys.cbegin(), Ys.cend(), V_outlet + RHOS_INDEX_PRIM);
 
 
-        //DEBUGVISCOUS
+        /*--- MANOTURB: DEbug structure 12 ---*/
         if(config->Get_debug_visc_bound()){
           std::cout<<" --------------outlet Primitive--------------- "<<std::endl;
           std::cout<< " T ------>"<<V_outlet[T_INDEX_PRIM]<<std::endl;
@@ -3985,17 +3966,17 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
       /*--- Compute the residual using an upwind scheme ---*/
       conv_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
 
-      //DEBUGVISCOUS
-      // if(config->Get_debug_visc_bound()){
-      //   std::cout<<" --------------Outlet Jacobian_i Convective Contribution--------------- "<<std::endl;
-      //   for (unsigned short iVar = 0; iVar < nVar; iVar++) {
-      //     for (unsigned short jVar = 0; jVar < nVar; jVar++) {
-      //       std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
-      //     }
-      //     std::cout<<std::endl;
-      //   }
-      //   std::cout<<std::endl;
-      // }
+      /*--- MANGOTURB:  Debug structure 13 ---*/
+      if(config->Get_debug_visc_bound()){
+        std::cout<<" --------------Outlet Jacobian_i Convective Contribution--------------- "<<std::endl;
+        for (unsigned short iVar = 0; iVar < nVar; iVar++) {
+          for (unsigned short jVar = 0; jVar < nVar; jVar++) {
+            std::cout<<Jacobian_i[iVar][jVar]<<"   -   ";
+          }
+          std::cout<<std::endl;
+        }
+        std::cout<<std::endl;
+      }
 
       /*--- Check for NaNs before applying the residual to the linear system ---*/
       bool err = !std::none_of(Residual, Residual + nVar, [](su2double elem){return std::isnan(elem);});
@@ -4073,7 +4054,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         /*--- Species binary coefficients ---*/
         visc_numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[iPoint]->GetDiffusionCoeff());
 
-        //MANGOTURB
+        /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
         if (config->GetKind_Turb_Model() == SST){
 
           visc_numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
@@ -4091,7 +4072,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
         /*--- Compute residual ---*/
         visc_numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
 
-        //DEBUGVISCOUS
+        /*--- MANGOTURB: Debug structure 14 ---*/
         if(config->Get_debug_visc_bound()){
           std::cout<<" --------------Outlet Residual--------------- "<<std::endl;
           for (unsigned short iVar = 0; iVar < nVar; iVar++) {
@@ -4100,7 +4081,7 @@ void CReactiveEulerSolver::BC_Outlet(CGeometry* geometry, CSolver** solver_conta
           std::cout<<std::endl;
         }
 
-        //DEBUGVISCOUS
+        /*--- MANGOTURB: Debug structure 15 ---*/
         if(config->Get_debug_visc_bound()){
           std::cout<<" --------------Outlet Jacobian_i Viscous Contribution--------------- "<<std::endl;
           for (unsigned short iVar = 0; iVar < nVar; iVar++) {
@@ -4318,7 +4299,7 @@ CReactiveNSSolver::CReactiveNSSolver(CGeometry* geometry, CConfig* config, unsig
     }
   }
 
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   /*--- Once set non dimensional tke within config file, tke is set within solver mmebers too ---*/
   Tke_Inf= config->GetTke_FreeStreamND();
   Prandtl_Turb    = config->GetPrandtl_Turb();
@@ -4412,9 +4393,6 @@ void CReactiveNSSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
   unsigned short nZone = geometry->GetnZone();
   std::string filename = config->GetSolution_FlowFileName();
   int Unst_RestartIter;
-  //MANGOTURB
-  // unsigned short turb_model = config->GetKind_Turb_Model();
-  //su2double Area_Children, Area_Parent, *Coord, *Solution_Fine, dull_val;
 
   /*--- Multizone problems require the number of the zone to be appended. ---*/
   if(nZone > 1)
@@ -4530,8 +4508,6 @@ void CReactiveNSSolver::Load_Restart(CGeometry* geometry, CConfig* config) {
   /*--- Close the restart file ---*/
   restart_file.close();
 
-  //MANGOTURB
-  //PARTE MANCANTE DA LOADRESTART ORIGINALE SU2
   /*--- MPI solution ---*/
   Set_MPI_Solution(geometry, config);
 
@@ -4553,7 +4529,7 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   #endif
 
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   /*--- Local turbolent variables for the adimensionalitazion of viscous contribution ---*/
   su2double Tke_FreeStream = 0.0,Tke_FreeStreamND = 0.0;
   bool turbulent          =(config->GetKind_Solver() == REACTIVE_RANS);
@@ -4611,8 +4587,6 @@ void CReactiveNSSolver::SetNondimensionalization(CGeometry* geometry, CConfig* c
   Viscosity_FreeStreamND = Viscosity_FreeStream/Viscosity_Ref;
   config->SetViscosity_FreeStreamND(Viscosity_FreeStreamND);
 
-  //MANGOTURB
-  //std::cout<<"     Reynolds Number ->        "<<config->GetReynolds()<<"        "<<std::endl;
 
   /*--- Update turbolent omega, turbolent ke and consequently free stream energy in case of turbolence---*/
   if (tkeNeeded){
@@ -4726,7 +4700,7 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
 
 
 
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   /*--- Set Voriticity and Omega parameters ---*/
   su2double StrainMag = 0.0, Omega = 0.0, *Vorticity;
   unsigned long ExtIter     = config->GetExtIter();
@@ -4765,7 +4739,6 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
   if(limiter && iMesh == MESH_0 && !Output)
     SetPrimitive_Limiter(geometry, config);
 
-  //MANGOTURB
   if ((iMesh == MESH_0) && (limiter_flow || limiter_turb || limiter_visc) && !Output) { SetPrimitive_Limiter(geometry, config);}
 
 
@@ -4779,7 +4752,6 @@ void CReactiveNSSolver::Preprocessing(CGeometry* geometry, CSolver** solver_cont
     Jacobian.SetValZero();
 
 
-  //MANGOTURB
   /*--- Error message ---*/
   if(config->GetConsole_Output_Verb() == VERB_HIGH) {
 
@@ -5088,7 +5060,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
   unsigned long iEdge, iVertex, iPoint, jPoint;
   unsigned short iMarker, iSpecies;
 
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   su2double Mean_EddyVisc=0.0;
   bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
   su2double Prandtl_Lam = config-> GetPrandtl_Lam();
@@ -5149,7 +5121,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
     /*--- Inviscid contribution ---*/
     Lambda = (std::abs(Mean_ProjVel) + Mean_SoundSpeed)*Area;
 
-    //DEBUGTIME
+    /*--- MANGOTURB: Debug structure 16 ---*/
     if(config->Get_debug_time()){
 
     std::cout<<" --------------Inviscid--------------- "<<std::endl;
@@ -5162,7 +5134,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
       node[jPoint]->AddMax_Lambda_Inv(Lambda);
 
     /*--- Determine the viscous spectral radius and apply it to the control volume ---*/
-    //MANGOTURB
+    /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
     if(rans){
       su2double Prandtl_Turb = config->GetPrandtl_Turb();
       Mean_EddyVisc    = 0.5*(node[iPoint]->GetEddyViscosity() + node[jPoint]->GetEddyViscosity());
@@ -5175,7 +5147,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
       Lambda_2 = Mean_ThermalCond/Mean_CV;
     }
 
-    //DEBUGTIME
+    /*--- MANGOTURB: Debug structure 17 ---*/
     if(config->Get_debug_time()){
 
     std::cout<<" --------------Viscid--------------- "<<std::endl;
@@ -5224,7 +5196,7 @@ void CReactiveNSSolver::SetTime_Step(CGeometry* geometry, CSolver** solver_conta
           node[iPoint]->AddMax_Lambda_Inv(Lambda);
 
         /*--- Viscous contribution ---*/
-        //MANGOTURB
+        /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
         if(rans){
           su2double Prandtl_Turb = config->GetPrandtl_Turb();
           Mean_EddyVisc    = node[iPoint]->GetEddyViscosity();
@@ -5363,7 +5335,7 @@ void CReactiveNSSolver::Viscous_Residual(CGeometry* geometry, CSolver** solver_c
     /*--- Set species binary diffusion coefficients at node i and j ---*/
     numerics->SetDiffusionCoeff(node[iPoint]->GetDiffusionCoeff(), node[jPoint]->GetDiffusionCoeff());
 
-    //MANGOTURB
+    /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
     /*--- Set values of adimensional turbolent kinetic energies and eddy viscosities into numerics class ---*/
     if (config->GetKind_Turb_Model() == SST){
       numerics->SetTurbKineticEnergy(solver_container[TURB_SOL]->node[iPoint]->GetSolution(0),
@@ -5433,7 +5405,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
     su2double dij, Area;
     su2double Normal[nDim], UnitNormal[nDim];
 
-    //MANGOTURB
+    /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
     bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
     RealVec aux_enthalpy,aux_Cp;
     su2double Prandtl_Turb = config->GetPrandtl_Turb();
@@ -5452,7 +5424,6 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
     /*--- Retrieve the specified wall temperature ---*/
     Twall = config->GetIsothermal_Temperature(Marker_Tag)/config->GetTemperature_Ref();
 
-    //MANGOTURB
     dim_temp =Twall*config->GetTemperature_Ref();
 
     if(US_System)
@@ -5518,8 +5489,8 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
         /*--- Apply a weak boundary condition for the energy equation.
         Compute the residual due to the prescribed heat flux. ---*/
 
-        //MANGOTURB
-        /*--- Full Turbolent closure ---*/
+        /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
+        /*--- Full Turbolent closure: part commented out implmented but eventually not tested in the final algorithm ---*/
         if(rans){
           turb_closure = 0.0;
           turb_ktr = 0.0;
@@ -5538,11 +5509,11 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
           turb_closure += eddy_v/Prandtl_Turb*(std::accumulate(aux_Cp.cbegin(),aux_Cp.cend(),0.0)/nSpecies)*
                           (Twall - Tj)/dij;
 
-          //
+
           for( unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies){
-            //
+
             // su2double *rho_s_grad = solver_container[FLOW_SOL]->node[iPoint]->GetGradient()[RHOS_INDEX_SOL+iSpecies];
-            // //
+
             //    turb_closure += eddy_v/(Prandtl_Turb+Lewis_Turb)*aux_enthalpy[iSpecies]*std::inner_product(
             //      rho_s_grad,rho_s_grad+nDim,UnitNormal,0.0);
             //
@@ -5553,7 +5524,8 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
             // turb_ktr += eddy_v/(Prandtl_Turb+Lewis_Turb)*aux_Cp[iSpecies]*aux_ys*std::inner_product(
             //     rho_s_grad,rho_s_grad+nDim,UnitNormal,0.0);
           }
-          //DEBUGVISCOUS
+
+          /*--- MANGOTURB: Debug structure 18 --*/
           if(config->Get_debug_visc_bound()){
 
             std::cout<<" --------------BC Isothermal--------------- "<<std::endl;
@@ -5627,7 +5599,7 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
           for(iDim = 0; iDim < nDim; iDim++) {
             /*--- Compute tau---*/
 
-            //MANGOTURB
+            /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
             if(rans){
               mu += node[iPoint]->GetEddyViscosity();
               su2double tke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);
@@ -5743,7 +5715,6 @@ void CReactiveNSSolver::BC_HeatFlux_Wall(CGeometry* geometry, CSolver** solver_c
     /*--- Local variables ---*/
     unsigned short iDim, iVar, jVar;
     unsigned long iVertex, iPoint, Point_Normal;
-    //MANGOTURB
     bool rans = (config->GetKind_Solver() == REACTIVE_RANS);
 
 
@@ -5816,7 +5787,7 @@ void CReactiveNSSolver::BC_HeatFlux_Wall(CGeometry* geometry, CSolver** solver_c
           su2double tau[nDim][nDim];
           for(iDim = 0; iDim < nDim; iDim++) {
             /*--- Compute tau---*/
-            //MANGOTURB
+            /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
             if(rans){
               mu += node[iPoint]->GetEddyViscosity();
               su2double tke = solver_container[TURB_SOL]->node[iPoint]->GetSolution(0);

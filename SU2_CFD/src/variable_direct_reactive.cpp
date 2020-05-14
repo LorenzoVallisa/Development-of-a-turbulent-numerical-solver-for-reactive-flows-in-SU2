@@ -283,7 +283,7 @@ bool CReactiveEulerVariable::SetPrimVar(CConfig* config) {
 
 
 
-//MANGOTURB
+/*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
 //
 //
 /*--- Set primitive variables ---*/
@@ -541,7 +541,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   return nonPhys;
 }
 
-//MANGOTURB-//DUBBI
+/*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
 //
 //
 /*--- Pass from conserved to primitive variables ---*/
@@ -761,7 +761,7 @@ bool CReactiveEulerVariable::Cons2PrimVar(CConfig* config, su2double* U, su2doub
   /*--- Enthalpy ---*/
   V[H_INDEX_PRIM] = (U[RHOE_INDEX_SOL] + V[P_INDEX_PRIM])/rho;
 
-  //DEBUGPRIMVAR
+  /*--- MANGOTURB: Debug structure 22 ---*/
   if(config->Get_debug_primvar()){
 
   std::cout<<" --------------Cons2PrimVar--------------- "<<std::endl;
@@ -1029,7 +1029,7 @@ CReactiveNSVariable::CReactiveNSVariable(su2double* val_solution, unsigned short
   Diffusion_Coeffs.resize(nSpecies,nSpecies);
 }
 
-//MANGOTURB
+/*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
 //
 //
 /*--- Set Vorticity ---*/
@@ -1051,7 +1051,7 @@ bool CReactiveNSVariable::SetVorticity(bool val_limiter) {
 }
 
 
-//MANGOTURB
+/*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
 //
 //
 /*--- Set StrainMag ---*/
@@ -1097,7 +1097,7 @@ bool CReactiveNSVariable::SetStrainMag(bool val_limiter) {
 }
 
 
-//MANGOTURB
+/*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
 //
 //
 //
@@ -1126,7 +1126,7 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config, su2double val_ke) {
   if(US_System)
     Diffusion_Coeffs *= 3.28084*3.28084;
 
-    //DEBUGPRIMVAR
+    /*--- MANGOTURB: Debug structure 23 ---*/
     if(config->Get_debug_primvar()){
 
     std::cout<<" --------------SetPrimVar--------------- "<<std::endl;
@@ -1179,7 +1179,7 @@ bool CReactiveNSVariable::SetPrimVar(CConfig* config) {
   return nonPhys;
 }
 
-//MANGOTURB
+/*--- MANGOTURB: Auxialiary method needed to retrieve turbulent formulation within the laminar reactive one ---*/
 //
 //
 /*--- Set primitive and turbulent variables ---*/
@@ -1189,7 +1189,7 @@ bool CReactiveNSVariable::SetPrimVar(su2double eddy_visc, su2double turb_ke,CCon
   /*--- Convert conserved to primitive variables using Euler version since primitives are the same ---*/
   bool nonPhys = CReactiveEulerVariable::SetPrimVar(config,turb_ke);
 
-  //MANGOTURB
+  /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
   SetEddyViscosity(eddy_visc);
 
   su2double dim_temp, dim_press;
@@ -1213,7 +1213,7 @@ bool CReactiveNSVariable::SetPrimVar(su2double eddy_visc, su2double turb_ke,CCon
   if(US_System)
     Diffusion_Coeffs *= 3.28084*3.28084;
 
-    //DEBUGPRIMVAR
+    /*--- MANGOTURB: Debug structure 24 ---*/
     if(config->Get_debug_primvar()){
 
     std::cout<<" --------------SetPrimVar--------------- "<<std::endl;

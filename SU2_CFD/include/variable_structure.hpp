@@ -128,7 +128,9 @@ public:
    */
   void SetSolution(unsigned short val_var, su2double val_solution);
 
-  //MANGOTURB
+  /*!
+   * \brief Set sigma_k.
+   */
   virtual su2double Get_Sigmak(void) const {};
 
   /*!
@@ -1018,10 +1020,10 @@ public:
    */
   virtual bool SetPrimVar(CConfig *config);
 
-  // //MANGOTURB
-  // virtual bool SetPrimVar(CConfig* config,su2double eddy_visc, su2double turb_ke){return true;};
-
-  //MANGOTURB
+  /*--- MANGOTURB : turbulent add-on ---*/
+  /*!
+   * \brief A virtual member.
+   */
   virtual bool SetPrimVar(CConfig* config,su2double val_ke){return true;};
   /*!
    * \brief A virtual member.
@@ -3756,7 +3758,6 @@ class CTurbSSTVariable : public CTurbVariable {
 protected:
   su2double sigma_om2,
   beta_star;
-  //MANGOTURB
   su2double sigma_k;
   su2double F1,    /*!< \brief Menter blending function for blending of k-w and k-eps. */
   F2,            /*!< \brief Menter blending function for stress limiter. */

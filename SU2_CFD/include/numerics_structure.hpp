@@ -67,15 +67,10 @@ protected:
   su2double *Enthalpy_formation;
   su2double Prandtl_Lam;        /*!< \brief Laminar Prandtl's number. */
   su2double Prandtl_Turb;    /*!< \brief Turbulent Prandtl's number. */
-  //MANGOTURB
   su2double C_mu;  /*!< \brief Turbulent constant. */
-  //MANGOTURB
   su2double omega_turb; /*!< \brief Auxiliary variable needed for chemistry source closure. */
-  //MANGOTURB
   su2double Lewis_Turb; /*!< \brief Auxiliary variable needed for chemistry source closure. */
-  //MANGOTURB
   su2double sigma_k; /*!< \brief Auxiliary variable needed for energy closure. */
-  //MANGOTURB
   su2double *Grad_Tke_i;
   su2double *Grad_Tke_j;
 
@@ -298,7 +293,7 @@ protected:
    */
   void SetConservative(su2double *val_u_i, su2double *val_u_j);
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
   /*!
    * \brief Add turbolent closure for chemistry source term
    * \param[out] omega - solution of turbolent problem closure
@@ -307,11 +302,11 @@ protected:
     omega_turb = omega;
   }
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
   /*!
-   * \brief Set the value of the conservative variables.
-   * \param[in] val_u_i - Value of the conservative variable at point i.
-   * \param[in] val_u_j - Value of the conservative variable at point j.
+   * \brief Set the value of the gradients of tke variables.
+   * \param[in] grad_tke_i - Value of the gradients of tke variable at point i.
+   * \param[in] grad_tke_j - Value of the gradients of tke variable at point j.
    */
   void Set_GradTKE(su2double *grad_tke_i, su2double *grad_tke_j){
     Grad_Tke_i = grad_tke_i;
@@ -486,11 +481,11 @@ protected:
    */
   virtual void SetF2blending(su2double val_F1_i, su2double val_F1_j) {/* empty */};
 
-  //MANGOTURB
+  /*--- MANGOTURB: Turbulent add-on ---*/
   /*!
    * \brief Set the value of the second blending function.
-   * \param[in] val_F1_i - Value of the second Menter blending function at point i.
-   * \param[in] val_F1_j - Value of the second Menter blending function at point j.
+   * \param[in] eddy_visc
+   * \param[in] temp - Temperature.
    */
   virtual su2double Get_HeatFactor(const su2double eddy_visc,const su2double temp){};
 
@@ -524,7 +519,9 @@ protected:
   void SetLaminarViscosity(su2double val_laminar_viscosity_i,
                            su2double val_laminar_viscosity_j);
 
-  //MANGOTURB
+  /*!
+  * \brief Set sigma_k
+  */
   su2double Set_Sigmak( const su2double o_k){
     sigma_k = o_k;
   }

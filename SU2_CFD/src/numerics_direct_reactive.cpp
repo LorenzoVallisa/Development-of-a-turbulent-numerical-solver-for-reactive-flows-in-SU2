@@ -391,7 +391,7 @@ CAvgGradReactive_Boundary::CAvgGradReactive_Boundary(unsigned short val_nDim, un
   nPrimVar = nSpecies + nDim + 5;
   nPrimVarAvgGrad = nSpecies + nDim + 1;
 
-  //MANGOTURB
+  /*--- MANGOTURB: Extracting Lewis number  ---*/
   if (config->GetKind_Turb_Model() == SST){
 
     Lewis_Turb = config -> GetLewis_Turb();
@@ -470,7 +470,6 @@ void CAvgGradReactive_Boundary::Solve_SM(const su2double val_density, const su2d
 }
 
 
-//MANGOTURB
 //
 //
 /*--- Compute residual for the viscous part for boundary conditions----*/
@@ -515,9 +514,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
   }
 
 
-
-  //MANGOTURB_init
-  /*--- Set the laminar component of viscous residual tensor ---*/
+  /*--- MANGOTURB: Set the laminar component of viscous residual tensor ---*/
   SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     Mean_Laminar_Viscosity, Mean_Thermal_Conductivity,
     Mean_Dij,config);
@@ -537,7 +534,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
           Mean_GradTKEVar(jDim) = 0.5*(Grad_Tke_i[jDim] + Grad_Tke_j[jDim]);
 
 
-
+    /*--- Turbulent closure for flux term  ---*/
     SST_Reactive_ResidualClosure(Mean_GradTKEVar,Mean_PrimVar,Mean_GradPrimVar,Normal,Mean_Eddy_Viscosity,Mean_Turbolent_KE,Mean_Laminar_Viscosity,config);
 
   }
@@ -549,9 +546,6 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     Proj_Flux_Tensor[RHOE_INDEX_SOL] += Flux_Tensor[RHOE_INDEX_SOL][iDim]*Normal[iDim];
   }
 
-
-
-  //MANGOTURB-end
 
 
   /*--- Update viscous residual with the species projected flux ---*/
@@ -602,8 +596,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     /*--- Compute effective normal gradient of mole fractions ---*/
     Grad_Xs_norm /= Area;
 
-    //MANGOTURB
-    /*--- Build auxiliary matrices for jacobian components ---*/
+    /*--- MANGOTURB: Build auxiliary matrices for jacobian components ---*/
     AuxMatrix dFdVi(nVar,RealVec(nVar));
     AuxMatrix dFdVj(nVar,RealVec(nVar));
     AuxMatrix dVdUi(nVar,RealVec(nVar));
@@ -622,6 +615,7 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
       Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
       Mean_Turbolent_KE = 0.5*(turb_ke_i + turb_ke_j);
 
+      /*--- Jacobian implementation for viscous closure ---*/
       SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity,config);
 
     }
@@ -653,11 +647,10 @@ void CAvgGradReactive_Boundary::ComputeResidual(su2double* val_residual, su2doub
     }
   }
 
-
-//MANGOTURB
+/*--- MANGOTURB: Auxialiary method to combine laminar reactive solver with turbulent one
 //
 //
-/*--- Build the closure for residual tensor of viscous residaul ---*/
+/*--- Build the closure for tensor of viscous residaul ---*/
 //
 //
 void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tkegradvar,const Vec& Mean_PrimVar,const RealMatrix& Mean_GradPrimVar, su2double* Normal,
@@ -686,21 +679,19 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
     }
 
 
-      //DEBUGVISCOUS
+        /*--- MANGOTURB: Debug strucutre 1  ---*/
       if(config->Get_debug_visc_flow()){
 
+        std::cout<<" --------------Laminar Flux_Tensor--------------- "<<std::endl;
 
+        for (jDim = 0 ; jDim < nDim; jDim++){
+          for (iDim = 0 ; iDim < nDim; iDim++){
+            std::cout<<Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim]<<"   -   ";
+          }
+          std::cout<<std::endl;
+        }
 
-        // std::cout<<" --------------Laminar Flux_Tensor--------------- "<<std::endl;
-        // //
-        // for (jDim = 0 ; jDim < nDim; jDim++){
-        //   for (iDim = 0 ; iDim < nDim; iDim++){
-        //     std::cout<<Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim]<<"   -   ";
-        //   }
-        //   std::cout<<std::endl;
-        // }
-        //
-        // std::cout<<Flux_Tensor[RHOE_INDEX_SOL][0]<<"   -   "<<Flux_Tensor[RHOE_INDEX_SOL][1]<<std::endl;
+        std::cout<<Flux_Tensor[RHOE_INDEX_SOL][0]<<"   -   "<<Flux_Tensor[RHOE_INDEX_SOL][1]<<std::endl;
 
       }
 
@@ -717,18 +708,18 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
     }
 
 
-    //DEBUGVISCOUS
+      /*--- MANGOTURB: Debug strucutre 2  ---*/
     if(config->Get_debug_visc_flow()){
 
 
 
       std::cout<<" --------------Turbolent add-on--------------- "<<std::endl;
 
-      // std::cout<<" rho -----------> "<<rho<<std::endl;
-      // std::cout<<" TKE -----------> "<<Mean_Turbolent_KE<<std::endl;
-      // std::cout<<" Cp -----------> "<<std::accumulate(Cps.cbegin(),Cps.cend(),0.0)/nSpecies<<std::endl;
-      // std::cout<<" PrT -----------> "<<Prandtl_Turb<<std::endl;
-      // std::cout<<" mu_t -----------> "<<Mean_Eddy_Viscosity<<std::endl;
+      std::cout<<" rho -----------> "<<rho<<std::endl;
+      std::cout<<" TKE -----------> "<<Mean_Turbolent_KE<<std::endl;
+      std::cout<<" Cp -----------> "<<std::accumulate(Cps.cbegin(),Cps.cend(),0.0)/nSpecies<<std::endl;
+      std::cout<<" PrT -----------> "<<Prandtl_Turb<<std::endl;
+      std::cout<<" mu_t -----------> "<<Mean_Eddy_Viscosity<<std::endl;
       std::cout<<" T_Grad -----------> "<<Mean_GradPrimVar(T_INDEX_AVGGRAD,0)<<"   -   "
                 <<Mean_GradPrimVar(T_INDEX_AVGGRAD,1)<<std::endl;
       std::cout<<" Velocities -----------> "<<Mean_PrimVar[VX_INDEX_PRIM]<<"   -   "
@@ -744,10 +735,8 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
 
     su2double temp = Mean_PrimVar[T_INDEX_PRIM]*config->GetTemperature_Ref();
 
-
-
+      /*--- MANGOTURB: Retrieving mass fractions gradients   ---*/
     RealMatrix M_tilde = Get_Molar2MassGrad_Operator();
-
     Mean_Mass_Grads.resize(nSpecies,nDim);
 
     for( iDim = 0; iDim < nDim; ++iDim)
@@ -761,7 +750,7 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
         }
 
 
-    //DEBUGVISCOUS
+    /*--- MANGOTURB: Debug strucutre 3  ---*/
     if(config->Get_debug_visc_flow()){
       std::cout<<"------------MassGrad CHECK---------------"<<std::endl;
 
@@ -790,39 +779,39 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
     }
 
 
+    /*--- MANGOTURB: Flux closure using full theoretical closure  ---*/
 
+    /*--- Closure for Reynolds stress tensor ---*/
     for( iDim = 0; iDim < nDim; ++iDim) {
 
       for( jDim = 0; jDim < nDim; ++jDim) {
-
-
         Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim] += tau_turb(iDim,jDim);
         Flux_Tensor[RHOE_INDEX_SOL][iDim] += tau_turb(iDim,jDim)*Mean_PrimVar[VX_INDEX_PRIM + jDim];
       }
 
-      /*--- Closure for species using molar fractions as approximation ---*/
+      /*--- Closure for species using mass fractions ---*/
       for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
          Proj_Flux_Tensor[RHOS_INDEX_SOL + iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*
-         Mean_Mass_Grads(iSpecies,iDim)* Normal[iDim]; //*(molar_masses[iSpecies]/M_tot); //*(molar_masses[iSpecies]/M_tot);
+         Mean_Mass_Grads(iSpecies,iDim)* Normal[iDim];
        }
-      // //
-      // //
-      // // // /*--- Fick's law partial densities closure --*/
+
+       /*--- Fick's law partial densities closure --*/
        for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
          Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb) *
-                                       hs[iSpecies]*Mean_Mass_Grads(iSpecies,iDim);//*(molar_masses[iSpecies]/M_tot);
+                                       hs[iSpecies]*Mean_Mass_Grads(iSpecies,iDim);
        }
-      // //
-      // /*--- Fick's law partial sensible enthalpies closure --*/
+
+      /*--- Fick's law partial sensible enthalpies closure --*/
       Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/Prandtl_Turb*(std::accumulate(Cps.cbegin(),Cps.cend(),0.0)/nSpecies)*
                                          Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim);
-      //
-      // // /*--- Wilcox closure for turbolent ke and main stresses turbolent transport term --*/
+
+      /*--- Wilcox closure for turbolent ke and main stresses turbolent transport term --*/
       Flux_Tensor[RHOE_INDEX_SOL][iDim] += (Mean_Laminar_Viscosity + Mean_Eddy_Viscosity/sigma_k) * mean_tkegradvar(iDim);
 
 
     }
-    //DEBUGVISCOUS
+
+    /*--- MANGOTURB: Debug strucutre 4  ---*/
     if(config->Get_debug_visc_flow()){
 
       std::cout<<" --------------Variable for residual closure--------------- "<<std::endl;
@@ -841,16 +830,16 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
       std::cout<<" TKE gradients --------------->  "<<mean_tkegradvar(0)<<"   -   "<<mean_tkegradvar(1)<<std::endl;
 
 
-      // std::cout<<" --------------Laminar+Turbolent Flux_Tensor--------------- "<<std::endl;
-      //
-      // for (jDim = 0 ; jDim < nDim; jDim++){
-      //   for (iDim = 0 ; iDim < nDim; iDim++){
-      //     std::cout<<Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim]<<"   -   ";
-      //   }
-      //   std::cout<<std::endl;
-      // }
-      //
-      // std::cout<<Flux_Tensor[RHOE_INDEX_SOL][0]<<"   -   "<<Flux_Tensor[RHOE_INDEX_SOL][1]<<std::endl;
+      std::cout<<" --------------Laminar and Turbolent Flux_Tensor--------------- "<<std::endl;
+
+      for (jDim = 0 ; jDim < nDim; jDim++){
+        for (iDim = 0 ; iDim < nDim; iDim++){
+          std::cout<<Flux_Tensor[RHOVX_INDEX_SOL + jDim][iDim]<<"   -   ";
+        }
+        std::cout<<std::endl;
+      }
+
+      std::cout<<Flux_Tensor[RHOE_INDEX_SOL][0]<<"   -   "<<Flux_Tensor[RHOE_INDEX_SOL][1]<<std::endl;
 
     }
 
@@ -858,10 +847,9 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
 
 
 
-  //MANGOTURB
+  /*--- MANGOTURB: Auxialiary method to retrieve Mass gradients using Giovangigli algorithm --- */
   //
   //
-  /*--- Build the closure for Jacobian tensor of viscous residaul ---*/
   //
   //
   Eigen::MatrixXd CAvgGradReactive_Boundary::Get_Molar2MassGrad_Operator(){
@@ -888,7 +876,7 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
 
 
 
-//MANGOTURB
+/*--- MANGOTURB: Auxialiary method to combine laminar reactive solver with turbulent one
 //
 //
 /*--- Build the closure for Jacobian tensor of viscous residaul ---*/
@@ -904,11 +892,8 @@ su2double theta = std::inner_product(UnitNormal, UnitNormal + nDim, UnitNormal, 
 RealVec molar_masses = library->GetMolarMasses();
 su2double M_tot = std::accumulate(molar_masses.begin(),molar_masses.end(),0.0);
 su2double temp = Mean_PrimVar[T_INDEX_PRIM]*config->GetTemperature_Ref();
-//su2double heat_flux_factor = Get_HeatFactor(Mean_Eddy_Viscosity,temp);
 su2double sqrt_dist_ij_2=std::sqrt(dist_ij_2);
 
-//QUI
-//Parte aggiuntiva da chiusura derivata frazione molare Orlando
 su2double rho_i = V_i[RHO_INDEX_PRIM];
 su2double rho_j = V_j[RHO_INDEX_PRIM];
 su2double sigma_i = std::accumulate(Xs_i.cbegin(), Xs_i.cend(), 0.0);
@@ -928,9 +913,9 @@ if(nDim == 2) {
 
   /*--- Populate primitive Jacobian ---*/
 
-  // Momentum : Tau_Reynolds
+  /*--- Momentum : Tau_Reynolds ---*/
 
-  // X-momentum
+  /*--- X-momentum - Commented out since implemented but eventually not tested ---*/
   // dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
   // dFdVi[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
 
@@ -939,7 +924,7 @@ if(nDim == 2) {
   dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] -= Mean_Eddy_Viscosity*thetax/sqrt_dist_ij_2*Area;
   dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
 
-  // Y-momentum(2D)
+  /*--- Y-momentum - Commented out since implemented but eventually not tested ---*/
   // dFdVj[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
   // dFdVi[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
 
@@ -948,47 +933,24 @@ if(nDim == 2) {
   dFdVi[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] -= Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
   dFdVi[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*thetay/sqrt_dist_ij_2*Area;
 
-  // Energy : Tau_Reynolds(2D)
+  /*--- Energy : Tau_Reynolds ---*/
   dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
   dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
   dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] -= pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
   dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
 
-  // Species: Fick's law partial densities
+  /*--- In the following MASS CLOSURE are the original turbulent closure, the one eventually used in the algorithm ---*/
+
   for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-    //
-    //   //SENSIBLE TERM(2D)
+
+    /*--- Energy - Energy term ---*/
     dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
     dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] -= Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
-    //
-    //
+
+
     for( unsigned int jSpecies = 0; jSpecies < nSpecies; ++jSpecies){
 
-
-
-
-      // MOLAR CLOSURE
-      // dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
-      // Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/sqrt_dist_ij_2*Area*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*
-      // M_tot/molar_masses[iSpecies]*sigma_j/rho_j);
-      //
-      // dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
-      // Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*theta/sqrt_dist_ij_2*Area*(Xs_i[iSpecies]/sigma_i/rho_i +(iSpecies==jSpecies)*
-      // M_tot/molar_masses[iSpecies]*sigma_i/rho_i);
-      // //
-      //
-      // // MOLAR CLOSURE
-      // dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*
-      // Area*(Xs_j[iSpecies]/sigma_j/rho_j +(iSpecies==jSpecies)*M_tot/molar_masses[iSpecies]*sigma_j/rho_j);
-      //
-      // dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +jSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*theta/sqrt_dist_ij_2*
-      // Area*(Xs_i[iSpecies]/sigma_i/rho_i +(iSpecies==jSpecies)*M_tot/molar_masses[iSpecies]*sigma_i/rho_i);
-
-
-      // //SPECIES TERM(2D)
-      /*--- Partial mass fractions are independent quantities ---*/
-
-      //MASS CLOSURE
+      /*--- MASS CLOSURE: Species-Species Term ---*/
       dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
       (iSpecies==jSpecies)*Mean_Eddy_Viscosity*Ys[iSpecies]/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
 
@@ -997,32 +959,12 @@ if(nDim == 2) {
 
     }
 
-    //MASS CLOSURE
+    /*--- MASS CLOSURE: Energy - Species Term ---*/
     dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*Ys[iSpecies]/rho_j*
     theta/sqrt_dist_ij_2*Area;
 
     dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*Ys[iSpecies]/rho_i*
     theta/sqrt_dist_ij_2*Area;
-
-
-
-// // DERIVATA RISPETTO A SOLA DENSITA - MASS CLOSURE
-// dFdVj[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] -=
-//   Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(rho_j*rho_j)*(rho_j*Ys[iSpecies])*
-//                               theta/sqrt_dist_ij_2*Area;
-//
-// dFdVi[RHOS_INDEX_SOL + iSpecies][RHO_INDEX_SOL] +=
-//   Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(rho_i*rho_i)*(rho_i*Ys[iSpecies])*
-//                               theta/sqrt_dist_ij_2*Area;
-
-// DERIVATA RISPETTO A SOLA DENSITA - MASS CLOSURE
-// dFdVj[RHOE_INDEX_SOL][RHO_INDEX_SOL] -=
-//   Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(rho_j*rho_j)*(rho_j*Ys[iSpecies])*hs[iSpecies]
-//                               theta/sqrt_dist_ij_2*Area;
-//
-// dFdVi[RHOE_INDEX_SOL][RHO_INDEX_SOL] +=
-//   Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/(rho_i*rho_i)*(rho_i*Ys[iSpecies])*hs[iSpecies]
-//                               theta/sqrt_dist_ij_2*Area;
 
 }
 
@@ -1046,9 +988,12 @@ if(nDim == 2) {
     Mean_PrimVar[VX_INDEX_PRIM + 2]*thetaz;
 
     /*--- Populate primitive Jacobian ---*/
-    // X-momentum
-    dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
-    dFdVi[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
+
+    /*--- Momentum : Tau_Reynolds ---*/
+
+    /*--- X-momentum - Commented out since implemented but eventually not tested ---*/
+    // dFdVj[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
+    // dFdVi[RHOVX_INDEX_SOL][RHO_INDEX_SOL] += -(2/3)*UnitNormal[0]*Mean_Turbolent_KE*Area;
 
     dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*thetax/sqrt_dist_ij_2*Area;
     dFdVj[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
@@ -1057,9 +1002,9 @@ if(nDim == 2) {
     dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
     dFdVi[RHOVX_INDEX_SOL][RHOVX_INDEX_SOL + 2] -= Mean_Eddy_Viscosity*etay/sqrt_dist_ij_2*Area;
 
-    // Y-momentum
-    dFdVj[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
-    dFdVi[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
+    /*--- Y-momentum - Commented out since implemented but eventually not tested ---*/
+    // dFdVj[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
+    // dFdVi[RHOVX_INDEX_SOL+1][RHO_INDEX_SOL] += -(2/3)*UnitNormal[1]*Mean_Turbolent_KE*Area;
 
 
     dFdVj[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*etaz/sqrt_dist_ij_2*Area;
@@ -1069,9 +1014,9 @@ if(nDim == 2) {
     dFdVi[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*thetay/sqrt_dist_ij_2*Area;
     dFdVi[RHOVX_INDEX_SOL + 1][RHOVX_INDEX_SOL + 2] -=Mean_Eddy_Viscosity*etax/sqrt_dist_ij_2*Area;
 
-    // Z-momentum
-    dFdVj[RHOVX_INDEX_SOL+2][RHO_INDEX_SOL] += -(2/3)*UnitNormal[2]*Mean_Turbolent_KE*Area;
-    dFdVi[RHOVX_INDEX_SOL+2][RHO_INDEX_SOL] += -(2/3)*UnitNormal[2]*Mean_Turbolent_KE*Area;
+    /*--- Z-momentum - Commented out since implemented but eventually not tested ---*/
+    // dFdVj[RHOVX_INDEX_SOL+2][RHO_INDEX_SOL] += -(2/3)*UnitNormal[2]*Mean_Turbolent_KE*Area;
+    // dFdVi[RHOVX_INDEX_SOL+2][RHO_INDEX_SOL] += -(2/3)*UnitNormal[2]*Mean_Turbolent_KE*Area;
 
 
     dFdVj[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL] += Mean_Eddy_Viscosity*etay/sqrt_dist_ij_2*Area;
@@ -1081,7 +1026,7 @@ if(nDim == 2) {
     dFdVi[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 1] -= Mean_Eddy_Viscosity*etax/sqrt_dist_ij_2*Area;
     dFdVi[RHOVX_INDEX_SOL + 2][RHOVX_INDEX_SOL + 2] -=Mean_Eddy_Viscosity*thetaz/sqrt_dist_ij_2*Area;
 
-    // Energy
+    /*--- Energy - Energy term ---*/
     dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
     dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
     dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 2] += piz*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
@@ -1089,7 +1034,8 @@ if(nDim == 2) {
     dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
     dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 2] -= piz*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
 
-    // Species: Fick's law partial densities
+    /*--- In the following MASS CLOSURE are the original turbulent closure, the one eventually used in the algorithm ---*/
+
     for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
 
 
@@ -1102,8 +1048,7 @@ if(nDim == 2) {
 
 
 
-        //SPECIES TERM
-        /*--- Partial mass fractions are independent quantities ---*/
+        /*--- MASS CLOSURE: Species-Species Term ---*/
         dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
         Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
 
@@ -1113,7 +1058,7 @@ if(nDim == 2) {
 
       }
 
-      // H-Y TERM (Termine beta) (2D)
+      /*--- MASS CLOSURE: Eenrgy-Species Term ---*/
       dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]/rho_j*
       theta/sqrt_dist_ij_2*Area;
 
@@ -1127,40 +1072,19 @@ if(nDim == 2) {
   } /*--- End of nDim = 3 ---*/
 
 
-  // MASS CLOSURE
+  /*--- MASS CLOSURE: Common closure term involving energy  ---*/
   for (iSpecies = 0; iSpecies<nSpecies ; iSpecies ++){
       su2double aux_sum_1=std::inner_product(Mean_Mass_Grads.row(iSpecies).data(),
                                       Mean_Mass_Grads.row(iSpecies).data()+nDim,UnitNormal ,0.0);
-      dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*aux_sum_1*Area; //*(molar_masses[iSpecies]/M_tot); //
-      dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*aux_sum_1*Area; //*(molar_masses[iSpecies]/M_tot); //
+      dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*aux_sum_1*Area;
+      dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*aux_sum_1*Area;
   }
-
-  //MOLAR CLOSURE
-  // for (iSpecies = 0; iSpecies<nSpecies ; iSpecies ++){
-  //   su2double aux_sum_1=std::inner_product(Mean_GradPrimVar.row(RHOS_INDEX_AVGGRAD+iSpecies).data(),
-  //   Mean_GradPrimVar.row(RHOS_INDEX_AVGGRAD+iSpecies).data()+nDim,UnitNormal ,0.0);
-  //   dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*aux_sum_1*Area;
-  //   dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*aux_sum_1*Area;
-  // }
-
-  //DEBUGVISCOUS
-  if(config->Get_debug_visc_flow()){
-    //
-    //
-    // std::cout<<" --------------Variable for residual closure--------------- "<<std::endl;
-    //
-    // std::cout<<" Species--------------->  "<<Ys[0]<<"  -   "<<Ys[1]<<"   -   "<<Ys[2]<<std::endl;
-    //for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
-
-  }
-
-
 
 
 }
 
 
-//MANGOTURB
+/*--- MANGOTURB: Auxialiary method to combine laminar reactive solver with turbulent one
 //
 //
 /*--- Set the laminar component of viscous residual tensor ---*/
@@ -1261,7 +1185,7 @@ void CAvgGradReactive_Boundary::SetLaminarTensorFlux(const Vec& val_primvar, con
 
 
 
-//MANGOTURB
+/*--- MANGOTURB: Auxialiary method to combine laminar reactive solver with turbulent one
 //
 //
 /*--- Compute approximate Jacobian of projected viscous flux. ---*/
@@ -1487,7 +1411,6 @@ CAvgGradReactive_Flow::CAvgGradReactive_Flow(unsigned short val_nDim, unsigned s
   limiter = config->GetViscous_Limiter_Flow();
 }
 
-//MANGOTURB
 //
 //
 /*--- Compute residual for the viscous part at interface between two nodes. ----*/
@@ -1593,7 +1516,7 @@ else
 throw std::runtime_error("Error: You are trying to compute flux between a node and itself");
 
 
-//MANGOTURB_init
+
 /*--- Set the laminar component of viscous residual tensor ---*/
 SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
   Mean_Laminar_Viscosity, Mean_Thermal_Conductivity,
@@ -1623,9 +1546,9 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     Proj_Flux_Tensor[iVar] += Flux_Tensor[iVar][iDim]*Normal[iDim];
     Proj_Flux_Tensor[RHOE_INDEX_SOL] += Flux_Tensor[RHOE_INDEX_SOL][iDim]*Normal[iDim];
   }
-  //MANGOTURB-end
 
-  //DEBUGVISCOUS
+
+  /*--- MANGOTURB: Debug structure 5 ---*/
   if(config->Get_debug_visc_flow()){
     //
     std::cout<<" --------------FLOW Proj_Flux_Tensor--------------- "<<std::endl;
@@ -1680,8 +1603,7 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
     /*--- Compute normal gradient of mole fractions ---*/
     Grad_Xs_norm /= Area;
 
-    //MANGOTURB
-    /*--- Build auxiliary matrices for jacobian components ---*/
+      /*--- Build auxiliary matrices for jacobian components ---*/
     AuxMatrix dFdVi(nVar,RealVec(nVar));
     AuxMatrix dFdVj(nVar,RealVec(nVar));
     AuxMatrix dVdUi(nVar,RealVec(nVar));
@@ -1697,6 +1619,7 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
         su2double Mean_Eddy_Viscosity, Mean_Turbolent_KE;
         Mean_Eddy_Viscosity = 2.0/(1.0/Eddy_Viscosity_i + 1.0/Eddy_Viscosity_j);
         Mean_Turbolent_KE = 0.5*(turb_ke_i + turb_ke_j);
+
         SST_Reactive_JacobianClosure(UnitNormal,Mean_PrimVar,Mean_Turbolent_KE,Area,Mean_Eddy_Viscosity,dist_ij_2,dFdVi,dFdVj,Mean_Laminar_Viscosity,config);
        }
 
@@ -1723,7 +1646,7 @@ SetLaminarTensorFlux(Mean_PrimVar, Mean_GradPrimVar, Normal,
         }
       }
 
-      //DEBUGVISCOUS
+      /*--- MANGOTURB: Debug Structure 6 ---*/
       if(config->Get_debug_visc_flow()){
 
         std::cout<<" --------------FLOW Jacobian_i--------------- "<<std::endl;
@@ -1820,7 +1743,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
     dim_rho *= 3.28084*3.28084*3.28084/0.0685218;
   }
 
-  // MANGOTURB
+    /*--- MANGOTURB: Auxialiary method to combine laminar reactive solver with turbulent one
    /*--- Initializing double tensor species-reactions through library method ---*/
    library -> SetSourceTerm(dim_temp, dim_rho, Ys);
 
@@ -1831,6 +1754,8 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
      /*--- Initializing double tensor derivative of reaction source term w.r.t. species through library method ---*/
      library -> Set_DfrDrhos(dim_temp, dim_rho);
      double PaSR_lb = config-> Get_PaSR_LB();
+
+     /*--- Obtaining the PaSR constant ---*/
      library->AssemblePaSRConstant(omega_turb,C_mu,PaSR_lb);
 
      omega.resize(Ys.size(),0.0);
@@ -1849,20 +1774,23 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
 
    }
 
-   //DEBUGVISCOUS
+   /*--- MANGOTURB: Debug structure 7 ---*/
    if(config->Get_debug_source()){
 
-     // std::cout<<" --------------------OMEGA--------------"<<std::endl;
-     // // for (const auto & val:omega)
-     // //      std::cout<<val<<"   -   ";
-     // // std::cout<<std::endl;
-     // for (unsigned int i = 0; i< omega.size(); i++)
-     //      std::cout<<omega[i]<<"   -   ";
-     // std::cout<<std::endl;
-     //
-     // std::cout<<" --------------------Df_rDrho_i--------------"<<std::endl;
-     // Eigen::MatrixXd dfdrho = library->Get_Df_rDrho_i();
-     // std::cout<<dfdrho<<std::endl;
+     std::cout<<" --------------------OMEGA--------------"<<std::endl;
+
+     for (const auto & val:omega)
+          std::cout<<val<<"   -   ";
+     std::cout<<std::endl;
+
+     for (unsigned int i = 0; i< omega.size(); i++)
+          std::cout<<omega[i]<<"   -   ";
+     std::cout<<std::endl;
+
+     std::cout<<" --------------------Df_rDrho_i--------------"<<std::endl;
+     Eigen::MatrixXd dfdrho = library->Get_Df_rDrho_i();
+     std::cout<<dfdrho<<std::endl;
+
      if (config->GetKind_Turb_Model() == SST){
      std::cout<<" --------------------PaSR Constants--------------"<<std::endl;
      std::vector<double> k_PASR = library->Get_k_PASR();
@@ -1911,7 +1839,7 @@ void CSourceReactive::ComputeChemistry(su2double* val_residual, su2double** val_
       val_Jacobian_i[RHOE_INDEX_SOL][iVar] = 0.0;
     }
 
-    // //MANGOTURB
+    /*--- MANGOTURB: Auxialiary method to combine laminar reactive solver with turbulent one
     // /*--- Setting derivative of backward and forward rates w.r.t. Temperature ---*/
     library->Set_BackFor_Contr(dim_temp, dim_rho);
 

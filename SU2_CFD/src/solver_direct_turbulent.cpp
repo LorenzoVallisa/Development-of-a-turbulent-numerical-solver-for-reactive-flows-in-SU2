@@ -575,7 +575,7 @@ void CTurbSolver::Viscous_Residual(CGeometry *geometry, CSolver **solver_contain
 
     /*--- Compute residual, and Jacobians ---*/
 
-    //MANGOTURB
+    /*--- MANGOTURB: Comunication turbulent solver - mean flow NS solver  ---*/
     numerics->SetLaminarViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(),
                            solver_container[FLOW_SOL]->node[jPoint]->GetLaminarViscosity());
     numerics->SetEddyViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity(),
@@ -584,13 +584,6 @@ void CTurbSolver::Viscous_Residual(CGeometry *geometry, CSolver **solver_contain
 
 
     numerics->ComputeResidual(Residual, Jacobian_i, Jacobian_j, config);
-
-    // std::cout<<"///////////////////////////TURBOLENT-RESIDUAL////////////////////////////////////////////////////"<<std::endl;
-    //
-    // for (int i =0; i< nVar ; i++)
-    //   std::cout<<Residual[i]<<std::endl;
-    //
-    // std::cout<<"/////////////////////////////////////////////////////////////////////////////////////////////////"<<std::endl;
 
     /*--- Add and subtract residual, and update Jacobians ---*/
 
@@ -1008,7 +1001,8 @@ void CTurbSolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfig *
   bool dual_time = ((config->GetUnsteady_Simulation() == DT_STEPPING_1ST) ||
                     (config->GetUnsteady_Simulation() == DT_STEPPING_2ND));
   bool time_stepping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
-  //MANGOTURB
+
+  /*--- MANGOTURB: Restart variable needed to include species when spacing the parsing process ---*/
   bool reactive = (config->GetKind_Solver() == REACTIVE_RANS);
 
   string UnstExt, text_line;
@@ -1053,7 +1047,6 @@ void CTurbSolver::LoadRestart(CGeometry **geometry, CSolver ***solver, CConfig *
 
   unsigned short skipVars = 0;
 
-  //MANGOTURB
   if( reactive && compressible ){
 
     if(reactive){
@@ -2615,7 +2608,7 @@ CTurbSSTSolver::CTurbSSTSolver(CGeometry *geometry, CConfig *config, unsigned sh
   bool dual_time = ((config->GetUnsteady_Simulation() == DT_STEPPING_1ST) ||
                     (config->GetUnsteady_Simulation() == DT_STEPPING_2ND));
   bool time_stepping = (config->GetUnsteady_Simulation() == TIME_STEPPING);
-  //MANGOTURB
+
   bool reactive = (config->GetKind_Solver() == REACTIVE_RANS);
   unsigned short nSpecies = config->GetnSpecies();
 
@@ -2761,7 +2754,7 @@ CTurbSSTSolver::CTurbSSTSolver(CGeometry *geometry, CConfig *config, unsigned sh
   /*--- Eddy viscosity, initialized without stress limiter at the infinity ---*/
   muT_Inf = rhoInf*kine_Inf/omega_Inf;
 
-  //DEBUGTURBVAR
+  /*--- MANGOTURB: Debug structure 26 ---*/
 
   if(config->Get_debug_turbvar()){
 
@@ -2843,7 +2836,7 @@ CTurbSSTSolver::CTurbSSTSolver(CGeometry *geometry, CConfig *config, unsigned sh
 
         iPoint_Local = Global2Local[iPoint_Global];
 
-        //MANGOTURB
+        /*--- MANGOTURB: Retrieving full reactive solution ---*/
         if( reactive && compressible ){
 
           if(reactive){
@@ -2873,7 +2866,6 @@ CTurbSSTSolver::CTurbSSTSolver(CGeometry *geometry, CConfig *config, unsigned sh
           if (nDim == 3) point_line >> index >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> dull_val >> Solution[0] >> Solution[1];
         }
 
-        // std::cout<<" TKE - > "<<Solution[0]<<" Omega - > "<<Solution[1]<<std::endl;
 
         /*--- Instantiate the solution at this node, note that the muT_Inf should recomputed ---*/
         node[iPoint_Local] = new CTurbSSTVariable(Solution[0], Solution[1], muT_Inf, nDim, nVar, constants, config);
@@ -3006,6 +2998,7 @@ void CTurbSSTSolver::Postprocessing(CGeometry *geometry, CSolver **solver_contai
     muT = min(max(rho*kine*zeta,0.0),1.0);
     node[iPoint]->SetmuT(muT);
 
+    /*--- MANGOTURB: Debug structure 27 ---*/
     if(config->Get_debug_turbvar()){
 
     std::cout<<" --------------Postprocessing SST--------------- "<<std::endl;
@@ -3068,7 +3061,7 @@ void CTurbSSTSolver::Source_Residual(CGeometry *geometry, CSolver **solver_conta
     numerics->SetCrossDiff(node[iPoint]->GetCrossDiff(),0.0);
 
 
-    //MANGOTURB
+    /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
     numerics->SetLaminarViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(),
                            solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity());
     numerics->SetEddyViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity(),
@@ -3343,7 +3336,7 @@ void CTurbSSTSolver::BC_Inlet(CGeometry *geometry, CSolver **solver_container, C
       /*--- Menter's first blending function ---*/
       visc_numerics->SetF1blending(node[iPoint]->GetF1blending(), node[iPoint]->GetF1blending());
 
-      //MANGOTURB
+      /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
       visc_numerics->SetLaminarViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(),
                              solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity());
       visc_numerics->SetEddyViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity(),
@@ -3435,7 +3428,7 @@ void CTurbSSTSolver::BC_Outlet(CGeometry *geometry, CSolver **solver_container, 
       /*--- Menter's first blending function ---*/
       visc_numerics->SetF1blending(node[iPoint]->GetF1blending(), node[iPoint]->GetF1blending());
 
-      //MANGOTURB
+      /*--- MANGOTURB: Add-on to include turbulent part into reactive one ---*/
       visc_numerics->SetLaminarViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity(),
                              solver_container[FLOW_SOL]->node[iPoint]->GetLaminarViscosity());
       visc_numerics->SetEddyViscosity(solver_container[FLOW_SOL]->node[iPoint]->GetEddyViscosity(),

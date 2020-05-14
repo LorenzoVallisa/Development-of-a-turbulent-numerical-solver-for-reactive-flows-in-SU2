@@ -1,0 +1,10 @@
+//Number of species
+5
+//Species	Molar masses[g/mol]	 Formation enthalpies[kJ]  Diffusion Volume
+C4H6	    54.09044              110.887                   77.46
+H2O	      18.01528             -241.822                   13.10
+O2	      31.99880              0.0                       16.30
+CO	      28.0101              -110.53                    18.00
+CO2	      44.0095              -393.51                    26.90
+
+STOP

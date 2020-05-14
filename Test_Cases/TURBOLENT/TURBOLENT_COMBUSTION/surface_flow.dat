@@ -1,0 +1,3 @@
+TITLE = "Visualization of the surface solution"
+VARIABLES = "x""y""Conservative_1""Conservative_2""Conservative_3""Conservative_4""Conservative_5""Conservative_6""Conservative_7""Conservative_8""Conservative_9""Conservative_10""Conservative_11""Conservative_12""Conservative_13""Conservative_14""Conservative_15""Pressure""Temperature""Mach""Laminar_Viscosity""<greek>m</greek><sub>t</sub>"
+ZONE NODES= 0, ELEMENTS= 0, DATAPACKING=POINT, ZONETYPE=FELINESEG

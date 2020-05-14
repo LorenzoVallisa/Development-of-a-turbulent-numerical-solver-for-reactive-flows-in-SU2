@@ -10572,7 +10572,7 @@ void COutput::LoadLocalData_Flow(CConfig *config, CGeometry *geometry, CSolver *
    to avoid confusion with the serial version, which still prints these
    names. Names can be set alternatively by using the commented code
    below. ---*/
-  //MANGOTURB
+  /*---MANGOTURB: Turbulent add-on ---*/
   std::vector<std::string> readme{"rho","rhovx","rhovy","rhoE","C4H6","H20","O2","CO","CO2"};
   for (auto it:readme){
     Variable_Names.push_back(it);

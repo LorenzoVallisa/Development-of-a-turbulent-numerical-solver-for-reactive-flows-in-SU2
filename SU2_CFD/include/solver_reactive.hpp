@@ -71,7 +71,6 @@ protected:
                  P_INDEX_PRIM, RHO_INDEX_PRIM,
                  H_INDEX_PRIM, A_INDEX_PRIM,
                  RHOS_INDEX_PRIM;               /*!< \brief Mapping for position in primitives array. */
-  //MANGOTURB
   su2double Eddy_Viscosity;
 
   unsigned short RHO_INDEX_SOL, RHOVX_INDEX_SOL,
@@ -407,7 +406,6 @@ protected:
           Xs_j,       /*!< \brief Auxiliary vectors to store mole fractions at node j. */
           Xs;         /*!< \brief Auxiliary vector to store mole fractions. */
 
-  //MANGOTURB
   su2double Tke_Inf;
   su2double Prandtl_Turb;
   su2double StrainMag_Max,Omega_Max;
@@ -442,17 +440,32 @@ public:
    */
    void SetPrimitive_Gradient_GG(CGeometry* geometry, CConfig* config) override;
 
-   //MANGOTURB
+   /*--- MANGOTURB: Turbulent add-on ---*/
+   /*!
+    * \brief Destructor of the class.
+    */
    su2double GetTke_Inf(void) { return Tke_Inf; }
 
-   //MANGOTURB
+   /*--- MANGOTURB: Turbulent add-on ---*/
+   /*!
+    * \brief StrainMag_Max setter.
+    */
    void SetStrainMag_Max(su2double val_strainmag_max) { StrainMag_Max = val_strainmag_max; }
 
-   //MANGOTURB
+   /*--- MANGOTURB: Turbulent add-on ---*/
+   /*!
+    * \brief Omega_Max setter.
+    */
    void SetOmega_Max(su2double val_omega_max) { Omega_Max = val_omega_max; }
 
+   /*!
+ 	 * \brief StrainMag_Max getter.
+ 	 */
    inline su2double GetStrainMag_Max(void) { return StrainMag_Max; }
 
+   /*!
+ 	 * \brief Omega_Max getter.
+ 	 */
    inline su2double GetOmega_Max(void) { return Omega_Max; }
 
   /*!
