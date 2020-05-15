@@ -950,20 +950,20 @@ if(nDim == 2) {
 
     for( unsigned int jSpecies = 0; jSpecies < nSpecies; ++jSpecies){
 
-      /*--- MASS CLOSURE: Species-Species Term ---*/
-      dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
-      (iSpecies==jSpecies)*Mean_Eddy_Viscosity*Ys[iSpecies]/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
-
-      dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
-      (iSpecies==jSpecies)*Mean_Eddy_Viscosity*Ys[iSpecies]/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
+      /*--- MASS CLOSURE: Species-Species Term 2D, seems to give instability problem though, so eventually it is not used ---*/ 
+      // dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
+      // (iSpecies==jSpecies)*Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
+      //
+      // dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
+      // (iSpecies==jSpecies)*Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
 
     }
 
-    /*--- MASS CLOSURE: Energy - Species Term ---*/
-    dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*Ys[iSpecies]/rho_j*
+    /*--- MASS CLOSURE: Energy - Species Term 2D---*/
+    dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]/rho_j*
     theta/sqrt_dist_ij_2*Area;
 
-    dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*Ys[iSpecies]/rho_i*
+    dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]/rho_i*
     theta/sqrt_dist_ij_2*Area;
 
 }
@@ -1039,7 +1039,7 @@ if(nDim == 2) {
     for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
 
 
-      //SENSIBLE TERM
+      /*--- Sensible Term closure 3D---*/
       dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
       dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] -= Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
 
@@ -1048,17 +1048,17 @@ if(nDim == 2) {
 
 
 
-        /*--- MASS CLOSURE: Species-Species Term ---*/
+        /*--- MASS CLOSURE: Species-Species Term 3D---*/
         dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
-        Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
+        (iSpecies==jSpecies)*Mean_Eddy_Viscosity*Ys[iSpecies]/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
 
         dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
-        Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
+        (iSpecies==jSpecies)*Mean_Eddy_Viscosity*Ys[iSpecies]/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
 
 
       }
 
-      /*--- MASS CLOSURE: Eenrgy-Species Term ---*/
+      /*--- MASS CLOSURE: Eenrgy-Species Term 3D ---*/
       dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]/rho_j*
       theta/sqrt_dist_ij_2*Area;
 
