@@ -660,8 +660,8 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
 
     /*--- Reynolds stress tensor (Boussinesq approximation) ---*/
     unsigned short iDim,jDim,iSpecies,iVar;
-    su2double div_vel(0.0);
-    su2double rho(Mean_PrimVar[RHO_INDEX_PRIM]);
+    su2double div_vel= 0.0;
+    su2double rho = Mean_PrimVar[RHO_INDEX_PRIM];
     RealVec molar_masses = library->GetMolarMasses();
     su2double M_tot = std::accumulate(molar_masses.begin(),molar_masses.end(),0.0);
 
@@ -742,10 +742,13 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
     for( iDim = 0; iDim < nDim; ++iDim)
         Mean_Mass_Grads.col(iDim) = M_tilde.colPivHouseholderQr().solve(Mean_GradPrimVar.col(iDim).segment(RHOS_INDEX_AVGGRAD,nSpecies));
 
+        /*--- Setting tolerance out of linear system solution computation ---*/
         for (iSpecies = 0 ; iSpecies < nSpecies ; iSpecies++){
           for ( iDim = 0; iDim < nDim; ++iDim ){
-            if(Mean_Mass_Grads(iSpecies,iDim) < 1e-6)
-            Mean_Mass_Grads(iSpecies,iDim)=0.0;
+            if(((iSpecies!=0) & (iSpecies!=2))||((std::abs(Mean_GradPrimVar(RHOS_INDEX_AVGGRAD+iSpecies,iDim)))<1e-8))
+            {
+              Mean_Mass_Grads(iSpecies,iDim)=0.0;
+            }
           }
         }
 
@@ -795,15 +798,18 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
          Mean_Mass_Grads(iSpecies,iDim)* Normal[iDim];
        }
 
-       /*--- Fick's law partial densities closure --*/
+       // /*--- Fick's law partial densities closure --*/
        for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
          Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb) *
-                                       hs[iSpecies]*Mean_Mass_Grads(iSpecies,iDim);
+                                       hs[iSpecies]*Ys[iSpecies]*Mean_Mass_Grads(iSpecies,iDim);
        }
 
       /*--- Fick's law partial sensible enthalpies closure --*/
-      Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/Prandtl_Turb*(std::accumulate(Cps.cbegin(),Cps.cend(),0.0)/nSpecies)*
+      for( iSpecies = 0; iSpecies < nSpecies; ++iSpecies) {
+      Flux_Tensor[RHOE_INDEX_SOL][iDim] += Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*
                                          Mean_GradPrimVar(T_INDEX_AVGGRAD,iDim);
+      }
+
 
       /*--- Wilcox closure for turbolent ke and main stresses turbolent transport term --*/
       Flux_Tensor[RHOE_INDEX_SOL][iDim] += (Mean_Laminar_Viscosity + Mean_Eddy_Viscosity/sigma_k) * mean_tkegradvar(iDim);
@@ -937,7 +943,7 @@ if(nDim == 2) {
   dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] += pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
   dFdVj[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
   dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL] -= pix*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
-  dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] += piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
+  dFdVi[RHOE_INDEX_SOL][RHOVX_INDEX_SOL + 1] -= piy*Mean_Eddy_Viscosity/sqrt_dist_ij_2*Area;
 
   /*--- In the following MASS CLOSURE are the original turbulent closure, the one eventually used in the algorithm ---*/
 
@@ -947,23 +953,23 @@ if(nDim == 2) {
     dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
     dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] -= Mean_Eddy_Viscosity/Prandtl_Turb*Cps[iSpecies]*Ys[iSpecies]*theta/sqrt_dist_ij_2*Area;
 
-
-    for( unsigned int jSpecies = 0; jSpecies < nSpecies; ++jSpecies){
-
-      /*--- MASS CLOSURE: Species-Species Term 2D, seems to give instability problem though, so eventually it is not used ---*/ 
-      // dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
-      // (iSpecies==jSpecies)*Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
-      //
-      // dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
-      // (iSpecies==jSpecies)*Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
-
-    }
+    /*--- Creates instabilities when used in the initial combustion process where species are diffused thought the engine ---*/
+    // for( unsigned int jSpecies = 0; jSpecies < nSpecies; ++jSpecies){
+    //
+    //   /*--- MASS CLOSURE: Species-Species Term 2D, seems to give instability problem though, so eventually it is not used ---*/
+    //   dFdVj[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] +=
+    //   (iSpecies==jSpecies)*Mean_Eddy_Viscosity*Ys[iSpecies]/(Prandtl_Turb*Lewis_Turb)/rho_j*theta/sqrt_dist_ij_2*Area;
+    //
+    //   dFdVi[RHOS_INDEX_SOL + iSpecies][RHOS_INDEX_SOL +jSpecies] -=
+    //   (iSpecies==jSpecies)*Mean_Eddy_Viscosity*Ys[iSpecies]/(Prandtl_Turb*Lewis_Turb)/rho_i*theta/sqrt_dist_ij_2*Area;
+    //
+    // }
 
     /*--- MASS CLOSURE: Energy - Species Term 2D---*/
-    dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]/rho_j*
+    dFdVj[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*Ys[iSpecies]/rho_j*
     theta/sqrt_dist_ij_2*Area;
 
-    dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]/rho_i*
+    dFdVi[RHOE_INDEX_SOL][RHOS_INDEX_SOL +iSpecies] -= Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*hs[iSpecies]*Ys[iSpecies]/rho_i*
     theta/sqrt_dist_ij_2*Area;
 
 }
@@ -1076,8 +1082,8 @@ if(nDim == 2) {
   for (iSpecies = 0; iSpecies<nSpecies ; iSpecies ++){
       su2double aux_sum_1=std::inner_product(Mean_Mass_Grads.row(iSpecies).data(),
                                       Mean_Mass_Grads.row(iSpecies).data()+nDim,UnitNormal ,0.0);
-      dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*aux_sum_1*Area;
-      dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*aux_sum_1*Area;
+      dFdVj[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*Ys[iSpecies]*aux_sum_1*Area;
+      dFdVi[RHOE_INDEX_SOL][RHOE_INDEX_SOL] += Mean_Eddy_Viscosity/(Prandtl_Turb*Lewis_Turb)*Cps[iSpecies]*Ys[iSpecies]*aux_sum_1*Area;
   }
 
 

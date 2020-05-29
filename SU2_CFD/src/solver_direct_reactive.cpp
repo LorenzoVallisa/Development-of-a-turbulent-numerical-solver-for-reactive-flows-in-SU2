@@ -5506,8 +5506,16 @@ void CReactiveNSSolver::BC_Isothermal_Wall(CGeometry* geometry, CSolver** solver
           //
           // turb_closure *=(mu);
           //
-          turb_closure += eddy_v/Prandtl_Turb*(std::accumulate(aux_Cp.cbegin(),aux_Cp.cend(),0.0)/nSpecies)*
+          // turb_closure += eddy_v/Prandtl_Turb*(std::accumulate(aux_Cp.cbegin(),aux_Cp.cend(),0.0)/nSpecies)*
+          //                 (Twall - Tj)/dij;
+          //ALTERNATIVE
+          for( unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies){
+
+          su2double aux_ys = solver_container[FLOW_SOL]->node[iPoint]->GetSolution()[RHOS_INDEX_SOL+iSpecies];
+
+          turb_closure += eddy_v/Prandtl_Turb*aux_Cp[iSpecies]*aux_ys*
                           (Twall - Tj)/dij;
+          }
 
 
           for( unsigned short iSpecies = 0; iSpecies < nSpecies; ++iSpecies){
