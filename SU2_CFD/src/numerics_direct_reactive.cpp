@@ -745,7 +745,7 @@ void CAvgGradReactive_Boundary::SST_Reactive_ResidualClosure(const Vec& mean_tke
         /*--- Setting tolerance out of linear system solution computation ---*/
         for (iSpecies = 0 ; iSpecies < nSpecies ; iSpecies++){
           for ( iDim = 0; iDim < nDim; ++iDim ){
-            if(((iSpecies!=0) & (iSpecies!=2))||((std::abs(Mean_GradPrimVar(RHOS_INDEX_AVGGRAD+iSpecies,iDim)))<1e-8))
+            if((((iSpecies!=0) & (iSpecies!=2)) & (!(library->GetnReactions()))) || ((std::abs(Mean_GradPrimVar(RHOS_INDEX_AVGGRAD+iSpecies,iDim)))<1e-8))
             {
               Mean_Mass_Grads(iSpecies,iDim)=0.0;
             }
