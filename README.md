@@ -9,11 +9,11 @@ Please check that in the m4 folder the parmetis.m4, metis.m4, compiler.m4, codi.
 For installation please refer to the following stages:
   1. cd /path/to/SU2
   2. ./bootstrap
-  3. ./configure --prefix=/path/to/install/SU2 CXXFLAGS="-O3" LIBS="-lstdc++fs" --enable-mpi --with-cxx=/path/to/mpicxx --with-cc=/path/to/mpicc
+  3. ./configure --prefix=/path/to/install/SU2_Turbulent_Combustion CXXFLAGS="-O3" LIBS="-lstdc++fs" --enable-mpi --with-cxx=/path/to/mpicxx --with-cc=/path/to/mpicc
   4. make -j 8 install
 
- As it can be easily noticed it is required to know the location of the MPI compiler; in case it is not available also a simple build is possible substituting step 3 and 4 as it follows:\
-  3. ./configure --prefix=/path/to/install/SU2 CXXFLAGS="-O3" LIBS="-lstdc++fs"\
+ As it can be easily noticed it is required to know the location of the MPI compiler; in case it is not available also a simple build is possible (simulation will not be run in parallel though) substituting step 3 and 4 as it follows:\
+  3. ./configure --prefix=/path/to/install/SU2_Turbulent_Combustion CXXFLAGS="-O3" LIBS="-lstdc++fs"\
   4. make\
   5. make install
 
